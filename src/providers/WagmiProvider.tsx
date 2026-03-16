@@ -34,9 +34,9 @@ const config = getDefaultConfig({
     chains: [sei],
     transports: {
         [sei.id]: fallback([
-            http('https://eth.llamarpc.com'),
-            http('https://rpc.ankr.com/eth'),
-            http('https://ethereum-rpc.publicnode.com'),
+            http('https://base-rpc.publicnode.com'),
+            http('https://base.meowrpc.com'),
+            http('https://rpc.ankr.com/base'),
         ]),
     },
     ssr: false,

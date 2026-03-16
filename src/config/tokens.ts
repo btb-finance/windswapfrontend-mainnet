@@ -1,4 +1,4 @@
-// Token List for Wind Swap DEX on Ethereum Mainnet
+// Token List for Wind Swap DEX on Base
 
 export interface Token {
     address: string;
@@ -21,9 +21,9 @@ export const SEI: Token = {
 
 export const ETH = SEI;
 
-// Wrapped ETH
+// Wrapped ETH (Base canonical WETH)
 export const WSEI: Token = {
-    address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    address: '0x4200000000000000000000000000000000000006',
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
@@ -45,7 +45,7 @@ export const YAKA = WIND;
 
 // Stablecoins
 export const USDC: Token = {
-    address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
     symbol: 'USDC',
     name: 'USD Coin',
     decimals: 6,
@@ -53,7 +53,7 @@ export const USDC: Token = {
 };
 
 export const USDT: Token = {
-    address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
     symbol: 'USDT',
     name: 'Tether USD',
     decimals: 6,
@@ -61,7 +61,7 @@ export const USDT: Token = {
 };
 
 export const DAI: Token = {
-    address: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
     symbol: 'DAI',
     name: 'Dai Stablecoin',
     decimals: 18,
@@ -69,15 +69,15 @@ export const DAI: Token = {
 };
 
 export const WBTC: Token = {
-    address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
-    symbol: 'WBTC',
-    name: 'Wrapped BTC',
+    address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c',
+    symbol: 'cbBTC',
+    name: 'Coinbase Wrapped BTC',
     decimals: 8,
     logoURI: '/logo/wbtc.jpg',
 };
 
 export const LINK: Token = {
-    address: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+    address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196',
     symbol: 'LINK',
     name: 'ChainLink Token',
     decimals: 18,

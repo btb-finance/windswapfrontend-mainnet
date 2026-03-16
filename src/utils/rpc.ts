@@ -1,15 +1,15 @@
-// Centralized RPC configuration for Ethereum Mainnet
+// Centralized RPC configuration for Base
 
-const DEFAULT_RPC = 'https://ethereum-rpc.publicnode.com';
+const DEFAULT_RPC = 'https://base-rpc.publicnode.com';
 const FALLBACK_RPCS = [
-    'https://ethereum-rpc.publicnode.com',
-    'https://rpc.ankr.com/eth',
-    'https://eth.llamarpc.com',
-    'https://1rpc.io/eth',
+    'https://base-rpc.publicnode.com',
+    'https://base.meowrpc.com',
+    'https://rpc.ankr.com/base',
+    'https://1rpc.io/base',
 ];
 
 function getPrimaryRpc(): string {
-    return process.env.NEXT_PUBLIC_ETH_RPC_URL || DEFAULT_RPC;
+    return process.env.NEXT_PUBLIC_BASE_RPC_URL || DEFAULT_RPC;
 }
 
 export function getRpcForUserData(): string {

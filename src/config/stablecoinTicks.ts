@@ -12,17 +12,15 @@
  * - USDC/USDC.n pool (0x0aeb4016e61987c48F63e9e03Df79f0f0b54eb5c): tick = 0, spacing = 50
  */
 
-// Stablecoin token addresses (6 decimal stablecoins)
+// Stablecoin token addresses (6 decimal stablecoins) - Base
 export const STABLECOIN_ADDRESSES = [
-    '0xe15fC38F6D8c56aF07bbCBe3BAf5708A2Bf42392', // USDC
-    '0x9151434b16b9763660705744891fA906F660EcC5', // USDT0
-    '0x3894085Ef7Ff0f0aeDf52E2A2704928d1Ec074F1', // USDC.n (Noble)
+    '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC (Base native)
+    '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', // USDT (Base)
 ] as const;
 
-// Pegged asset addresses (other 1:1 pairs like wrapped BTC variants)
+// Pegged asset addresses (other 1:1 pairs like wrapped BTC variants) - Base
 export const PEGGED_ASSET_ADDRESSES = [
-    '0x9cC02b09f7dDB2F88f8d36f0EF57900c0f65ae25', // cbBTC (Coinbase Wrapped BTC)
-    '0xE53E4F58E765Dcb75a76B22D48D9d6eB552E7C7a', // WBTC
+    '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c', // cbBTC (Coinbase Wrapped BTC)
 ] as const;
 
 export const STABLECOIN_SYMBOLS = ['USDC', 'USDT', 'USDT0', 'USDC.n', 'DAI', 'FRAX', 'LUSD', 'USDS'] as const;

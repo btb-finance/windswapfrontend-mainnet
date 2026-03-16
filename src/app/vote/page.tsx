@@ -810,7 +810,7 @@ export default function VotePage() {
                         </svg>
                         Transaction submitted!
                     </div>
-                    <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline text-xs">
+                    <a href={`https://basescan.org/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline text-xs">
                         View on Etherscan
                     </a>
                 </div>

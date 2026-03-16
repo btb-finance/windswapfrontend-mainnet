@@ -120,7 +120,7 @@ export const BRIDGE_CHAINS = {
         name: 'Sei',
         rpcUrl: 'https://evm-rpc.sei-apis.com',
         hyperlaneMailbox: '0x2f2aFaE1139Ce54feFC03593FeE8AB2aDF4a85A7',
-        explorer: 'https://etherscan.io',
+        explorer: 'https://basescan.org',
         logoURI: '/logo/WSEI.png',
         nativeCurrency: 'SEI',
     },

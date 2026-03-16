@@ -1,4 +1,4 @@
-// Wind Swap Contract Addresses - Ethereum Mainnet
+// Wind Swap Contract Addresses - Base
 // All contracts deployed via CreateX CREATE3 with vanity addresses
 
 // ============================================
@@ -6,50 +6,50 @@
 // ============================================
 export const V2_CONTRACTS = {
     // Protocol Token (WIND)
-    WIND: '0x888809BfEF45Df38007b3DFfd24E1f5343EcDc7b',
-    YAKA: '0x888809BfEF45Df38007b3DFfd24E1f5343EcDc7b', // Legacy alias
+    WIND: '0x888859FEaAb4922DFBB9Add836172ec6f38caBb2',
+    YAKA: '0x888859FEaAb4922DFBB9Add836172ec6f38caBb2', // Legacy alias
 
     // Core Voting Escrow
-    VotingEscrow: '0x88885eA48B68CAEEBffF4Ee6c01b38af8FA62f71',
+    VotingEscrow: '0x88889e34e5Eb7a8F0f986DDce5f2711220A0c02F',
 
     // Router for V2 swaps and liquidity
-    Router: '0x8888af3f769aD60F6fECEB9664FA7adbBa2c3812',
+    Router: '0x88880576315176b632b0D7a4DD291d6b5e317692',
 
     // Voter for gauge voting
-    Voter: '0x88884cBF344EE63aC013625654Bbbb017502fDfe',
+    Voter: '0x888843352588d670F0e0c009Ec276d5F055aE9Ed',
 
     // Token minter
-    Minter: '0x8888259F6EdF107193e0f0dB67c2a914f03cB1CD',
+    Minter: '0x88882CEe351fA534C1b2DB2c72A6762F6c80c4BC',
 
     // V2 Pool Factory
-    PoolFactory: '0x8888E2e4380332c4E987eB99aA18355eD879b19B',
+    PoolFactory: '0x88881EF7Fd02FaC4C3321bb9f65Be887008290f0',
 
     // Pool implementation
-    Pool: '0x8888e0Ebb6AB33a3690B4205976A5cB4C924975E',
+    Pool: '0x8888f98b168dA48a0cb5C6Ba20A132Cf1149E579',
 
     // Rewards distributor for veNFT rebases
-    RewardsDistributor: '0x8888F24e41f31879a6a4E46E7a40Beb3EB980939',
+    RewardsDistributor: '0x88881105D16f242B791fE8D713C254D3992b2A6E',
 
     // Factory registry
-    FactoryRegistry: '0x8888Fdcb6b76bfA338a374702739335dAe05886D',
+    FactoryRegistry: '0x8888500b00C5f5eCCa7BbCD2fFB04619F6b8b4cc',
 
     // Gauge Factory
-    GaugeFactory: '0x88882A74463435C110724E6492d26dfb4C72AF08',
+    GaugeFactory: '0x8888fc8623ca00349e4f947Dd99330F3AF75a941',
 
     // Voting Rewards Factory
-    VotingRewardsFactory: '0x888863d71e9d42bc6326eA7A73FB790d3c09EBE6',
+    VotingRewardsFactory: '0x888834b351dfE9953Ddac7c427640B0Ff70Fc34D',
 
     // Managed Rewards Factory
-    ManagedRewardsFactory: '0x8888Ee5087912172451302cFa70180D21027f38D',
+    ManagedRewardsFactory: '0x888890188ea6473c0E31AB762140F49D4368B96D',
 
     // VeArt Proxy for NFT art
-    VeArtProxy: '0x8888c93968419a7a4cAAbb86016aB2E9774dd00e',
+    VeArtProxy: '0x8888232436766e1b6EEabC37ff7913ee3D90A455',
 
     // Airdrop Distributor
-    AirdropDistributor: '0x888865edcCcc3F43Eb82125Ce1AD7938F93ed48f',
+    AirdropDistributor: '0x88888EE2c6e04586a1DfE15e5e89eD1288149e68',
 
     // Forwarder
-    Forwarder: '0x8888cC4D6B6D1a83932a923A489016c8e2D6C284',
+    Forwarder: '0x888886dDfbb2aDa679c70F03907D1c789b991593',
 
     // StablecoinZap (stub)
     StablecoinZap: '0x0000000000000000000000000000000000000000',
@@ -63,39 +63,39 @@ export const V2_CONTRACTS = {
 // V2 Libraries
 // ============================================
 export const V2_LIBRARIES = {
-    PerlinNoise: '0x88888AC7d77f5cFe1ac7F9d7bc304e900ad9B60d',
-    Trig: '0x888859FEaAb4922DFBB9Add836172ec6f38caBb2',
-    BalanceLogicLibrary: '0x88881F00EeE69f1cD6B1a148C0474d467904cC1F',
-    DelegationLogicLibrary: '0x88881EF7Fd02FaC4C3321bb9f65Be887008290f0',
+    PerlinNoise: '0x8888C66B93A3217d19b625A7A8ccE528A268Dbed',
+    Trig: '0x88881F4e88922d05ad6E0b482F483398a921B4b7',
+    BalanceLogicLibrary: '0x888890Fa180cA82BfFe132dB159B8B94f3fC0edD',
+    DelegationLogicLibrary: '0x8888AeB5726d29A114829f86165dCE7bbBD6a636',
 } as const;
 
 // ============================================
 // Slipstream (Concentrated Liquidity) Contracts
 // ============================================
 export const CL_CONTRACTS = {
-    CLFactory: '0x8888fc8623ca00349e4f947Dd99330F3AF75a941',
-    CLPool: '0x8888Fc9Fb892352eD249D94F975663AaA042C214',
-    CLGaugeFactory: '0x888834b351dfE9953Ddac7c427640B0Ff70Fc34D',
-    CLGauge: '0x8888899B459Dc9E9Fb372E2b05D371dD45D47Ab6',
-    SwapRouter: '0x88881C1BC7A0c391C7dA3eD0c6bEa6231F1bAd97',
-    NonfungiblePositionManager: '0x888890188ea6473c0E31AB762140F49D4368B96D',
-    NonfungibleTokenPositionDescriptor: '0x88888A6DE67Bae32929b42A3062f5c665Dea4fb8',
-    QuoterV2: '0x88889e34e5Eb7a8F0f986DDce5f2711220A0c02F',
-    MixedRouteQuoterV1: '0x88883a730fEF2A26707E79f4a9fB0D3c821D866a',
-    SugarHelper: '0x8888232436766e1b6EEabC37ff7913ee3D90A455',
-    CustomSwapFeeModule: '0x8888d548Aa52c0b15F2eb3A20e751BF1A20eBa6B',
-    CustomUnstakedFeeModule: '0x8888500b00C5f5eCCa7BbCD2fFB04619F6b8b4cc',
-    NFTDescriptor: '0x88881105D16f242B791fE8D713C254D3992b2A6E',
-    NFTSVG: '0x8888C087d091b46646523Cae173f14C1BB5e7ECd',
+    CLFactory: '0x88888493d3e3a133cB80da23610f23a6D563D083',
+    CLPool: '0x8888001A78925a533ebd01efFdF5538B75D95D07',
+    CLGaugeFactory: '0x888898D1d00867F2FEe511A30Fa56913F8e88728',
+    CLGauge: '0x8888bb5ef5428eB7c3Bb71663E630a9f696fDBE0',
+    SwapRouter: '0x8888bf918c9c97cAD175a3A2037451f471a479E6',
+    NonfungiblePositionManager: '0x8888ef0BbF7aF08bBbaca8d6596F8Df18C78AE19',
+    NonfungibleTokenPositionDescriptor: '0x8888F243B25dA58f97Ffb885872Dc4D369903408',
+    QuoterV2: '0x8888eda381972e924F9331413a3BF84215e34A83',
+    MixedRouteQuoterV1: '0x88888a4a1e5c54A21A875BD5676bEc211D902dba',
+    SugarHelper: '0x88887E0C9819719897050228F181e992f7a07bd9',
+    CustomSwapFeeModule: '0x8888C00889B0Fff1A8D41f29F2F999AF2413fe83',
+    CustomUnstakedFeeModule: '0x88888Ff05C141C690319ED7B12D555ec97565389',
+    NFTDescriptor: '0x88886Ea0791846EcC1f97121755319A86042Cdc0',
+    NFTSVG: '0x888854d60a7CCE9e1aA18B3F1a702B37B06A33C9',
 } as const;
 
 // ============================================
 // Common Addresses
 // ============================================
 export const COMMON = {
-    // Wrapped ETH (canonical WETH on Ethereum mainnet)
-    WSEI: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-    WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    // Wrapped ETH (canonical WETH on Base)
+    WSEI: '0x4200000000000000000000000000000000000006',
+    WETH: '0x4200000000000000000000000000000000000006',
 
     ZERO_ADDRESS: '0x0000000000000000000000000000000000000000',
 } as const;
@@ -103,7 +103,7 @@ export const COMMON = {
 // ============================================
 // All Contracts Combined (for easy access)
 // ============================================
-// Notable pools (empty on ETH mainnet for now)
+// Notable pools (empty on Base for now)
 export const NOTABLE_POOLS = {} as const;
 export const NOTABLE_GAUGES = {} as const;
 

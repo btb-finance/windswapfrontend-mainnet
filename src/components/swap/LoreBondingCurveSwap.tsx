@@ -256,7 +256,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             {txHash && (
                 <div className="mb-3 p-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-xs">
                     Success!{' '}
-                    <a href={`https://etherscan.io/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline">
+                    <a href={`https://basescan.org/tx/${txHash}`} target="_blank" rel="noopener noreferrer" className="underline">
                         View →
                     </a>
                 </div>
