@@ -87,6 +87,7 @@ export const CL_CONTRACTS = {
     CustomUnstakedFeeModule: '0x88888Ff05C141C690319ED7B12D555ec97565389',
     NFTDescriptor: '0x88886Ea0791846EcC1f97121755319A86042Cdc0',
     NFTSVG: '0x888854d60a7CCE9e1aA18B3F1a702B37B06A33C9',
+    TickLens: '0x888865Bae438E0E194b9a2d774140290776B48Dd',
 } as const;
 
 // ============================================

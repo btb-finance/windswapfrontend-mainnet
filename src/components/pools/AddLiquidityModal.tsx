@@ -27,6 +27,8 @@ import {
     MAX_TICK,
     MIN_TICK
 } from '@/utils/liquidityMath';
+import { useTickLensData } from '@/hooks/useTickLensData';
+import { LiquidityDepthChart } from '@/components/pools/LiquidityDepthChart';
 
 // Smart price formatter for displaying very small or large prices
 function formatSmartPrice(price: number): string {
@@ -346,6 +348,22 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     // - if A is token1 and range is below: deposit A (token1), B should be 0
     const depositTokenAForOneSided = (isRangeAboveCurrent && isAToken0) || (isRangeBelowCurrent && !isAToken0);
     const depositTokenBForOneSided = (isRangeAboveCurrent && !isAToken0) || (isRangeBelowCurrent && isAToken0);
+
+    // Compute current tick for TickLens
+    const currentTickForLens = (() => {
+        if (!clPoolPrice || !actualTokenA || !actualTokenB) return null;
+        const t0Dec = isAToken0 ? (actualTokenA.decimals) : (actualTokenB.decimals);
+        const t1Dec = isAToken0 ? (actualTokenB.decimals) : (actualTokenA.decimals);
+        const poolPrice = isAToken0 ? clPoolPrice : 1 / clPoolPrice;
+        const adjusted = poolPrice * Math.pow(10, t1Dec - t0Dec);
+        return Math.round(Math.log(adjusted) / Math.log(1.0001));
+    })();
+
+    const { bars: tickLensBars, loading: tickLensLoading } = useTickLensData(
+        clPoolAddress,
+        tickSpacing,
+        currentTickForLens,
+    );
 
     // Auto-calculate the paired token amount for CL using ON-CHAIN SugarHelper contract.
     // Supports BOTH directions:
@@ -1676,6 +1694,18 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                     </div>
                                                 </div>
 
+                                                {/* Liquidity Depth Chart */}
+                                                <LiquidityDepthChart
+                                                    bars={tickLensBars}
+                                                    loading={tickLensLoading}
+                                                    currentTick={currentTickForLens}
+                                                    tickSpacing={tickSpacing}
+                                                    token0Decimals={isAToken0 ? (actualTokenA?.decimals || 18) : (actualTokenB?.decimals || 18)}
+                                                    token1Decimals={isAToken0 ? (actualTokenB?.decimals || 18) : (actualTokenA?.decimals || 18)}
+                                                    isToken0Base={isAToken0}
+                                                    priceLower={priceLower ? parseFloat(priceLower) : undefined}
+                                                    priceUpper={priceUpper ? parseFloat(priceUpper) : undefined}
+                                                />
 
                                                 {/* Draggable Range Slider */}
                                                 <div className="relative h-10 mb-4">

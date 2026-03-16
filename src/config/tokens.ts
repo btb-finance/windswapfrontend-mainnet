@@ -15,7 +15,7 @@ export const SEI: Token = {
     symbol: 'ETH',
     name: 'Ethereum',
     decimals: 18,
-    logoURI: '/logo/eth.png',
+    logoURI: '/logo/eth.svg',
     isNative: true,
 };
 
@@ -27,14 +27,14 @@ export const WSEI: Token = {
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
-    logoURI: '/logo/eth.png',
+    logoURI: '/logo/eth.svg',
 };
 
 export const WETH = WSEI;
 
 // WIND Protocol Token
 export const WIND: Token = {
-    address: '0x888809BfEF45Df38007b3DFfd24E1f5343EcDc7b',
+    address: '0x888859FEaAb4922DFBB9Add836172ec6f38caBb2',
     symbol: 'WIND',
     name: 'Wind Swap',
     decimals: 18,
@@ -52,39 +52,11 @@ export const USDC: Token = {
     logoURI: '/logo/USDCoin.svg',
 };
 
-export const USDT: Token = {
-    address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
-    symbol: 'USDT',
-    name: 'Tether USD',
-    decimals: 6,
-    logoURI: '/logo/usdt0.png',
-};
-
-export const DAI: Token = {
-    address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
-    symbol: 'DAI',
-    name: 'Dai Stablecoin',
-    decimals: 18,
-    logoURI: '/logo/dai.png',
-};
-
-export const WBTC: Token = {
-    address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c',
-    symbol: 'cbBTC',
-    name: 'Coinbase Wrapped BTC',
-    decimals: 8,
-    logoURI: '/logo/wbtc.jpg',
-};
-
-export const LINK: Token = {
-    address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196',
-    symbol: 'LINK',
-    name: 'ChainLink Token',
-    decimals: 18,
-    logoURI: '/logo/chainlink_ofc_32.svg',
-};
-
-// Aliases for code compatibility
+// Keep exports for code compatibility (referenced elsewhere)
+export const USDT: Token = { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: '/logo/usdt0.png' };
+export const DAI: Token = { address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 };
+export const WBTC: Token = { address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c', symbol: 'cbBTC', name: 'Coinbase Wrapped BTC', decimals: 8 };
+export const LINK: Token = { address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196', symbol: 'LINK', name: 'ChainLink Token', decimals: 18 };
 export const USDT0 = USDT;
 export const USDCN = USDC;
 export const cbBTC = WBTC;
@@ -106,16 +78,12 @@ export const LARRY: Token = { address: '0x00000000000000000000000000000000000000
 export const WILSON: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'WILSON', name: 'WILSON', decimals: 6 };
 export const LORE: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LORE', name: 'LORE', decimals: 18 };
 
-// Default token list
+// Default token list - only core tokens
 export const DEFAULT_TOKEN_LIST: Token[] = [
     SEI,
     WSEI,
     WIND,
     USDC,
-    USDT,
-    DAI,
-    WBTC,
-    LINK,
 ];
 
 // Token addresses for quick lookup
