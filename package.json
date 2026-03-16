@@ -29,6 +29,9 @@
     "viem": "^2.46.2",
     "wagmi": "^3.5.0"
   },
+  "overrides": {
+    "lru-cache": "11.2.6"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "25.3.0",
