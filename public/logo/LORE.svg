@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- Outer ring gradient: deep purple → gold -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#7c3aed"/>
+      <stop offset="50%"  stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+
+    <!-- Background circle gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="35%" r="65%">
+      <stop offset="0%"   stop-color="#1e1035"/>
+      <stop offset="100%" stop-color="#0d0820"/>
+    </radialGradient>
+
+    <!-- Inner gem gradient -->
+    <linearGradient id="gemTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="gemLeft" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#92400e"/>
+    </linearGradient>
+    <linearGradient id="gemRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Subtle shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="97" fill="url(#bgGrad)"/>
+
+  <!-- Outer ring (stroke only, thick) -->
+  <circle cx="100" cy="100" r="92" fill="none" stroke="url(#ringGrad)" stroke-width="6"/>
+
+  <!-- Decorative tick marks on ring -->
+  <g stroke="url(#ringGrad)" stroke-width="2.5" opacity="0.7">
+    <!-- top -->
+    <line x1="100" y1="8"  x2="100" y2="20"/>
+    <!-- bottom -->
+    <line x1="100" y1="180" x2="100" y2="192"/>
+    <!-- left -->
+    <line x1="8"   y1="100" x2="20"  y2="100"/>
+    <!-- right -->
+    <line x1="180" y1="100" x2="192" y2="100"/>
+    <!-- diagonals -->
+    <line x1="27"  y1="27"  x2="35"  y2="35"/>
+    <line x1="173" y1="27"  x2="165" y2="35"/>
+    <line x1="27"  y1="173" x2="35"  y2="165"/>
+    <line x1="173" y1="173" x2="165" y2="165"/>
+  </g>
+
+  <!-- ── Pickaxe icon centred ── -->
+  <!-- Pickaxe is drawn as a stylised gem/crystal + handle shape -->
+  <!-- Crystal gem: hexagonal faceted diamond -->
+  <g filter="url(#glow)" transform="translate(100,92)">
+    <!-- Top facet -->
+    <polygon points="0,-34  22,-12  -22,-12" fill="url(#gemTop)" opacity="0.95"/>
+    <!-- Left facet -->
+    <polygon points="-22,-12  0,-34  0,28" fill="url(#gemLeft)" opacity="0.9"/>
+    <!-- Right facet -->
+    <polygon points="22,-12   0,-34  0,28" fill="url(#gemRight)" opacity="0.95"/>
+    <!-- Bottom left -->
+    <polygon points="-22,-12  0,28  -10,8" fill="#92400e" opacity="0.6"/>
+    <!-- Bottom right -->
+    <polygon points="22,-12   0,28  10,8"  fill="#b45309" opacity="0.5"/>
+    <!-- Center highlight line -->
+    <line x1="0" y1="-34" x2="0" y2="28" stroke="#fef3c7" stroke-width="1" opacity="0.3"/>
+  </g>
+
+  <!-- Shine / sparkle top-left of gem -->
+  <g transform="translate(82,58)" opacity="0.8">
+    <line x1="0" y1="-6" x2="0" y2="6"  stroke="#fde68a" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="-6" y1="0" x2="6" y2="0"  stroke="#fde68a" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(125,55)" opacity="0.5">
+    <line x1="0" y1="-4" x2="0" y2="4"  stroke="#fde68a" stroke-width="1" stroke-linecap="round"/>
+    <line x1="-4" y1="0" x2="4" y2="0"  stroke="#fde68a" stroke-width="1" stroke-linecap="round"/>
+  </g>
+
+  <!-- "LORE" wordmark at bottom -->
+  <text
+    x="100" y="158"
+    text-anchor="middle"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="26"
+    letter-spacing="5"
+    fill="url(#ringGrad)"
+    filter="url(#shadow)"
+  >LORE</text>
+</svg>

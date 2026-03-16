@@ -1,0 +1,45 @@
+{
+  "name": "windswap",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun --bun next dev",
+    "build": "next build",
+    "analyze": "next experimental-analyze",
+    "start": "bun --bun next start",
+    "lint": "eslint",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@base-org/account": "^2.5.2",
+    "@coinbase/wallet-sdk": "^4.3.7",
+    "@gemini-wallet/core": "^0.3.2",
+    "@metamask/sdk": "^0.34.0",
+    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@safe-global/safe-apps-provider": "^0.18.6",
+    "@safe-global/safe-apps-sdk": "^9.1.0",
+    "@tanstack/react-query": "^5.90.21",
+    "@walletconnect/ethereum-provider": "^2.23.6",
+    "framer-motion": "^12.34.3",
+    "next": "16.1.6",
+    "porto": "^0.2.37",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "viem": "^2.46.2",
+    "wagmi": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.0",
+    "@types/node": "25.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript/native-preview": "^7.0.0-dev.20260220.1",
+    "babel-plugin-react-compiler": "1.0.0",
+    "eslint": "^10.0.0",
+    "eslint-config-next": "16.1.6",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "tailwindcss": "^4.2.0",
+    "typescript": "^5.9.3"
+  }
+}
