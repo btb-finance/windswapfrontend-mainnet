@@ -56,15 +56,12 @@ const WindIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-// Nav items - 6 items with Portfolio elevated in center
+// Nav items - 4 core items with Portfolio elevated in center
 const navItems = [
     { href: '/swap', label: 'Swap', Icon: SwapIcon },
     { href: '/pools', label: 'Pools', Icon: PoolsIcon },
     { href: '/portfolio', label: 'Portfolio', Icon: PortfolioIcon, isMain: true },
-    { href: '/wind', label: 'Curve', Icon: WindIcon },
     { href: '/vote', label: 'Vote', Icon: VoteIcon },
-    { href: '/btb', label: 'BTB', Icon: BTBIcon },
-    { href: '/mining', label: 'Mining', Icon: MiningIcon },
 ];
 
 /**

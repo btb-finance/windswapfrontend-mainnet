@@ -15,7 +15,7 @@ import { useToast } from '@/providers/ToastProvider';
 export const toastErrors = {
   // Wallet errors
   walletNotConnected: 'Please connect your wallet first',
-  wrongNetwork: 'Please switch to Sei Network',
+  wrongNetwork: 'Please switch to Base',
   
   // Balance errors
   insufficientBalance: 'Insufficient balance for this transaction',
