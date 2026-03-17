@@ -79,7 +79,7 @@ interface UseSubgraphResult {
 // GraphQL query for pools
 const POOLS_QUERY = `
     query GetPools($first: Int!, $skip: Int!, $orderBy: String!, $orderDirection: String!) {
-        pools(first: $first, skip: $skip, orderBy: $orderBy, orderDirection: $orderDirection) {
+        pools(first: $first, skip: $skip, orderBy: $orderBy, orderDirection: $orderDirection, where: { tickSpacing_not: 2000 }) {
             id
             token0 {
                 id

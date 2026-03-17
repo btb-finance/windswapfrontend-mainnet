@@ -33,6 +33,7 @@
     "lru-cache": "11.2.6"
   },
   "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.9",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "25.3.0",
     "@types/react": "^19.2.14",

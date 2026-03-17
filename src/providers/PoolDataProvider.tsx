@@ -56,7 +56,7 @@ async function fetchPoolsFromSubgraph(): Promise<{
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query: `{
-                    pools(first: 100, orderBy: totalValueLockedUSD, orderDirection: desc) {
+                    pools(first: 100, orderBy: totalValueLockedUSD, orderDirection: desc, where: { tickSpacing_not: 2000 }) {
                         id
                         token0 { id symbol decimals }
                         token1 { id symbol decimals }
@@ -677,9 +677,9 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                     epochCount
                     activePeriod
                 }
-                gauges(first: 1000, where: { isActive: true }) {
+                gauges(first: 1000, where: { isActive: true, pool_: { tickSpacing_not: 2000 } }) {
                     id
-                    pool { id token0 { id symbol decimals } token1 { id symbol decimals } }
+                    pool { id token0 { id symbol decimals } token1 { id symbol decimals } tickSpacing }
                     gaugeType
                     weight
                     rewardRate
