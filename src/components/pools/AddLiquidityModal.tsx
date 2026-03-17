@@ -99,7 +99,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const [txHash, setTxHash] = useState<string | null>(null);
 
     // CL specific state
-    const [tickSpacing, setTickSpacing] = useState(initialPool?.tickSpacing || 200);
+    const [tickSpacing, setTickSpacing] = useState(initialPool?.tickSpacing || 2);
     const [priceLower, setPriceLower] = useState('');
     const [priceUpper, setPriceUpper] = useState('');
     const [clPoolPrice, setClPoolPrice] = useState<number | null>(null);
@@ -1264,7 +1264,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 </div>
                                                 <span className="font-semibold text-xs truncate">{tokenA?.symbol}/{tokenB?.symbol}</span>
                                                 <span className="text-[10px] text-gray-400 flex-shrink-0">
-                                                    {poolType === 'cl' ? ({ 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' }[tickSpacing] || `${tickSpacing}ts`) : (stable ? 'S' : 'V')}
+                                                    {poolType === 'cl' ? ({ 1: '0.005%', 2: '1%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' }[tickSpacing] || `${tickSpacing}ts`) : (stable ? 'S' : 'V')}
                                                 </span>
                                             </div>
                                             {poolType === 'cl' && clPoolPrice && (
@@ -1462,7 +1462,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 { spacing: 50, fee: '0.02%', best: 'Correlated' },
                                                 { spacing: 100, fee: '0.045%', best: 'Standard' },
                                                 { spacing: 200, fee: '0.25%', best: 'Medium' },
-                                                { spacing: 2000, fee: '1%', best: 'Exotic' },
+                                                { spacing: 2, fee: '1%', best: 'Exotic' },
                                             ].map(({ spacing, fee, best }) => (
                                                 <button
                                                     key={spacing}
@@ -1571,11 +1571,13 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 const belowToken = isAToken0 ? tokenB : tokenA; // token1
 
                                                 // Determine range based on tick spacing
-                                                // Stable pairs (tick 1, 50) = tight range (0.5%) - very little movement
-                                                // Standard pairs (tick 100, 200) = medium range (5%) - some movement  
-                                                // Exotic pairs (tick 2000) = wide range (10%) - high volatility
-                                                const rangePercent = tickSpacing <= 50 ? 0.005 : tickSpacing <= 200 ? 0.05 : 0.10;
-                                                const rangeLabel = tickSpacing <= 50 ? '±0.5%' : tickSpacing <= 200 ? '±5%' : '±10%';
+                                                // Stable pairs (tick 1) = tight range (0.5%) - very little movement
+                                                // Exotic pairs (tick 2) = wide range (10%) - high volatility with tight LP ranges
+                                                // Correlated pairs (tick 50) = tight range (0.5%)
+                                                // Standard pairs (tick 100, 200) = medium range (5%) - some movement
+                                                // Legacy exotic (tick 2000) = wide range (10%)
+                                                const rangePercent = tickSpacing === 1 ? 0.005 : tickSpacing === 2 ? 0.10 : tickSpacing <= 50 ? 0.005 : tickSpacing <= 200 ? 0.05 : 0.10;
+                                                const rangeLabel = tickSpacing === 1 ? '±0.5%' : tickSpacing === 2 ? '±10%' : tickSpacing <= 50 ? '±0.5%' : tickSpacing <= 200 ? '±5%' : '±10%';
 
                                                 return (
                                                     <div className="mt-3">
