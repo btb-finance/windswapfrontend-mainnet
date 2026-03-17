@@ -5,7 +5,7 @@
 
 // Goldsky GraphQL endpoint for WindSwap protocol data
 export const SUBGRAPH_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL || 
-  'https://api.goldsky.com/api/public/project_cmjlh2t5mylhg01tm7t545rgk/subgraphs/windswap-base/1.0.0/gn';
+  'https://api.goldsky.com/api/public/project_cmjlh2t5mylhg01tm7t545rgk/subgraphs/windswap-base/1.0.1/gn';
 
 /**
  * Helper to read subgraph JSON response with error handling
