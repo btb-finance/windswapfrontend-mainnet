@@ -16,7 +16,7 @@ interface Props {
     priceUpper?: number;
 }
 
-const BAR_COUNT = 60;
+const BAR_COUNT = 30;
 
 export function LiquidityDepthChart({
     bars,
@@ -32,19 +32,30 @@ export function LiquidityDepthChart({
     const chartData = useMemo(() => {
         if (!bars.length || currentTick === null) return null;
 
-        // Determine visible range: ±30 tick spacings * tickSpacing around current tick,
-        // or wider if there's data beyond
-        const halfRange = BAR_COUNT / 2 * tickSpacing;
+        // Find the range where liquidity exists to determine zoom level
+        const activeBars = bars.filter(b => b.liquidity > BigInt(0));
+        let halfRange: number;
+
+        if (activeBars.length > 0) {
+            const minTick = Math.min(...activeBars.map(b => b.tick));
+            const maxTick = Math.max(...activeBars.map(b => b.tickUpper));
+            // Half range = max distance from current tick to any liquidity, with padding
+            const distLow = Math.abs(currentTick - minTick);
+            const distHigh = Math.abs(maxTick - currentTick);
+            halfRange = Math.max(distLow, distHigh, tickSpacing * 10) * 1.5;
+        } else {
+            halfRange = BAR_COUNT / 2 * tickSpacing;
+        }
+
+        // Always center on current tick
         const viewMin = currentTick - halfRange;
         const viewMax = currentTick + halfRange;
 
-        // Bucket bars into uniform chart bars
-        const bucketSize = tickSpacing;
+        const totalRange = viewMax - viewMin;
+        const bucketSize = Math.max(tickSpacing, Math.floor(totalRange / BAR_COUNT / tickSpacing) * tickSpacing || tickSpacing);
         const buckets: { tick: number; liquidity: bigint }[] = [];
 
         for (let t = viewMin; t < viewMax; t += bucketSize) {
-            // Find the liquidity active at tick t
-            // This is the last bar where bar.tick <= t
             let liq = BigInt(0);
             for (let i = bars.length - 1; i >= 0; i--) {
                 if (bars[i].tick <= t) {
@@ -57,7 +68,6 @@ export function LiquidityDepthChart({
 
         if (buckets.length === 0) return null;
 
-        // Find max liquidity for normalization
         let maxLiq = BigInt(0);
         for (const b of buckets) {
             if (b.liquidity > maxLiq) maxLiq = b.liquidity;
@@ -108,7 +118,7 @@ export function LiquidityDepthChart({
                     {tickToPrice(currentTick, token0Decimals, token1Decimals, isToken0Base).toPrecision(5)} current
                 </span>
             </div>
-            <div className="flex items-end gap-px h-20 relative">
+            <div className="flex items-end gap-1 h-40 relative px-1">
                 {buckets.map((b, i) => {
                     const height = maxLiq > BigInt(0)
                         ? Number((b.liquidity * BigInt(100)) / maxLiq)
@@ -134,10 +144,10 @@ export function LiquidityDepthChart({
                             title={`Tick ${b.tick}`}
                         >
                             <div
-                                className={`w-full rounded-t-sm ${barColor} transition-colors`}
+                                className={`w-full rounded-t ${barColor} transition-colors`}
                                 style={{
-                                    height: `${Math.max(height, 1)}%`,
-                                    minHeight: height > 0 ? '2px' : '1px',
+                                    height: `${Math.max(height, 2)}%`,
+                                    minHeight: height > 0 ? '6px' : '2px',
                                 }}
                             />
                         </div>

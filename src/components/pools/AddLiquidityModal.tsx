@@ -980,10 +980,10 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
         const poolPrice = isAToken0 ? price : 1 / price;
         const adjustedPrice = poolPrice * Math.pow(10, t1Dec - t0Dec);
         const rawTick = Math.log(adjustedPrice) / Math.log(1.0001);
-        const currentTick = Math.round(rawTick);
+        const alignedTick = Math.round(rawTick / tickSpacing) * tickSpacing;
         // Invert tick direction when pool ordering is opposite to UI ordering
         const tickDir = isAToken0 ? direction : -direction as 1 | -1;
-        const newTick = currentTick + tickDir;
+        const newTick = alignedTick + tickDir * tickSpacing;
         return tickToPrice(newTick, t0Dec, t1Dec, isAToken0);
     };
 
@@ -1576,8 +1576,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 // Correlated pairs (tick 50) = tight range (0.5%)
                                                 // Standard pairs (tick 100, 200) = medium range (5%) - some movement
                                                 // Legacy exotic (tick 2000) = wide range (10%)
-                                                const rangePercent = tickSpacing === 1 ? 0.005 : tickSpacing === 2 ? 0.10 : tickSpacing <= 50 ? 0.005 : tickSpacing <= 200 ? 0.05 : 0.10;
-                                                const rangeLabel = tickSpacing === 1 ? '±0.5%' : tickSpacing === 2 ? '±10%' : tickSpacing <= 50 ? '±0.5%' : tickSpacing <= 200 ? '±5%' : '±10%';
+                                                const rangePercent = tickSpacing === 1 ? 0.005 : tickSpacing === 2 ? 0.01 : tickSpacing <= 50 ? 0.005 : tickSpacing <= 200 ? 0.05 : 0.10;
+                                                const rangeLabel = tickSpacing === 1 ? '±0.5%' : tickSpacing === 2 ? '±1%' : tickSpacing <= 50 ? '±0.5%' : tickSpacing <= 200 ? '±5%' : '±10%';
 
                                                 return (
                                                     <div className="mt-3">
@@ -1587,14 +1587,16 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <button
                                                                 onClick={() => {
-                                                                    // Set range ABOVE current price - only deposit token0
-                                                                    // Use larger buffer (1% minimum) to ensure tick is truly above current
-                                                                    const minBuffer = Math.max(rangePercent * 0.2, 0.01); // At least 1% buffer
-                                                                    const lower = currentPrice * (1 + minBuffer);
-                                                                    const upper = currentPrice * (1 + rangePercent + minBuffer);
-                                                                    setPriceLower(lower.toFixed(6));
-                                                                    setPriceUpper(upper.toFixed(6));
-                                                                    // Clear amounts - Above means deposit token0 (aboveToken)
+                                                                    if (currentTickForLens == null || !actualTokenA || !actualTokenB) return;
+                                                                    const t0Dec = isAToken0 ? actualTokenA.decimals : actualTokenB.decimals;
+                                                                    const t1Dec = isAToken0 ? actualTokenB.decimals : actualTokenA.decimals;
+                                                                    // Align current tick to tickSpacing grid
+                                                                    const alignedTick = Math.floor(currentTickForLens / tickSpacing) * tickSpacing;
+                                                                    // Place range from current tick to 100 ticks above
+                                                                    const lowerTick = alignedTick + tickSpacing;
+                                                                    const upperTick = alignedTick + tickSpacing * 100;
+                                                                    setPriceLower(tickToPrice(lowerTick, t0Dec, t1Dec, isAToken0).toFixed(8));
+                                                                    setPriceUpper(tickToPrice(upperTick, t0Dec, t1Dec, isAToken0).toFixed(8));
                                                                     if (isAToken0) {
                                                                         setAmountA('');
                                                                         setAmountB('0');
@@ -1610,14 +1612,16 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                             </button>
                                                             <button
                                                                 onClick={() => {
-                                                                    // Set range BELOW current price - only deposit token1
-                                                                    // Use larger buffer (1% minimum) to ensure tick is truly below current
-                                                                    const minBuffer = Math.max(rangePercent * 0.2, 0.01); // At least 1% buffer
-                                                                    const lower = currentPrice * (1 - rangePercent - minBuffer);
-                                                                    const upper = currentPrice * (1 - minBuffer);
-                                                                    setPriceLower(lower.toFixed(6));
-                                                                    setPriceUpper(upper.toFixed(6));
-                                                                    // Clear amounts - Below means deposit token1 (belowToken)
+                                                                    if (currentTickForLens == null || !actualTokenA || !actualTokenB) return;
+                                                                    const t0Dec = isAToken0 ? actualTokenA.decimals : actualTokenB.decimals;
+                                                                    const t1Dec = isAToken0 ? actualTokenB.decimals : actualTokenA.decimals;
+                                                                    // Align current tick to tickSpacing grid
+                                                                    const alignedTick = Math.floor(currentTickForLens / tickSpacing) * tickSpacing;
+                                                                    // Place range from 100 ticks below to current tick
+                                                                    const lowerTick = alignedTick - tickSpacing * 100;
+                                                                    const upperTick = alignedTick;
+                                                                    setPriceLower(tickToPrice(lowerTick, t0Dec, t1Dec, isAToken0).toFixed(8));
+                                                                    setPriceUpper(tickToPrice(upperTick, t0Dec, t1Dec, isAToken0).toFixed(8));
                                                                     if (isAToken0) {
                                                                         setAmountA('0');
                                                                         setAmountB('');
