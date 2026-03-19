@@ -1662,22 +1662,25 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                             const pool = allPools.find(p => p.address.toLowerCase() === clPoolAddress.toLowerCase());
                                                             const tvlUsd = pool ? (parseFloat(pool.tvl) || 1) : 1;
 
-                                                            // Get base pool APR (without range adjustment)
+                                                            // Get base pool APR (full-range, no concentration)
                                                             const poolAPR = calculatePoolAPR(rewardRate, windPrice, tvlUsd, undefined);
 
-                                                            // Calculate range-adjusted APR based on user's selected range
+                                                            // Calculate tick-based range-adjusted APR
                                                             const pLow = parseFloat(priceLower || '0');
                                                             const pHigh = parseFloat(priceUpper || '0');
 
                                                             if (pLow > 0 && pHigh > 0 && pLow < pHigh && currentPrice) {
-                                                                // Range width as percentage of current price
-                                                                const rangeWidth = (pHigh - pLow) / currentPrice;
+                                                                // Convert prices to ticks: tick = log(price) / log(1.0001)
+                                                                const LOG_1_0001 = Math.log(1.0001);
+                                                                const tickLow = Math.floor(Math.log(pLow) / LOG_1_0001);
+                                                                const tickHigh = Math.ceil(Math.log(pHigh) / LOG_1_0001);
+                                                                const positionWidthTicks = tickHigh - tickLow;
 
-                                                                // Reference: ±100% range = 2x width = rangeWidth of 2
-                                                                // Tighter ranges get higher multiplier using sqrt for balance
-                                                                const referenceWidth = 2.0;
-                                                                const rawMultiplier = Math.sqrt(referenceWidth / rangeWidth);
-                                                                const rangeMultiplier = Math.max(1, Math.min(rawMultiplier, 500));
+                                                                // Full range = 1,774,544 ticks. Concentration = fullRange / positionWidth
+                                                                const FULL_RANGE_TICKS = 1774544;
+                                                                const rangeMultiplier = positionWidthTicks > 0
+                                                                    ? Math.max(1, Math.min(FULL_RANGE_TICKS / positionWidthTicks, 5000))
+                                                                    : 1;
 
                                                                 const rangeAdjustedAPR = poolAPR * rangeMultiplier;
 

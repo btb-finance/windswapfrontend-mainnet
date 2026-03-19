@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
+import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { parseUnits, Address } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { VOTING_ESCROW_ABI, REWARDS_DISTRIBUTOR_ABI, ERC20_ABI } from '@/config/abis';
@@ -49,6 +50,7 @@ export function useVeWIND() {
     }));
 
     const { writeContractAsync } = useWriteContract();
+    const { executeBatch, encodeContractCall } = useBatchTransactions();
 
     // Create new lock
     const createLock = useCallback(async (amount: string, durationSeconds: number) => {
@@ -63,21 +65,39 @@ export function useVeWIND() {
         try {
             const amountWei = parseUnits(amount, 18);
 
-            // Approve WIND
-            await writeContractAsync({
-                address: V2_CONTRACTS.YAKA as Address,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
-            });
+            // Try batch: approve + createLock in 1 tx
+            const approveCall = encodeContractCall(
+                V2_CONTRACTS.YAKA as Address,
+                ERC20_ABI as any,
+                'approve',
+                [V2_CONTRACTS.VotingEscrow as Address, amountWei]
+            );
+            const lockCall = encodeContractCall(
+                V2_CONTRACTS.VotingEscrow as Address,
+                VOTING_ESCROW_ABI as any,
+                'createLock',
+                [amountWei, BigInt(durationSeconds)]
+            );
+            const batchResult = await executeBatch([approveCall, lockCall]);
 
-            // Create lock
-            const hash = await writeContractAsync({
-                address: V2_CONTRACTS.VotingEscrow as Address,
-                abi: VOTING_ESCROW_ABI,
-                functionName: 'createLock',
-                args: [amountWei, BigInt(durationSeconds)],
-            });
+            let hash: string | undefined;
+            if (batchResult.usedBatching && batchResult.success) {
+                hash = batchResult.hash;
+            } else {
+                // Sequential fallback
+                await writeContractAsync({
+                    address: V2_CONTRACTS.YAKA as Address,
+                    abi: ERC20_ABI,
+                    functionName: 'approve',
+                    args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
+                });
+                hash = await writeContractAsync({
+                    address: V2_CONTRACTS.VotingEscrow as Address,
+                    abi: VOTING_ESCROW_ABI,
+                    functionName: 'createLock',
+                    args: [amountWei, BigInt(durationSeconds)],
+                });
+            }
 
             setIsLoading(false);
             refetchVeNFTs();
@@ -88,7 +108,7 @@ export function useVeWIND() {
             setIsLoading(false);
             return null;
         }
-    }, [address, writeContractAsync, refetchVeNFTs]);
+    }, [address, writeContractAsync, executeBatch, encodeContractCall, refetchVeNFTs]);
 
     // Increase lock amount
     const increaseAmount = useCallback(async (tokenId: bigint, amount: string) => {
@@ -103,21 +123,39 @@ export function useVeWIND() {
         try {
             const amountWei = parseUnits(amount, 18);
 
-            // Approve WIND
-            await writeContractAsync({
-                address: V2_CONTRACTS.YAKA as Address,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
-            });
+            // Try batch: approve + increaseAmount in 1 tx
+            const approveCall = encodeContractCall(
+                V2_CONTRACTS.YAKA as Address,
+                ERC20_ABI as any,
+                'approve',
+                [V2_CONTRACTS.VotingEscrow as Address, amountWei]
+            );
+            const increaseCall = encodeContractCall(
+                V2_CONTRACTS.VotingEscrow as Address,
+                VOTING_ESCROW_ABI as any,
+                'increaseAmount',
+                [tokenId, amountWei]
+            );
+            const batchResult = await executeBatch([approveCall, increaseCall]);
 
-            // Increase amount
-            const hash = await writeContractAsync({
-                address: V2_CONTRACTS.VotingEscrow as Address,
-                abi: VOTING_ESCROW_ABI,
-                functionName: 'increaseAmount',
-                args: [tokenId, amountWei],
-            });
+            let hash: string | undefined;
+            if (batchResult.usedBatching && batchResult.success) {
+                hash = batchResult.hash;
+            } else {
+                // Sequential fallback
+                await writeContractAsync({
+                    address: V2_CONTRACTS.YAKA as Address,
+                    abi: ERC20_ABI,
+                    functionName: 'approve',
+                    args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
+                });
+                hash = await writeContractAsync({
+                    address: V2_CONTRACTS.VotingEscrow as Address,
+                    abi: VOTING_ESCROW_ABI,
+                    functionName: 'increaseAmount',
+                    args: [tokenId, amountWei],
+                });
+            }
 
             setIsLoading(false);
             refetchVeNFTs();
@@ -128,7 +166,7 @@ export function useVeWIND() {
             setIsLoading(false);
             return null;
         }
-    }, [address, writeContractAsync, refetchVeNFTs]);
+    }, [address, writeContractAsync, executeBatch, encodeContractCall, refetchVeNFTs]);
 
     // Extend lock duration
     const extendLock = useCallback(async (tokenId: bigint, durationSeconds: number) => {

@@ -809,50 +809,65 @@ export default function PortfolioPage() {
             const approvedAddress = approvedResult.result ? ('0x' + approvedResult.result.slice(-40)).toLowerCase() : '';
             const needsApproval = approvedAddress !== gaugeAddressLower;
 
-            // Only request approval if not already approved
             if (needsApproval) {
-                const approvalTx = await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: [{ inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], name: 'approve', outputs: [], stateMutability: 'nonpayable', type: 'function' }],
-                    functionName: 'approve',
-                    args: [gaugeAddressLower as Address, position.tokenId],
-                });
-
-                // Wait for approval to be confirmed before depositing
-                // Poll for tx receipt
-                let confirmed = false;
-                for (let i = 0; i < 30; i++) { // Wait up to 30 seconds
-                    const receipt = await fetch(getRpcForPoolData(), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0', method: 'eth_getTransactionReceipt',
-                            params: [approvalTx],
-                            id: 1
-                        })
-                    }).then(r => r.json());
-
-                    if (receipt.result && receipt.result.status === '0x1') {
-                        confirmed = true;
-                        break;
+                // Try batch: approve + deposit in 1 tx
+                const approveCall = encodeContractCall(
+                    CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    [{ inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], name: 'approve', outputs: [], stateMutability: 'nonpayable', type: 'function' }] as any,
+                    'approve',
+                    [gaugeAddressLower as Address, position.tokenId]
+                );
+                const depositCall = encodeContractCall(
+                    gaugeAddressLower as Address,
+                    CL_GAUGE_ABI as any,
+                    'deposit',
+                    [position.tokenId]
+                );
+                const batchResult = await executeBatch([approveCall, depositCall]);
+                if (!batchResult.usedBatching || !batchResult.success) {
+                    // Sequential fallback
+                    const approvalTx = await writeContractAsync({
+                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        abi: [{ inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], name: 'approve', outputs: [], stateMutability: 'nonpayable', type: 'function' }],
+                        functionName: 'approve',
+                        args: [gaugeAddressLower as Address, position.tokenId],
+                    });
+                    // Wait for approval confirmation
+                    let confirmed = false;
+                    for (let i = 0; i < 30; i++) {
+                        const receipt = await fetch(getRpcForPoolData(), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                jsonrpc: '2.0', method: 'eth_getTransactionReceipt',
+                                params: [approvalTx],
+                                id: 1
+                            })
+                        }).then(r => r.json());
+                        if (receipt.result && receipt.result.status === '0x1') { confirmed = true; break; }
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    if (!confirmed) {
+                        toast.error('Approval failed. Try again');
+                        setActionLoading(false);
+                        return;
+                    }
+                    await writeContractAsync({
+                        address: gaugeAddressLower as Address,
+                        abi: CL_GAUGE_ABI,
+                        functionName: 'deposit',
+                        args: [position.tokenId],
+                    });
                 }
-
-                if (!confirmed) {
-                    toast.error('Approval failed. Try again');
-                    setActionLoading(false);
-                    return;
-                }
+            } else {
+                // Already approved, just deposit
+                await writeContractAsync({
+                    address: gaugeAddressLower as Address,
+                    abi: CL_GAUGE_ABI,
+                    functionName: 'deposit',
+                    args: [position.tokenId],
+                });
             }
-
-            // Deposit to gauge
-            await writeContractAsync({
-                address: gaugeAddressLower as Address,
-                abi: CL_GAUGE_ABI,
-                functionName: 'deposit',
-                args: [position.tokenId],
-            });
 
             toast.success('Position staked! Earning WIND rewards');
             refetchCL();
