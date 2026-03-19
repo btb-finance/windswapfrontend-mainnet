@@ -716,6 +716,14 @@ export const NFT_POSITION_MANAGER_ABI = [
         stateMutability: 'payable',
         type: 'function',
     },
+    // Burn position NFT (requires liquidity=0 and all fees collected)
+    {
+        inputs: [{ name: 'tokenId', type: 'uint256' }],
+        name: 'burn',
+        outputs: [],
+        stateMutability: 'payable',
+        type: 'function',
+    },
 ] as const;
 
 // V3 SwapRouter ABI (CL Swaps)

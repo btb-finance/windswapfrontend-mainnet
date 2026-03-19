@@ -618,6 +618,70 @@ export default function PortfolioPage() {
         setActionLoading(false);
     };
 
+    // Burn empty position NFT (liquidity=0, fees=0)
+    const handleBurnPosition = async (position: typeof clPositions[0]) => {
+        if (!address) return;
+        setActionLoading(true);
+        try {
+            // If there are uncollected fees, collect first then burn
+            if (position.tokensOwed0 > BigInt(0) || position.tokensOwed1 > BigInt(0)) {
+                const maxUint128 = BigInt('340282366920938463463374607431768211455');
+                const batchCalls = [
+                    encodeContractCall(
+                        CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        NFT_POSITION_MANAGER_ABI,
+                        'collect',
+                        [{
+                            tokenId: position.tokenId,
+                            recipient: address,
+                            amount0Max: maxUint128,
+                            amount1Max: maxUint128,
+                        }]
+                    ),
+                    encodeContractCall(
+                        CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        NFT_POSITION_MANAGER_ABI,
+                        'burn',
+                        [position.tokenId]
+                    )
+                ];
+                const batchResult = await executeBatch(batchCalls);
+                if (!batchResult.usedBatching || !batchResult.success) {
+                    await writeContractAsync({
+                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        abi: NFT_POSITION_MANAGER_ABI,
+                        functionName: 'collect',
+                        args: [{
+                            tokenId: position.tokenId,
+                            recipient: address,
+                            amount0Max: maxUint128,
+                            amount1Max: maxUint128,
+                        }],
+                    });
+                    await writeContractAsync({
+                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        abi: NFT_POSITION_MANAGER_ABI,
+                        functionName: 'burn',
+                        args: [position.tokenId],
+                    });
+                }
+            } else {
+                await writeContractAsync({
+                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'burn',
+                    args: [position.tokenId],
+                });
+            }
+            toast.success('Position burned!');
+            refetchCL();
+        } catch (err) {
+            console.error('Burn position error:', err);
+            toast.error('Failed to burn position');
+        }
+        setActionLoading(false);
+    };
+
     // Remove liquidity from CL position with batch support
     const handleRemoveLiquidity = async (position: typeof clPositions[0]) => {
         if (!address || position.liquidity <= BigInt(0)) return;
@@ -626,7 +690,7 @@ export default function PortfolioPage() {
             const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
-            // Build batch: decrease liquidity + collect
+            // Build batch: decrease liquidity + collect + burn
             const batchCalls = [
                 encodeContractCall(
                     CL_CONTRACTS.NonfungiblePositionManager as Address,
@@ -650,6 +714,12 @@ export default function PortfolioPage() {
                         amount0Max: maxUint128,
                         amount1Max: maxUint128,
                     }]
+                ),
+                encodeContractCall(
+                    CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    NFT_POSITION_MANAGER_ABI,
+                    'burn',
+                    [position.tokenId]
                 )
             ];
 
@@ -687,6 +757,14 @@ export default function PortfolioPage() {
                         amount0Max: maxUint128,
                         amount1Max: maxUint128,
                     }],
+                });
+
+                // Then burn the empty NFT
+                await writeContractAsync({
+                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'burn',
+                    args: [position.tokenId],
                 });
 
                 toast.success('Liquidity removed!');
@@ -918,7 +996,7 @@ export default function PortfolioPage() {
                 ));
             }
 
-            // 3. Collect fees LAST
+            // 3. Collect fees
             batchCalls.push(encodeContractCall(
                 CL_CONTRACTS.NonfungiblePositionManager as Address,
                 NFT_POSITION_MANAGER_ABI,
@@ -929,6 +1007,14 @@ export default function PortfolioPage() {
                     amount0Max: maxUint128,
                     amount1Max: maxUint128,
                 }]
+            ));
+
+            // 4. Burn the empty NFT
+            batchCalls.push(encodeContractCall(
+                CL_CONTRACTS.NonfungiblePositionManager as Address,
+                NFT_POSITION_MANAGER_ABI,
+                'burn',
+                [pos.tokenId]
             ));
             // Note: Rewards are auto-claimed when unstaking, no separate claim needed
 
@@ -971,7 +1057,7 @@ export default function PortfolioPage() {
                     });
                 }
 
-                // 3. Collect fees LAST
+                // 3. Collect fees
                 await writeContractAsync({
                     address: CL_CONTRACTS.NonfungiblePositionManager as Address,
                     abi: NFT_POSITION_MANAGER_ABI,
@@ -983,7 +1069,14 @@ export default function PortfolioPage() {
                         amount1Max: maxUint128,
                     }],
                 });
-                // Note: Rewards are auto-claimed when unstaking, no separate claim needed
+
+                // 4. Burn the empty NFT
+                await writeContractAsync({
+                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'burn',
+                    args: [pos.tokenId],
+                });
 
                 toast.success('Position fully exited!');
             }
@@ -1910,45 +2003,79 @@ export default function PortfolioPage() {
                                                             </div>
                                                         </div>
 
-                                                        {/* Stake CTA - subtle inline */}
-                                                        <div className="flex items-center justify-between p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/15">
-                                                            <div className="text-xs">
-                                                                <span className="text-gray-300">Earning fees</span>
-                                                                <span className="text-gray-500"> · Stake for bonus WIND</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleStakePosition(pos); }}
-                                                                disabled={actionLoading}
-                                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition disabled:opacity-50"
-                                                            >
-                                                                Stake
-                                                            </button>
-                                                        </div>
+                                                        {pos.liquidity > BigInt(0) ? (
+                                                            <>
+                                                                {/* Stake CTA - subtle inline */}
+                                                                <div className="flex items-center justify-between p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/15">
+                                                                    <div className="text-xs">
+                                                                        <span className="text-gray-300">Earning fees</span>
+                                                                        <span className="text-gray-500"> · Stake for bonus WIND</span>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleStakePosition(pos); }}
+                                                                        disabled={actionLoading}
+                                                                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition disabled:opacity-50"
+                                                                    >
+                                                                        Stake
+                                                                    </button>
+                                                                </div>
 
-                                                        {/* Action Buttons */}
-                                                        <div className="grid grid-cols-3 gap-2 pt-1">
-                                                            <button
-                                                                onClick={() => openIncreaseLiquidityModal(pos)}
-                                                                disabled={actionLoading}
-                                                                className="py-2.5 text-xs font-medium rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 transition disabled:opacity-50"
-                                                            >
-                                                                {actionLoading ? '...' : 'Increase'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleCollectFees(pos)}
-                                                                disabled={actionLoading || (pos.tokensOwed0 <= BigInt(0) && pos.tokensOwed1 <= BigInt(0))}
-                                                                className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
-                                                            >
-                                                                {actionLoading ? '...' : 'Collect Fees'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleRemoveLiquidity(pos)}
-                                                                disabled={actionLoading || pos.liquidity <= BigInt(0)}
-                                                                className="py-2.5 text-xs font-medium rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
-                                                            >
-                                                                {actionLoading ? '...' : 'Remove'}
-                                                            </button>
-                                                        </div>
+                                                                {/* Action Buttons */}
+                                                                <div className="grid grid-cols-3 gap-2 pt-1">
+                                                                    <button
+                                                                        onClick={() => openIncreaseLiquidityModal(pos)}
+                                                                        disabled={actionLoading}
+                                                                        className="py-2.5 text-xs font-medium rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 transition disabled:opacity-50"
+                                                                    >
+                                                                        {actionLoading ? '...' : 'Increase'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleCollectFees(pos)}
+                                                                        disabled={actionLoading || (pos.tokensOwed0 <= BigInt(0) && pos.tokensOwed1 <= BigInt(0))}
+                                                                        className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
+                                                                    >
+                                                                        {actionLoading ? '...' : 'Collect Fees'}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleRemoveLiquidity(pos)}
+                                                                        disabled={actionLoading}
+                                                                        className="py-2.5 text-xs font-medium rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
+                                                                    >
+                                                                        {actionLoading ? '...' : 'Remove'}
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {/* Empty position - show burn option */}
+                                                                <div className="flex items-center justify-between p-3 rounded-xl bg-gray-500/5 border border-gray-500/15">
+                                                                    <div className="text-xs">
+                                                                        <span className="text-gray-400">Empty position</span>
+                                                                        {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
+                                                                            <span className="text-green-400"> · Has uncollected fees</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                                                    {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
+                                                                        <button
+                                                                            onClick={() => handleCollectFees(pos)}
+                                                                            disabled={actionLoading}
+                                                                            className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
+                                                                        >
+                                                                            {actionLoading ? '...' : 'Collect Fees'}
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => handleBurnPosition(pos)}
+                                                                        disabled={actionLoading}
+                                                                        className="py-2.5 text-xs font-medium rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition disabled:opacity-50"
+                                                                    >
+                                                                        {actionLoading ? '...' : (pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) ? 'Collect & Burn' : 'Burn Position'}
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

@@ -355,7 +355,7 @@ const USER_DATA_QUERY = `
                 firstActivityTimestamp
                 lastActivityTimestamp
             }
-            positions(first: 1000, skip: $positionsSkip) {
+            positions(first: 1000, skip: $positionsSkip, where: { closed: false }) {
                 id
                 tokenId
                 pool {
@@ -381,7 +381,7 @@ const USER_DATA_QUERY = `
                 collectedToken0
                 collectedToken1
             }
-            veNFTs(first: 50) {
+            veNFTs(first: 50, where: { closed: false }) {
                 id
                 tokenId
                 lockedAmount

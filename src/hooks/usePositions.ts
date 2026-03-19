@@ -101,7 +101,7 @@ async function fetchRealTimeFees(
  * Primary hook for fetching CL positions from subgraph + real-time fees from RPC
  * @param showZeroBalance - If true, show positions with 0 liquidity and 0 fees (default: false)
  */
-export function useCLPositionsFromSubgraph(showZeroBalance: boolean = false) {
+export function useCLPositionsFromSubgraph(showZeroBalance: boolean = true) {
     const { address } = useAccount();
     const { positions: subgraphPositions, isLoading, error, refetch } = useUserPositions(address);
     const [rpcFees, setRpcFees] = useState<Map<string, { amount0: bigint; amount1: bigint }>>(new Map());
@@ -155,12 +155,10 @@ export function useCLPositionsFromSubgraph(showZeroBalance: boolean = false) {
         })
         .filter(p => showZeroBalance || p.liquidity > BigInt(0) || p.tokensOwed0 > BigInt(0) || p.tokensOwed1 > BigInt(0));
 
-    // Fetch real-time fees from RPC whenever positions change
+    // Fetch real-time fees from RPC for ALL positions (including zero-liquidity with unclaimed fees)
     useEffect(() => {
         if (unstakedSubgraphPositions.length === 0) return;
-        const tokenIds = unstakedSubgraphPositions
-            .filter(p => BigInt(p.liquidity) > BigInt(0))
-            .map(p => BigInt(p.tokenId));
+        const tokenIds = unstakedSubgraphPositions.map(p => BigInt(p.tokenId));
         if (tokenIds.length === 0) return;
 
         setFeesLoading(true);
