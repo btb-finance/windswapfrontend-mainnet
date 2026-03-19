@@ -245,7 +245,7 @@ export function useMixedRouteQuoter() {
             }
 
             // Build split quote requests for ALL pairs of distinct routes
-            const splits = [90, 80, 70, 60, 50, 40, 30, 20, 10];
+            const splits = [95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5];
             const splitRequests: BatchQuoteRequest[] = [];
             const splitMeta: { pct1: number; idx1: number; idx2: number; r1: RouteQuote; r2: RouteQuote }[] = [];
 
