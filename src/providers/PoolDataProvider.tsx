@@ -173,6 +173,13 @@ export interface StakedPosition {
     liquidity: bigint;
     pendingRewards: bigint;
     rewardRate: bigint;
+    token0PriceUSD: number;
+    token1PriceUSD: number;
+    amountUSD: number;
+    depositedUSD: number;
+    withdrawnUSD: number;
+    collectedUSD: number;
+    totalWindEarned: number;
 }
 
 export interface VeNFT {
@@ -581,6 +588,13 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
             liquidity: toBigIntSafe(sp.position?.liquidity || sp.amount || '0'),
             pendingRewards: earnedFromRpc,
             rewardRate: BigInt(0),
+            token0PriceUSD: pool?.token0?.priceUSD ? parseFloat(pool.token0.priceUSD) : 0,
+            token1PriceUSD: pool?.token1?.priceUSD ? parseFloat(pool.token1.priceUSD) : 0,
+            amountUSD: sp.position?.amountUSD ? parseFloat(sp.position.amountUSD) : 0,
+            depositedUSD: sp.position?.depositedUSD ? parseFloat(sp.position.depositedUSD) : 0,
+            withdrawnUSD: sp.position?.withdrawnUSD ? parseFloat(sp.position.withdrawnUSD) : 0,
+            collectedUSD: sp.position?.collectedUSD ? parseFloat(sp.position.collectedUSD) : 0,
+            totalWindEarned: sp.position?.totalWindEarned ? parseFloat(sp.position.totalWindEarned) : 0,
         };
     });
 

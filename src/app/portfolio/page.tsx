@@ -66,6 +66,13 @@ interface StakedPosition {
     liquidity: bigint;
     pendingRewards: bigint;
     rewardRate: bigint;
+    token0PriceUSD: number;
+    token1PriceUSD: number;
+    amountUSD: number;
+    depositedUSD: number;
+    withdrawnUSD: number;
+    collectedUSD: number;
+    totalWindEarned: number;
 }
 
 // Get token info from known token list (uses centralized utility)
@@ -2126,10 +2133,12 @@ export default function PortfolioPage() {
 
                                                         {/* PnL Summary */}
                                                         <div className="p-3 rounded-xl bg-white/5 space-y-1.5">
-                                                            <div className="flex justify-between text-xs">
-                                                                <span className="text-gray-500">Invested</span>
-                                                                <span className="text-gray-300">{formatPrice(depositedUsd)}</span>
-                                                            </div>
+                                                            {depositedUsd > 0 && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Invested</span>
+                                                                    <span className="text-gray-300">{formatPrice(depositedUsd)}</span>
+                                                                </div>
+                                                            )}
                                                             <div className="flex justify-between text-xs">
                                                                 <span className="text-gray-500">Current value</span>
                                                                 <span className="text-gray-300">{formatPrice(pos.amountUSD || 0)}</span>
@@ -2146,12 +2155,14 @@ export default function PortfolioPage() {
                                                                     <span className="text-yellow-400">+{pos.totalWindEarned.toFixed(4)} WIND</span>
                                                                 </div>
                                                             )}
-                                                            <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs">
-                                                                <span className="text-gray-400 font-medium">P&L</span>
-                                                                <span className={`font-semibold ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                    {pnlUsd >= 0 ? '+' : ''}{formatPrice(pnlUsd)} ({pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
-                                                                </span>
-                                                            </div>
+                                                            {depositedUsd > 0 ? (
+                                                                <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs">
+                                                                    <span className="text-gray-400 font-medium">P&L</span>
+                                                                    <span className={`font-semibold ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                        {pnlUsd >= 0 ? '+' : ''}{formatPrice(pnlUsd)} ({pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+                                                                    </span>
+                                                                </div>
+                                                            ) : null}
                                                         </div>
 
                                                         {/* Actions */}
@@ -2445,18 +2456,6 @@ export default function PortfolioPage() {
                                                     </span>
                                                 </div>
 
-                                                {/* Range visualization */}
-                                                {!stakedIsFullRange && (
-                                                    <div className="mb-2">
-                                                        <PriceRangeBar
-                                                            currentPrice={stakedCurrentPrice}
-                                                            priceLower={stakedPriceLower}
-                                                            priceUpper={stakedPriceUpper}
-                                                            isFullRange={stakedIsFullRange}
-                                                        />
-                                                    </div>
-                                                )}
-
                                                 {/* Token Amounts & Rewards Row */}
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div className="p-2.5 rounded-xl bg-white/5">
@@ -2481,14 +2480,103 @@ export default function PortfolioPage() {
                                                             {amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 4 : 2)}
                                                         </div>
                                                     </div>
-                                                    <div className="p-2.5 rounded-xl bg-green-500/5 border border-green-500/10">
+                                                    <div className="p-2.5 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
                                                         <div className="text-xs text-gray-400 mb-1">Rewards</div>
-                                                        <div className="font-bold text-sm text-green-400">
+                                                        <div className="font-bold text-sm text-yellow-400">
                                                             {rewardsAmount.toFixed(rewardsAmount < 0.01 ? 6 : 4)}
                                                         </div>
-                                                        <div className="text-[10px] text-green-400/60">WIND</div>
+                                                        <div className="text-[10px] text-yellow-400/60">WIND</div>
                                                     </div>
                                                 </div>
+
+                                                {/* Range visualization */}
+                                                {!stakedIsFullRange && stakedCurrentPrice > 0 && (() => {
+                                                    const rangeSpan = stakedPriceUpper - stakedPriceLower;
+                                                    const padding = rangeSpan * 0.25;
+                                                    const dMin = stakedPriceLower - padding;
+                                                    const dSpan = (stakedPriceUpper + padding) - dMin;
+                                                    const lPct = ((stakedPriceLower - dMin) / dSpan) * 100;
+                                                    const rPct = ((stakedPriceUpper - dMin) / dSpan) * 100;
+                                                    const cPct = Math.max(2, Math.min(98, ((stakedCurrentPrice - dMin) / dSpan) * 100));
+                                                    const pctDown = ((stakedCurrentPrice - stakedPriceLower) / stakedCurrentPrice * 100);
+                                                    const pctUp = ((stakedPriceUpper - stakedCurrentPrice) / stakedCurrentPrice * 100);
+                                                    return (
+                                                        <div className="p-3 rounded-xl bg-white/5 mb-3">
+                                                            <div className="flex items-end justify-between mb-1.5">
+                                                                <div className="text-[10px] text-gray-600">{pos.token1Symbol}/{pos.token0Symbol}</div>
+                                                                <div className={`text-xs font-semibold ${inRange ? 'text-green-400' : 'text-orange-400'}`}>
+                                                                    {formatPrice(stakedCurrentPrice)}
+                                                                </div>
+                                                            </div>
+                                                            <div className="relative h-8 rounded-lg overflow-hidden bg-white/[0.03]">
+                                                                <div className="absolute top-0 h-full rounded-lg" style={{ left: `${lPct}%`, width: `${rPct - lPct}%`, background: inRange ? 'linear-gradient(90deg, rgba(74,222,128,0.12), rgba(74,222,128,0.06))' : 'rgba(251,146,60,0.08)', borderLeft: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.1)' }} />
+                                                                <div className="absolute top-0 h-full flex items-center" style={{ left: `${lPct + 1}%` }}>
+                                                                    <span className="text-[10px] text-gray-500 pl-1">{formatPrice(stakedPriceLower)}</span>
+                                                                </div>
+                                                                <div className="absolute top-0 h-full flex items-center" style={{ right: `${100 - rPct + 1}%` }}>
+                                                                    <span className="text-[10px] text-gray-500 pr-1">{formatPrice(stakedPriceUpper)}</span>
+                                                                </div>
+                                                                <div className="absolute top-0 h-full" style={{ left: `${cPct}%` }}>
+                                                                    <div className={`w-px h-full ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                    <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-[#0d0d14] ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex justify-between mt-1.5">
+                                                                <span className="text-[10px] text-gray-500">−{pctDown.toFixed(1)}%</span>
+                                                                {!inRange && <span className="text-[10px] text-orange-400/80">{stakedCurrentPrice < stakedPriceLower ? `100% ${pos.token0Symbol}` : `100% ${pos.token1Symbol}`}</span>}
+                                                                <span className="text-[10px] text-gray-500">+{pctUp.toFixed(1)}%</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {/* PnL Summary */}
+                                                {(() => {
+                                                    const sDepUsd = pos.depositedUSD || 0;
+                                                    const sColUsd = pos.collectedUSD || 0;
+                                                    const sWitUsd = pos.withdrawnUSD || 0;
+                                                    const sFeesUsd = Math.max(0, sColUsd - sWitUsd);
+                                                    const sWindUsd = (pos.totalWindEarned || 0) * (windPrice || 0);
+                                                    const sCurrentUsd = (pos.amountUSD > 0) ? pos.amountUSD
+                                                        : amounts.amount0 * pos.token0PriceUSD + amounts.amount1 * pos.token1PriceUSD;
+                                                    const hasHistorical = sDepUsd > 0;
+                                                    const sPnl = hasHistorical ? sCurrentUsd + sColUsd + sWindUsd - sDepUsd : 0;
+                                                    const sPnlPct = hasHistorical && sDepUsd > 0 ? (sPnl / sDepUsd) * 100 : 0;
+                                                    return (
+                                                        <div className="p-3 rounded-xl bg-white/5 space-y-1.5 mb-3">
+                                                            {hasHistorical && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Invested</span>
+                                                                    <span className="text-gray-300">{formatPrice(sDepUsd)}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-gray-500">Current value</span>
+                                                                <span className="text-gray-300">{formatPrice(sCurrentUsd)}</span>
+                                                            </div>
+                                                            {sFeesUsd > 0 && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Fees collected</span>
+                                                                    <span className="text-green-400">+{formatPrice(sFeesUsd)}</span>
+                                                                </div>
+                                                            )}
+                                                            {(pos.totalWindEarned > 0 || rewardsAmount > 0) && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">WIND earned</span>
+                                                                    <span className="text-yellow-400">+{((pos.totalWindEarned || 0) + rewardsAmount).toFixed(4)} WIND</span>
+                                                                </div>
+                                                            )}
+                                                            {hasHistorical && (
+                                                                <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs">
+                                                                    <span className="text-gray-400 font-medium">P&L</span>
+                                                                    <span className={`font-semibold ${sPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                        {sPnl >= 0 ? '+' : ''}{formatPrice(sPnl)} ({sPnl >= 0 ? '+' : ''}{sPnlPct.toFixed(2)}%)
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {/* Action Buttons */}
                                                 <div className="grid grid-cols-3 gap-2">

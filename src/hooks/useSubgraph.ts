@@ -312,6 +312,16 @@ export interface SubgraphStakedPosition {
         amount0: string;
         amount1: string;
         amountUSD: string;
+        depositedToken0?: string;
+        depositedToken1?: string;
+        withdrawnToken0?: string;
+        withdrawnToken1?: string;
+        collectedToken0?: string;
+        collectedToken1?: string;
+        depositedUSD?: string;
+        withdrawnUSD?: string;
+        collectedUSD?: string;
+        totalWindEarned?: string;
     };
     tokenId: string;
     amount: string;
@@ -424,6 +434,16 @@ const USER_DATA_QUERY = `
                 amount0
                 amount1
                 amountUSD
+                depositedToken0
+                depositedToken1
+                withdrawnToken0
+                withdrawnToken1
+                collectedToken0
+                collectedToken1
+                depositedUSD
+                withdrawnUSD
+                collectedUSD
+                totalWindEarned
             }
             tokenId
             amount
