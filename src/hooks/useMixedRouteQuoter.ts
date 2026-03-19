@@ -12,7 +12,7 @@ const INTERMEDIATE_TOKENS = [WSEI, USDC, WIND];
 // CL tick spacings from CLFactory contract
 const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
 
-interface RouteQuote {
+export interface RouteQuote {
     amountOut: string;
     path: string[];
     routeType: 'direct' | 'multi-hop';
@@ -21,6 +21,24 @@ interface RouteQuote {
     gasEstimate?: bigint;
     tickSpacing1?: number;
     tickSpacing2?: number;
+}
+
+export interface SplitRouteResult {
+    totalAmountOut: string;
+    legs: {
+        route: RouteQuote;
+        amountIn: string;
+        amountOut: string;
+        percent: number;
+    }[];
+}
+
+export interface OptimalRouteResult {
+    bestSingle: RouteQuote | null;
+    bestSplit: SplitRouteResult | null;
+    // The winner — whichever gives more output
+    winner: 'single' | 'split' | null;
+    amountOut: string;
 }
 
 interface BatchQuoteRequest {
@@ -63,11 +81,10 @@ export function useMixedRouteQuoter() {
         return `0x${selector}${pathOffset}${amountInHex}${pathLength}${pathPadded}`;
     };
 
-    // BATCH all quotes in a SINGLE HTTP request!
+    // BATCH all quotes in a SINGLE HTTP request
     const batchQuote = useCallback(async (requests: BatchQuoteRequest[]): Promise<(RouteQuote | null)[]> => {
         if (requests.length === 0) return [];
 
-        // Build batch JSON-RPC request
         const batchBody = requests.map((req, i) => ({
             jsonrpc: '2.0',
             method: 'eth_call',
@@ -84,7 +101,6 @@ export function useMixedRouteQuoter() {
 
             const results = await response.json();
 
-            // Parse results - they come back as array in same order
             return requests.map((req, i) => {
                 const result = Array.isArray(results)
                     ? (results as Array<{ id: number; result: string }>).find((r) => r.id === i + 1)
@@ -120,12 +136,67 @@ export function useMixedRouteQuoter() {
         }
     }, []);
 
-    // Find the best route - ALL quotes in ONE HTTP request!
-    const findBestRoute = useCallback(async (
+    // Build route request templates for a token pair
+    const buildRouteRequests = useCallback((
+        tokenIn: Token,
+        tokenOut: Token,
+        amountInWei: bigint,
+    ): BatchQuoteRequest[] => {
+        const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+        const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+        const requests: BatchQuoteRequest[] = [];
+
+        // Direct routes
+        for (const ts of TICK_SPACINGS) {
+            requests.push({
+                path: encodePath([actualTokenIn.address, actualTokenOut.address], [ts]),
+                amountIn: amountInWei,
+                outputDecimals: actualTokenOut.decimals,
+                routeType: 'direct',
+                tokenIn, tokenOut,
+                tickSpacing1: ts,
+            });
+        }
+
+        // Multi-hop routes
+        for (const intermediate of INTERMEDIATE_TOKENS) {
+            const actualIntermediate = intermediate.isNative ? WSEI : intermediate;
+            if (actualIntermediate.address.toLowerCase() === actualTokenIn.address.toLowerCase() ||
+                actualIntermediate.address.toLowerCase() === actualTokenOut.address.toLowerCase()) continue;
+
+            for (const ts1 of TICK_SPACINGS) {
+                for (const ts2 of TICK_SPACINGS) {
+                    requests.push({
+                        path: encodePath(
+                            [actualTokenIn.address, actualIntermediate.address, actualTokenOut.address],
+                            [ts1, ts2]
+                        ),
+                        amountIn: amountInWei,
+                        outputDecimals: actualTokenOut.decimals,
+                        routeType: 'multi-hop',
+                        tokenIn, tokenOut,
+                        intermediate,
+                        tickSpacing1: ts1,
+                        tickSpacing2: ts2,
+                    });
+                }
+            }
+        }
+
+        return requests;
+    }, [encodePath]);
+
+    /**
+     * Unified route finder: finds best single route AND best split in minimal RPC calls.
+     * - 1st batch: all routes at full amount (direct + multi-hop × all tick spacings)
+     * - 2nd batch: split quotes across top 2 distinct routes at various ratios
+     * Returns whichever gives the most output.
+     */
+    const findOptimalRoute = useCallback(async (
         tokenIn: Token,
         tokenOut: Token,
         amountIn: string
-    ): Promise<RouteQuote | null> => {
+    ): Promise<OptimalRouteResult | null> => {
         if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) {
             return null;
         }
@@ -135,85 +206,209 @@ export function useMixedRouteQuoter() {
 
         try {
             const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
-            const amountInWei = parseUnits(amountIn, actualTokenIn.decimals);
+            const fullAmountWei = parseUnits(amountIn, actualTokenIn.decimals);
 
-            // Build ALL quote requests
-            const requests: BatchQuoteRequest[] = [];
+            // === BATCH 1: All routes at full amount ===
+            const requests = buildRouteRequests(tokenIn, tokenOut, fullAmountWei);
+            const fullResults = await batchQuote(requests);
 
-            // Direct routes (2 tick spacings)
-            for (const ts of TICK_SPACINGS) {
-                requests.push({
-                    path: encodePath([actualTokenIn.address, actualTokenOut.address], [ts]),
-                    amountIn: amountInWei,
-                    outputDecimals: actualTokenOut.decimals,
-                    routeType: 'direct',
-                    tokenIn,
-                    tokenOut,
-                    tickSpacing1: ts,
-                });
+            const validQuotes = fullResults
+                .filter((r): r is RouteQuote => r !== null && parseFloat(r.amountOut) > 0)
+                .sort((a, b) => parseFloat(b.amountOut) - parseFloat(a.amountOut));
+
+            if (validQuotes.length === 0) {
+                setIsLoading(false);
+                return { bestSingle: null, bestSplit: null, winner: null, amountOut: '0' };
             }
 
-            // Multi-hop routes (2 intermediates × 2×2 tick spacing combos = 8)
-            for (const intermediate of INTERMEDIATE_TOKENS) {
-                const actualIntermediate = intermediate.isNative ? WSEI : intermediate;
+            const bestSingle = validQuotes[0];
 
-                // Skip if intermediate same as input/output
-                if (actualIntermediate.address.toLowerCase() === actualTokenIn.address.toLowerCase() ||
-                    actualIntermediate.address.toLowerCase() === actualTokenOut.address.toLowerCase()) {
-                    continue;
+            // === BATCH 2: Try split across ALL pairs of distinct routes ===
+            // Collect all distinct routes (different path structure)
+            const distinctRoutes: RouteQuote[] = [validQuotes[0]];
+            for (let i = 1; i < validQuotes.length; i++) {
+                const r = validQuotes[i];
+                const isDuplicate = distinctRoutes.some(d =>
+                    d.routeType === r.routeType &&
+                    d.tickSpacing1 === r.tickSpacing1 &&
+                    d.via === r.via
+                );
+                if (!isDuplicate) {
+                    distinctRoutes.push(r);
+                    if (distinctRoutes.length >= 5) break; // Cap at top 5 distinct routes
                 }
+            }
 
-                for (const ts1 of TICK_SPACINGS) {
-                    for (const ts2 of TICK_SPACINGS) {
-                        requests.push({
-                            path: encodePath(
-                                [actualTokenIn.address, actualIntermediate.address, actualTokenOut.address],
-                                [ts1, ts2]
-                            ),
-                            amountIn: amountInWei,
-                            outputDecimals: actualTokenOut.decimals,
-                            routeType: 'multi-hop',
-                            tokenIn,
-                            tokenOut,
-                            intermediate,
-                            tickSpacing1: ts1,
-                            tickSpacing2: ts2,
-                        });
+            if (distinctRoutes.length < 2) {
+                setIsLoading(false);
+                return { bestSingle, bestSplit: null, winner: 'single', amountOut: bestSingle.amountOut };
+            }
+
+            // Build split quote requests for ALL pairs of distinct routes
+            const splits = [90, 80, 70, 60, 50, 40, 30, 20, 10];
+            const splitRequests: BatchQuoteRequest[] = [];
+            const splitMeta: { pct1: number; idx1: number; idx2: number; r1: RouteQuote; r2: RouteQuote }[] = [];
+
+            // Helper to find request template for a route
+            const findTemplate = (route: RouteQuote) => requests.find(r =>
+                r.routeType === route.routeType &&
+                r.tickSpacing1 === route.tickSpacing1 &&
+                (r.tickSpacing2 || 0) === (route.tickSpacing2 || 0) &&
+                (r.intermediate?.symbol || '') === (route.via || '')
+            );
+
+            // Try all pairs
+            for (let a = 0; a < distinctRoutes.length; a++) {
+                for (let b = a + 1; b < distinctRoutes.length; b++) {
+                    const rA = distinctRoutes[a];
+                    const rB = distinctRoutes[b];
+                    const tA = findTemplate(rA);
+                    const tB = findTemplate(rB);
+                    if (!tA || !tB) continue;
+
+                    for (const pct1 of splits) {
+                        const amount1 = (fullAmountWei * BigInt(pct1)) / BigInt(100);
+                        const amount2 = fullAmountWei - amount1;
+
+                        const idx1 = splitRequests.length;
+                        splitRequests.push({ ...tA, amountIn: amount1 });
+                        const idx2 = splitRequests.length;
+                        splitRequests.push({ ...tB, amountIn: amount2 });
+                        splitMeta.push({ pct1, idx1, idx2, r1: rA, r2: rB });
                     }
                 }
             }
 
-            // Execute ALL quotes in ONE HTTP request!
-            const results = await batchQuote(requests);
+            let bestSplit: SplitRouteResult | null = null;
 
-            // Find best result
-            const validQuotes = results.filter((r): r is RouteQuote => r !== null);
+            if (splitRequests.length > 0) {
+                const splitResults = await batchQuote(splitRequests);
+                const singleBestOut = parseFloat(bestSingle.amountOut);
 
-            if (validQuotes.length === 0) {
-                setIsLoading(false);
-                return null;
+                for (const { pct1, idx1, idx2, r1, r2 } of splitMeta) {
+                    const res1 = splitResults[idx1];
+                    const res2 = splitResults[idx2];
+                    if (!res1 || !res2) continue;
+
+                    const totalOut = parseFloat(res1.amountOut) + parseFloat(res2.amountOut);
+
+                    if (totalOut > singleBestOut && (!bestSplit || totalOut > parseFloat(bestSplit.totalAmountOut))) {
+                        const pct2 = 100 - pct1;
+                        const amount1Str = formatUnits((fullAmountWei * BigInt(pct1)) / BigInt(100), actualTokenIn.decimals);
+                        const amount2Str = formatUnits(fullAmountWei - (fullAmountWei * BigInt(pct1)) / BigInt(100), actualTokenIn.decimals);
+
+                        bestSplit = {
+                            totalAmountOut: totalOut.toString(),
+                            legs: [
+                                { route: r1, amountIn: amount1Str, amountOut: res1.amountOut, percent: pct1 },
+                                { route: r2, amountIn: amount2Str, amountOut: res2.amountOut, percent: pct2 },
+                            ],
+                        };
+                    }
+                }
             }
 
-            const best = validQuotes.reduce((a, b) =>
-                parseFloat(a.amountOut) > parseFloat(b.amountOut) ? a : b
-            );
+            const winner = bestSplit ? 'split' : 'single';
+            const amountOut = bestSplit ? bestSplit.totalAmountOut : bestSingle.amountOut;
 
             setIsLoading(false);
-            return best;
+            return { bestSingle, bestSplit, winner, amountOut } as OptimalRouteResult;
         } catch (err: unknown) {
             setError((err instanceof Error ? err.message : undefined) || 'Quote failed');
             setIsLoading(false);
             return null;
         }
-    }, [batchQuote]);
+    }, [batchQuote, buildRouteRequests]);
+
+    // Spot rate: quote a tiny USDC amount to get prices of both tokens, then derive rate
+    // 0.000001 USDC (1 wei) → tokenIn and 0.000001 USDC → tokenOut
+    // Rate = (USDC per tokenOut) / (USDC per tokenIn) = tokenIn amount / tokenOut amount
+    const getSpotRate = useCallback(async (
+        tokenIn: Token,
+        tokenOut: Token,
+    ): Promise<number | null> => {
+        try {
+            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+
+            // If one side IS USDC, we only need one quote
+            const isTokenInUSDC = actualTokenIn.address.toLowerCase() === USDC.address.toLowerCase();
+            const isTokenOutUSDC = actualTokenOut.address.toLowerCase() === USDC.address.toLowerCase();
+
+            // Use 100 wei (0.0001 USDC) — smallest amount that quoter handles, zero price impact
+            const usdcAmount = BigInt(100);
+
+            const allRequests: BatchQuoteRequest[] = [];
+            let inStart = 0, inCount = 0, outStart = 0, outCount = 0;
+
+            if (!isTokenInUSDC) {
+                // Quote: 1 USDC → tokenIn (how much tokenIn per $1)
+                const reqs = buildRouteRequests(
+                    USDC, // tokenIn for this quote
+                    { ...actualTokenIn, isNative: false } as Token, // tokenOut
+                    usdcAmount
+                );
+                inStart = allRequests.length;
+                inCount = reqs.length;
+                allRequests.push(...reqs);
+            }
+
+            if (!isTokenOutUSDC) {
+                // Quote: 1 USDC → tokenOut (how much tokenOut per $1)
+                const reqs = buildRouteRequests(
+                    USDC,
+                    { ...actualTokenOut, isNative: false } as Token,
+                    usdcAmount
+                );
+                outStart = allRequests.length;
+                outCount = reqs.length;
+                allRequests.push(...reqs);
+            }
+
+            if (allRequests.length === 0) {
+                // Both are USDC — rate is 1
+                return 1;
+            }
+
+            const results = await batchQuote(allRequests);
+
+            // Both values are "per 1 wei USDC" — the ratio cancels the unit
+            const usdcRefValue = 0.0001; // 100 wei in USDC terms
+            let tokenInPerUSDC = usdcRefValue; // default if tokenIn IS USDC (1 wei USDC = 0.000001 USDC)
+            if (!isTokenInUSDC) {
+                const inResults = results.slice(inStart, inStart + inCount);
+                const valid = inResults.filter((r): r is RouteQuote => r !== null && parseFloat(r.amountOut) > 0);
+                if (valid.length === 0) return null;
+                const best = valid.reduce((a, b) => parseFloat(a.amountOut) > parseFloat(b.amountOut) ? a : b);
+                tokenInPerUSDC = parseFloat(best.amountOut);
+            }
+
+            let tokenOutPerUSDC = usdcRefValue; // default if tokenOut IS USDC
+            if (!isTokenOutUSDC) {
+                const outResults = results.slice(outStart, outStart + outCount);
+                const valid = outResults.filter((r): r is RouteQuote => r !== null && parseFloat(r.amountOut) > 0);
+                if (valid.length === 0) return null;
+                const best = valid.reduce((a, b) => parseFloat(a.amountOut) > parseFloat(b.amountOut) ? a : b);
+                tokenOutPerUSDC = parseFloat(best.amountOut);
+            }
+
+            // Rate: 1 tokenIn = ? tokenOut
+            // tokenInPerUSDC = how many tokenIn you get for $1
+            // tokenOutPerUSDC = how many tokenOut you get for $1
+            // So 1 tokenIn = (tokenOutPerUSDC / tokenInPerUSDC) tokenOut
+            return tokenOutPerUSDC / tokenInPerUSDC;
+        } catch {
+            return null;
+        }
+    }, [batchQuote, buildRouteRequests]);
 
     const getIntermediateToken = useCallback((symbol: string): Token | undefined => {
         return INTERMEDIATE_TOKENS.find(t => t.symbol === symbol);
     }, []);
 
     return {
-        findBestRoute,
+        findOptimalRoute,
+        getSpotRate,
         getIntermediateToken,
         INTERMEDIATE_TOKENS,
         isLoading,
