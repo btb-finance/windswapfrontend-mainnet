@@ -1930,16 +1930,6 @@ export default function PortfolioPage() {
                                                             </svg>
                                                         </div>
                                                     </div>
-                                                    {/* Mini range bar - only for active positions */}
-                                                    {!isEmpty && !isExtremeTickRange(pos.tickLower, pos.tickUpper) && (
-                                                        <PriceRangeBar
-                                                            currentPrice={currentPrice}
-                                                            priceLower={priceLower}
-                                                            priceUpper={priceUpper}
-                                                            isFullRange={isExtremeTickRange(pos.tickLower, pos.tickUpper)}
-                                                            compact={true}
-                                                        />
-                                                    )}
                                                 </button>
 
                                                 {/* Expanded Details */}
@@ -2058,16 +2048,74 @@ export default function PortfolioPage() {
                                                         {/* Price Range */}
                                                         {!isExtremeTickRange(pos.tickLower, pos.tickUpper) ? (
                                                             <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="flex items-center justify-between mb-0.5">
-                                                                    <span className="text-xs text-gray-400">Price Range</span>
-                                                                    <span className="text-[10px] text-gray-600">{t1.symbol}/{t0.symbol}</span>
-                                                                </div>
-                                                                <PriceRangeBar
-                                                                    currentPrice={currentPrice}
-                                                                    priceLower={priceLower}
-                                                                    priceUpper={priceUpper}
-                                                                    isFullRange={false}
-                                                                />
+                                                                {/* Visual range indicator */}
+                                                                {currentPrice !== null && (() => {
+                                                                    const rangeSpan = priceUpper - priceLower;
+                                                                    const padding = rangeSpan * 0.25;
+                                                                    const dMin = priceLower - padding;
+                                                                    const dSpan = (priceUpper + padding) - dMin;
+                                                                    const lPct = ((priceLower - dMin) / dSpan) * 100;
+                                                                    const rPct = ((priceUpper - dMin) / dSpan) * 100;
+                                                                    const cPct = Math.max(2, Math.min(98, ((currentPrice - dMin) / dSpan) * 100));
+                                                                    const pctDown = ((currentPrice - priceLower) / currentPrice * 100);
+                                                                    const pctUp = ((priceUpper - currentPrice) / currentPrice * 100);
+                                                                    return (
+                                                                        <div>
+                                                                            {/* Labels above bar */}
+                                                                            <div className="flex items-end justify-between mb-1.5">
+                                                                                <div>
+                                                                                    <div className="text-[10px] text-gray-600">{t1.symbol}/{t0.symbol}</div>
+                                                                                </div>
+                                                                                <div className={`text-xs font-semibold ${inRange ? 'text-green-400' : 'text-orange-400'}`}>
+                                                                                    {formatPrice(currentPrice)}
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Bar */}
+                                                                            <div className="relative h-8 rounded-lg overflow-hidden bg-white/[0.03]">
+                                                                                {/* Range fill */}
+                                                                                <div
+                                                                                    className="absolute top-0 h-full rounded-lg"
+                                                                                    style={{
+                                                                                        left: `${lPct}%`,
+                                                                                        width: `${rPct - lPct}%`,
+                                                                                        background: inRange
+                                                                                            ? 'linear-gradient(90deg, rgba(74,222,128,0.12), rgba(74,222,128,0.06))'
+                                                                                            : 'rgba(251,146,60,0.08)',
+                                                                                        borderLeft: '1px solid rgba(255,255,255,0.1)',
+                                                                                        borderRight: '1px solid rgba(255,255,255,0.1)',
+                                                                                    }}
+                                                                                />
+                                                                                {/* Min label inside */}
+                                                                                <div className="absolute top-0 h-full flex items-center" style={{ left: `${lPct + 1}%` }}>
+                                                                                    <span className="text-[10px] text-gray-500 pl-1">{formatPrice(priceLower)}</span>
+                                                                                </div>
+                                                                                {/* Max label inside */}
+                                                                                <div className="absolute top-0 h-full flex items-center" style={{ right: `${100 - rPct + 1}%` }}>
+                                                                                    <span className="text-[10px] text-gray-500 pr-1">{formatPrice(priceUpper)}</span>
+                                                                                </div>
+                                                                                {/* Current price dot + line */}
+                                                                                <div className="absolute top-0 h-full" style={{ left: `${cPct}%` }}>
+                                                                                    <div className={`w-px h-full ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                                    <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-[#0d0d14] ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* +/- % labels below */}
+                                                                            <div className="flex justify-between mt-1.5">
+                                                                                <span className="text-[10px] text-gray-500">
+                                                                                    −{pctDown.toFixed(1)}%
+                                                                                </span>
+                                                                                {!inRange && (
+                                                                                    <span className="text-[10px] text-orange-400/80">
+                                                                                        {currentPrice < priceLower ? `100% ${t0.symbol}` : `100% ${t1.symbol}`}
+                                                                                    </span>
+                                                                                )}
+                                                                                <span className="text-[10px] text-gray-500">
+                                                                                    +{pctUp.toFixed(1)}%
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-500/5">
