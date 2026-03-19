@@ -30,6 +30,10 @@ export interface CLPosition {
     withdrawnToken1: number;
     collectedToken0: number;
     collectedToken1: number;
+    depositedUSD: number;
+    withdrawnUSD: number;
+    collectedUSD: number;
+    totalWindEarned: number;
     token0Symbol?: string;
     token1Symbol?: string;
 }
@@ -149,6 +153,10 @@ export function useCLPositionsFromSubgraph(showZeroBalance: boolean = true) {
                 withdrawnToken1: p.withdrawnToken1 ? parseFloat(p.withdrawnToken1) : 0,
                 collectedToken0: p.collectedToken0 ? parseFloat(p.collectedToken0) : 0,
                 collectedToken1: p.collectedToken1 ? parseFloat(p.collectedToken1) : 0,
+                depositedUSD: p.depositedUSD ? parseFloat(p.depositedUSD) : 0,
+                withdrawnUSD: p.withdrawnUSD ? parseFloat(p.withdrawnUSD) : 0,
+                collectedUSD: p.collectedUSD ? parseFloat(p.collectedUSD) : 0,
+                totalWindEarned: p.totalWindEarned ? parseFloat(p.totalWindEarned) : 0,
                 token0Symbol: p.pool.token0.symbol,
                 token1Symbol: p.pool.token1.symbol,
             };

@@ -271,6 +271,10 @@ export interface SubgraphPosition {
     withdrawnToken1?: string;
     collectedToken0?: string;
     collectedToken1?: string;
+    depositedUSD?: string;
+    withdrawnUSD?: string;
+    collectedUSD?: string;
+    totalWindEarned?: string;
 }
 
 export interface SubgraphVeNFT {
@@ -380,6 +384,10 @@ const USER_DATA_QUERY = `
                 withdrawnToken1
                 collectedToken0
                 collectedToken1
+                depositedUSD
+                withdrawnUSD
+                collectedUSD
+                totalWindEarned
             }
             veNFTs(first: 50, where: { closed: false }) {
                 id
