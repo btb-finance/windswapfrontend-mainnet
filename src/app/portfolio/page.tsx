@@ -66,6 +66,13 @@ interface StakedPosition {
     liquidity: bigint;
     pendingRewards: bigint;
     rewardRate: bigint;
+    token0PriceUSD: number;
+    token1PriceUSD: number;
+    amountUSD: number;
+    depositedUSD: number;
+    withdrawnUSD: number;
+    collectedUSD: number;
+    totalWindEarned: number;
 }
 
 // Get token info from known token list (uses centralized utility)
@@ -309,6 +316,7 @@ export default function PortfolioPage() {
     // Search and sort state for positions
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<'value' | 'pnl' | 'recent'>('value'); // Sort by locked amount (value) by default
+    const [hideEmpty, setHideEmpty] = useState(true);
 
     // Search and sort state for staked positions
     const [stakedSearchQuery, setStakedSearchQuery] = useState('');
@@ -618,6 +626,70 @@ export default function PortfolioPage() {
         setActionLoading(false);
     };
 
+    // Burn empty position NFT (liquidity=0, fees=0)
+    const handleBurnPosition = async (position: typeof clPositions[0]) => {
+        if (!address) return;
+        setActionLoading(true);
+        try {
+            // If there are uncollected fees, collect first then burn
+            if (position.tokensOwed0 > BigInt(0) || position.tokensOwed1 > BigInt(0)) {
+                const maxUint128 = BigInt('340282366920938463463374607431768211455');
+                const batchCalls = [
+                    encodeContractCall(
+                        CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        NFT_POSITION_MANAGER_ABI,
+                        'collect',
+                        [{
+                            tokenId: position.tokenId,
+                            recipient: address,
+                            amount0Max: maxUint128,
+                            amount1Max: maxUint128,
+                        }]
+                    ),
+                    encodeContractCall(
+                        CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        NFT_POSITION_MANAGER_ABI,
+                        'burn',
+                        [position.tokenId]
+                    )
+                ];
+                const batchResult = await executeBatch(batchCalls);
+                if (!batchResult.usedBatching || !batchResult.success) {
+                    await writeContractAsync({
+                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        abi: NFT_POSITION_MANAGER_ABI,
+                        functionName: 'collect',
+                        args: [{
+                            tokenId: position.tokenId,
+                            recipient: address,
+                            amount0Max: maxUint128,
+                            amount1Max: maxUint128,
+                        }],
+                    });
+                    await writeContractAsync({
+                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                        abi: NFT_POSITION_MANAGER_ABI,
+                        functionName: 'burn',
+                        args: [position.tokenId],
+                    });
+                }
+            } else {
+                await writeContractAsync({
+                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'burn',
+                    args: [position.tokenId],
+                });
+            }
+            toast.success('Position burned!');
+            refetchCL();
+        } catch (err) {
+            console.error('Burn position error:', err);
+            toast.error('Failed to burn position');
+        }
+        setActionLoading(false);
+    };
+
     // Remove liquidity from CL position with batch support
     const handleRemoveLiquidity = async (position: typeof clPositions[0]) => {
         if (!address || position.liquidity <= BigInt(0)) return;
@@ -626,7 +698,7 @@ export default function PortfolioPage() {
             const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
-            // Build batch: decrease liquidity + collect
+            // Build batch: decrease liquidity + collect + burn
             const batchCalls = [
                 encodeContractCall(
                     CL_CONTRACTS.NonfungiblePositionManager as Address,
@@ -650,6 +722,12 @@ export default function PortfolioPage() {
                         amount0Max: maxUint128,
                         amount1Max: maxUint128,
                     }]
+                ),
+                encodeContractCall(
+                    CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    NFT_POSITION_MANAGER_ABI,
+                    'burn',
+                    [position.tokenId]
                 )
             ];
 
@@ -687,6 +765,14 @@ export default function PortfolioPage() {
                         amount0Max: maxUint128,
                         amount1Max: maxUint128,
                     }],
+                });
+
+                // Then burn the empty NFT
+                await writeContractAsync({
+                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'burn',
+                    args: [position.tokenId],
                 });
 
                 toast.success('Liquidity removed!');
@@ -918,7 +1004,7 @@ export default function PortfolioPage() {
                 ));
             }
 
-            // 3. Collect fees LAST
+            // 3. Collect fees
             batchCalls.push(encodeContractCall(
                 CL_CONTRACTS.NonfungiblePositionManager as Address,
                 NFT_POSITION_MANAGER_ABI,
@@ -929,6 +1015,14 @@ export default function PortfolioPage() {
                     amount0Max: maxUint128,
                     amount1Max: maxUint128,
                 }]
+            ));
+
+            // 4. Burn the empty NFT
+            batchCalls.push(encodeContractCall(
+                CL_CONTRACTS.NonfungiblePositionManager as Address,
+                NFT_POSITION_MANAGER_ABI,
+                'burn',
+                [pos.tokenId]
             ));
             // Note: Rewards are auto-claimed when unstaking, no separate claim needed
 
@@ -971,7 +1065,7 @@ export default function PortfolioPage() {
                     });
                 }
 
-                // 3. Collect fees LAST
+                // 3. Collect fees
                 await writeContractAsync({
                     address: CL_CONTRACTS.NonfungiblePositionManager as Address,
                     abi: NFT_POSITION_MANAGER_ABI,
@@ -983,7 +1077,14 @@ export default function PortfolioPage() {
                         amount1Max: maxUint128,
                     }],
                 });
-                // Note: Rewards are auto-claimed when unstaking, no separate claim needed
+
+                // 4. Burn the empty NFT
+                await writeContractAsync({
+                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'burn',
+                    args: [pos.tokenId],
+                });
 
                 toast.success('Position fully exited!');
             }
@@ -1324,8 +1425,12 @@ export default function PortfolioPage() {
     }
 
     // Filter and sort positions
+    const emptyCount = clPositions.filter(pos => pos.liquidity <= BigInt(0) && pos.tokensOwed0 <= BigInt(0) && pos.tokensOwed1 <= BigInt(0)).length;
+
     const filteredAndSortedCLPositions = clPositions
         .filter(pos => {
+            // Hide empty filter
+            if (hideEmpty && pos.liquidity <= BigInt(0) && pos.tokensOwed0 <= BigInt(0) && pos.tokensOwed1 <= BigInt(0)) return false;
             if (!searchQuery) return true;
             const t0 = getTokenInfo(pos.token0);
             const t1 = getTokenInfo(pos.token1);
@@ -1341,9 +1446,9 @@ export default function PortfolioPage() {
                 // Sort by USD value (highest first)
                 return (b.amountUSD || 0) - (a.amountUSD || 0);
             } else if (sortBy === 'pnl') {
-                // Sort by PnL (highest first)
-                const aPnl = (a.amountUSD || 0) + (a.withdrawnToken0 || 0) * (a.token0PriceUSD || 0) + (a.withdrawnToken1 || 0) * (a.token1PriceUSD || 0) + (a.collectedToken0 || 0) * (a.token0PriceUSD || 0) + (a.collectedToken1 || 0) * (a.token1PriceUSD || 0) - (a.depositedToken0 || 0) * (a.token0PriceUSD || 0) - (a.depositedToken1 || 0) * (a.token1PriceUSD || 0);
-                const bPnl = (b.amountUSD || 0) + (b.withdrawnToken0 || 0) * (b.token0PriceUSD || 0) + (b.withdrawnToken1 || 0) * (b.token1PriceUSD || 0) + (b.collectedToken0 || 0) * (b.token0PriceUSD || 0) + (b.collectedToken1 || 0) * (b.token1PriceUSD || 0) - (b.depositedToken0 || 0) * (b.token0PriceUSD || 0) - (b.depositedToken1 || 0) * (b.token1PriceUSD || 0);
+                // Sort by PnL using historical USD values
+                const aPnl = (a.amountUSD || 0) + (a.collectedUSD || 0) + (a.totalWindEarned || 0) * (windPrice || 0) - (a.depositedUSD || 0);
+                const bPnl = (b.amountUSD || 0) + (b.collectedUSD || 0) + (b.totalWindEarned || 0) * (windPrice || 0) - (b.depositedUSD || 0);
                 return bPnl - aPnl;
             } else {
                 // Sort by tokenId (most recent first - assuming higher ID = newer)
@@ -1710,6 +1815,14 @@ export default function PortfolioPage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                             </div>
+                            {emptyCount > 0 && (
+                                <button
+                                    onClick={() => setHideEmpty(!hideEmpty)}
+                                    className={`px-3 py-2 text-xs rounded-xl border transition ${hideEmpty ? 'bg-orange-500/10 border-orange-500/30 text-orange-400' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                                >
+                                    {hideEmpty ? `Show ${emptyCount} Empty` : `Hide ${emptyCount} Empty`}
+                                </button>
+                            )}
                         </div>
 
                         {/* CL Positions */}
@@ -1726,10 +1839,18 @@ export default function PortfolioPage() {
                                         const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
                                         const isExpanded = expandedCLPosition === pos.tokenId.toString();
 
-                                        const depositedUsd = (pos.depositedToken0 || 0) * (pos.token0PriceUSD || 0) + (pos.depositedToken1 || 0) * (pos.token1PriceUSD || 0);
-                                        const withdrawnUsd = (pos.withdrawnToken0 || 0) * (pos.token0PriceUSD || 0) + (pos.withdrawnToken1 || 0) * (pos.token1PriceUSD || 0);
-                                        const collectedUsd = (pos.collectedToken0 || 0) * (pos.token0PriceUSD || 0) + (pos.collectedToken1 || 0) * (pos.token1PriceUSD || 0);
-                                        const pnlUsd = (pos.amountUSD || 0) + withdrawnUsd + collectedUsd - depositedUsd;
+                                        // Use historical USD values from subgraph (captured at time of event)
+                                        const depositedUsd = pos.depositedUSD || 0;
+                                        const withdrawnUsd = pos.withdrawnUSD || 0;
+                                        const collectedUsd = pos.collectedUSD || 0;
+                                        // Fees = collected - withdrawn (collect() returns principal + fees together)
+                                        const feesEarnedUsd = Math.max(0, collectedUsd - withdrawnUsd);
+                                        const feesToken0 = Math.max(0, (pos.collectedToken0 || 0) - (pos.withdrawnToken0 || 0));
+                                        const feesToken1 = Math.max(0, (pos.collectedToken1 || 0) - (pos.withdrawnToken1 || 0));
+                                        // WIND staking rewards
+                                        const windEarnedUsd = (pos.totalWindEarned || 0) * (windPrice || 0);
+                                        // PnL = current value + what you got back + WIND earned - what you put in
+                                        const pnlUsd = (pos.amountUSD || 0) + collectedUsd + windEarnedUsd - depositedUsd;
                                         const pnlPct = depositedUsd > 0 ? (pnlUsd / depositedUsd) * 100 : 0;
 
                                         const currentPoolTick = positionTicks[pos.tokenId.toString()];
@@ -1748,8 +1869,10 @@ export default function PortfolioPage() {
                                             ? parseFloat(formatUnits(pos.tokensOwed1, t1.decimals)) * pos.token1PriceUSD : 0;
                                         const totalFeesUsd = uncollectedFees0Usd + uncollectedFees1Usd;
 
+                                        const isEmpty = pos.liquidity <= BigInt(0);
+
                                         return (
-                                            <div key={i} className="rounded-2xl bg-white/[0.03] border border-white/10 overflow-hidden hover:border-white/20 transition-colors">
+                                            <div key={i} className={`rounded-2xl border overflow-hidden transition-colors ${isEmpty ? 'bg-white/[0.02] border-white/5 hover:border-white/15' : 'bg-white/[0.03] border-white/10 hover:border-white/20'}`}>
                                                 {/* Clickable Summary Row */}
                                                 <button
                                                     onClick={() => setExpandedCLPosition(isExpanded ? null : pos.tokenId.toString())}
@@ -1772,29 +1895,41 @@ export default function PortfolioPage() {
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="font-bold text-sm">{t0.symbol}/{t1.symbol}</span>
+                                                                    <span className={`font-bold text-sm ${isEmpty ? 'text-gray-500' : ''}`}>{t0.symbol}/{t1.symbol}</span>
                                                                     <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/5 text-gray-400">{feeMap[pos.tickSpacing] || `${pos.tickSpacing}ts`}</span>
                                                                 </div>
                                                                 <div className="flex items-center gap-2 mt-0.5">
                                                                     <span className="text-xs text-gray-500">#{pos.tokenId.toString()}</span>
-                                                                    <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
-                                                                        isExtremeTickRange(pos.tickLower, pos.tickUpper) ? 'bg-purple-500/15 text-purple-400' :
-                                                                        !hasTickData ? 'bg-gray-500/15 text-gray-400' :
-                                                                        inRange ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'
-                                                                    }`}>
-                                                                        {isExtremeTickRange(pos.tickLower, pos.tickUpper) ? 'Full Range' :
-                                                                            !hasTickData ? '...' : inRange ? 'In Range' : 'Out of Range'}
-                                                                    </span>
+                                                                    {isEmpty ? (
+                                                                        <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-500/15 text-gray-500">Closed</span>
+                                                                    ) : (
+                                                                        <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
+                                                                            isExtremeTickRange(pos.tickLower, pos.tickUpper) ? 'bg-purple-500/15 text-purple-400' :
+                                                                            !hasTickData ? 'bg-gray-500/15 text-gray-400' :
+                                                                            inRange ? 'bg-green-500/15 text-green-400' : 'bg-orange-500/15 text-orange-400'
+                                                                        }`}>
+                                                                            {isExtremeTickRange(pos.tickLower, pos.tickUpper) ? 'Full Range' :
+                                                                                !hasTickData ? '...' : inRange ? 'In Range' : 'Out of Range'}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-3 flex-shrink-0">
                                                             <div className="text-right">
-                                                                <div className="font-bold text-sm">{formatPrice(pos.amountUSD || 0)}</div>
-                                                                {pnlUsd !== 0 && (
-                                                                    <div className={`text-xs ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                        {pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                                                                {isEmpty ? (
+                                                                    <div className={`text-xs font-medium ${pnlUsd >= 0 ? 'text-green-400/70' : 'text-red-400/70'}`}>
+                                                                        {pnlUsd >= 0 ? '+' : ''}{formatPrice(pnlUsd)}
                                                                     </div>
+                                                                ) : (
+                                                                    <>
+                                                                        <div className="font-bold text-sm">{formatPrice(pos.amountUSD || 0)}</div>
+                                                                        {pnlUsd !== 0 && (
+                                                                            <div className={`text-xs ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                                {pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                                                                            </div>
+                                                                        )}
+                                                                    </>
                                                                 )}
                                                             </div>
                                                             <svg className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1802,153 +1937,267 @@ export default function PortfolioPage() {
                                                             </svg>
                                                         </div>
                                                     </div>
-                                                    {/* Mini range bar - always visible */}
-                                                    {!isExtremeTickRange(pos.tickLower, pos.tickUpper) && (
-                                                        <PriceRangeBar
-                                                            currentPrice={currentPrice}
-                                                            priceLower={priceLower}
-                                                            priceUpper={priceUpper}
-                                                            isFullRange={isExtremeTickRange(pos.tickLower, pos.tickUpper)}
-                                                            compact={true}
-                                                        />
-                                                    )}
                                                 </button>
 
                                                 {/* Expanded Details */}
                                                 {isExpanded && (
                                                     <div className="px-4 pb-4 space-y-3 border-t border-white/5">
-                                                        {/* Token Balances */}
-                                                        <div className="grid grid-cols-2 gap-2 pt-3">
-                                                            <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="flex items-center gap-1.5 mb-1">
+
+                                                      {pos.liquidity <= BigInt(0) ? (
+                                                        <>
+                                                            {/* Compact summary for empty positions */}
+                                                            <div className="p-3 rounded-xl bg-white/5 space-y-2 pt-3">
+                                                                <div className="text-xs text-gray-500 mb-2">Position Summary</div>
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Range</span>
+                                                                    <span className="text-gray-300">
+                                                                        {isExtremeTickRange(pos.tickLower, pos.tickUpper)
+                                                                            ? 'Full Range'
+                                                                            : `${formatPrice(priceLower)} — ${formatPrice(priceUpper)} ${t1.symbol}/${t0.symbol}`
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">You put in</span>
+                                                                    <span className="text-gray-300 font-medium">{formatPrice(depositedUsd)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">You took out</span>
+                                                                    <span className="text-gray-300 font-medium">{formatPrice(withdrawnUsd)}</span>
+                                                                </div>
+                                                                {feesEarnedUsd > 0 && (
+                                                                    <div className="flex justify-between text-xs">
+                                                                        <span className="text-gray-500">Fees earned</span>
+                                                                        <span className="text-green-400 font-medium">+{formatPrice(feesEarnedUsd)}</span>
+                                                                    </div>
+                                                                )}
+                                                                {pos.totalWindEarned > 0 && (
+                                                                    <div className="flex justify-between text-xs">
+                                                                        <span className="text-gray-500">WIND earned</span>
+                                                                        <span className="text-yellow-400 font-medium">+{pos.totalWindEarned.toFixed(4)} WIND</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="border-t border-white/10 pt-2 flex justify-between text-xs">
+                                                                    <span className="text-gray-400 font-medium">Net profit</span>
+                                                                    <span className={`font-semibold ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                        {pnlUsd >= 0 ? '+' : ''}{formatPrice(pnlUsd)} ({pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Burn CTA */}
+                                                            <div className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
+                                                                <div className="text-xs text-orange-400/90">
+                                                                    Hey! This LP is useless — it costs us money to track and wastes your time loading. Do yourself a favor and burn it!
+                                                                </div>
+                                                                {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
+                                                                    <div className="text-xs text-green-400 mt-1">Has uncollected fees — collect before burning!</div>
+                                                                )}
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                                                {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
+                                                                    <button
+                                                                        onClick={() => handleCollectFees(pos)}
+                                                                        disabled={actionLoading}
+                                                                        className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
+                                                                    >
+                                                                        {actionLoading ? '...' : 'Collect Fees'}
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={() => handleBurnPosition(pos)}
+                                                                    disabled={actionLoading}
+                                                                    className="py-2.5 text-xs font-medium rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition disabled:opacity-50"
+                                                                >
+                                                                    {actionLoading ? '...' : (pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) ? 'Collect & Burn' : 'Burn Position'}
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                      ) : (
+                                                        <>
+                                                        {/* Active position details */}
+
+                                                        {/* Balances + Uncollected Fees in one row */}
+                                                        <div className="grid grid-cols-3 gap-2 pt-3">
+                                                            <div className="p-2.5 rounded-xl bg-white/5">
+                                                                <div className="flex items-center gap-1 mb-1">
                                                                     {getTokenLogo(pos.token0) ? (
-                                                                        <img src={getTokenLogo(pos.token0)} alt={t0.symbol} className="w-4 h-4 rounded-full" />
-                                                                    ) : (
-                                                                        <div className="w-4 h-4 rounded-full bg-secondary/30 flex items-center justify-center text-[7px] font-bold">{t0.symbol.slice(0, 2)}</div>
-                                                                    )}
+                                                                        <img src={getTokenLogo(pos.token0)} alt={t0.symbol} className="w-3.5 h-3.5 rounded-full" />
+                                                                    ) : null}
                                                                     <span className="text-xs text-gray-400">{t0.symbol}</span>
                                                                 </div>
                                                                 <div className="font-semibold text-sm">
-                                                                    {hasTickData ? amounts.amount0.toFixed(amounts.amount0 < 0.01 ? 6 : 4) : <span className="text-gray-500">...</span>}
+                                                                    {hasTickData ? amounts.amount0.toFixed(amounts.amount0 < 0.01 ? 6 : 4) : '...'}
                                                                 </div>
                                                             </div>
-                                                            <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="flex items-center gap-1.5 mb-1">
+                                                            <div className="p-2.5 rounded-xl bg-white/5">
+                                                                <div className="flex items-center gap-1 mb-1">
                                                                     {getTokenLogo(pos.token1) ? (
-                                                                        <img src={getTokenLogo(pos.token1)} alt={t1.symbol} className="w-4 h-4 rounded-full" />
-                                                                    ) : (
-                                                                        <div className="w-4 h-4 rounded-full bg-primary/30 flex items-center justify-center text-[7px] font-bold">{t1.symbol.slice(0, 2)}</div>
-                                                                    )}
+                                                                        <img src={getTokenLogo(pos.token1)} alt={t1.symbol} className="w-3.5 h-3.5 rounded-full" />
+                                                                    ) : null}
                                                                     <span className="text-xs text-gray-400">{t1.symbol}</span>
                                                                 </div>
                                                                 <div className="font-semibold text-sm">
-                                                                    {hasTickData ? amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 6 : 4) : <span className="text-gray-500">...</span>}
+                                                                    {hasTickData ? amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 6 : 4) : '...'}
                                                                 </div>
+                                                            </div>
+                                                            <div className="p-2.5 rounded-xl bg-green-500/5 border border-green-500/10">
+                                                                <div className="text-xs text-gray-400 mb-1">Claimable</div>
+                                                                <div className="font-bold text-sm text-green-400">{formatPrice(totalFeesUsd)}</div>
+                                                                {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
+                                                                    <div className="text-[10px] text-green-400/60 mt-0.5">
+                                                                        {parseFloat(formatUnits(pos.tokensOwed0, t0.decimals)).toFixed(4)} {t0.symbol} + {parseFloat(formatUnits(pos.tokensOwed1, t1.decimals)).toFixed(4)} {t1.symbol}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
 
                                                         {/* Price Range */}
-                                                        <div className="p-3 rounded-xl bg-white/5">
-                                                            <div className="flex items-center justify-between mb-0.5">
-                                                                <span className="text-xs text-gray-400">Price Range</span>
-                                                                <span className="text-[10px] text-gray-600">{t1.symbol}/{t0.symbol}</span>
+                                                        {!isExtremeTickRange(pos.tickLower, pos.tickUpper) ? (
+                                                            <div className="p-3 rounded-xl bg-white/5">
+                                                                {/* Visual range indicator */}
+                                                                {currentPrice !== null && (() => {
+                                                                    const rangeSpan = priceUpper - priceLower;
+                                                                    const padding = rangeSpan * 0.25;
+                                                                    const dMin = priceLower - padding;
+                                                                    const dSpan = (priceUpper + padding) - dMin;
+                                                                    const lPct = ((priceLower - dMin) / dSpan) * 100;
+                                                                    const rPct = ((priceUpper - dMin) / dSpan) * 100;
+                                                                    const cPct = Math.max(2, Math.min(98, ((currentPrice - dMin) / dSpan) * 100));
+                                                                    const pctDown = ((currentPrice - priceLower) / currentPrice * 100);
+                                                                    const pctUp = ((priceUpper - currentPrice) / currentPrice * 100);
+                                                                    return (
+                                                                        <div>
+                                                                            {/* Labels above bar */}
+                                                                            <div className="flex items-end justify-between mb-1.5">
+                                                                                <div>
+                                                                                    <div className="text-[10px] text-gray-600">{t1.symbol}/{t0.symbol}</div>
+                                                                                </div>
+                                                                                <div className={`text-xs font-semibold ${inRange ? 'text-green-400' : 'text-orange-400'}`}>
+                                                                                    {formatPrice(currentPrice)}
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Bar */}
+                                                                            <div className="relative h-8 rounded-lg overflow-hidden bg-white/[0.03]">
+                                                                                {/* Range fill */}
+                                                                                <div
+                                                                                    className="absolute top-0 h-full rounded-lg"
+                                                                                    style={{
+                                                                                        left: `${lPct}%`,
+                                                                                        width: `${rPct - lPct}%`,
+                                                                                        background: inRange
+                                                                                            ? 'linear-gradient(90deg, rgba(74,222,128,0.12), rgba(74,222,128,0.06))'
+                                                                                            : 'rgba(251,146,60,0.08)',
+                                                                                        borderLeft: '1px solid rgba(255,255,255,0.1)',
+                                                                                        borderRight: '1px solid rgba(255,255,255,0.1)',
+                                                                                    }}
+                                                                                />
+                                                                                {/* Min label inside */}
+                                                                                <div className="absolute top-0 h-full flex items-center" style={{ left: `${lPct + 1}%` }}>
+                                                                                    <span className="text-[10px] text-gray-500 pl-1">{formatPrice(priceLower)}</span>
+                                                                                </div>
+                                                                                {/* Max label inside */}
+                                                                                <div className="absolute top-0 h-full flex items-center" style={{ right: `${100 - rPct + 1}%` }}>
+                                                                                    <span className="text-[10px] text-gray-500 pr-1">{formatPrice(priceUpper)}</span>
+                                                                                </div>
+                                                                                {/* Current price dot + line */}
+                                                                                <div className="absolute top-0 h-full" style={{ left: `${cPct}%` }}>
+                                                                                    <div className={`w-px h-full ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                                    <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-[#0d0d14] ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* +/- % labels below */}
+                                                                            <div className="flex justify-between mt-1.5">
+                                                                                <span className="text-[10px] text-gray-500">
+                                                                                    −{pctDown.toFixed(1)}%
+                                                                                </span>
+                                                                                {!inRange && (
+                                                                                    <span className="text-[10px] text-orange-400/80">
+                                                                                        {currentPrice < priceLower ? `100% ${t0.symbol}` : `100% ${t1.symbol}`}
+                                                                                    </span>
+                                                                                )}
+                                                                                <span className="text-[10px] text-gray-500">
+                                                                                    +{pctUp.toFixed(1)}%
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </div>
-                                                            {isExtremeTickRange(pos.tickLower, pos.tickUpper) ? (
-                                                                <div className="text-xs font-medium text-purple-300 mt-1">Full Range (all prices)</div>
-                                                            ) : (
-                                                                <PriceRangeBar
-                                                                    currentPrice={currentPrice}
-                                                                    priceLower={priceLower}
-                                                                    priceUpper={priceUpper}
-                                                                    isFullRange={false}
-                                                                />
-                                                            )}
-                                                        </div>
-
-                                                        {/* Uncollected Fees */}
-                                                        {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
-                                                            <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10">
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <span className="text-xs text-gray-400">Uncollected Fees</span>
-                                                                    <span className="text-xs font-semibold text-green-400">{formatPrice(totalFeesUsd)}</span>
-                                                                </div>
-                                                                <div className="grid grid-cols-2 gap-2 text-xs">
-                                                                    <div className="flex justify-between">
-                                                                        <span className="text-gray-500">{t0.symbol}</span>
-                                                                        <span className="text-green-400 font-medium">{parseFloat(formatUnits(pos.tokensOwed0, t0.decimals)).toFixed(6)}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between">
-                                                                        <span className="text-gray-500">{t1.symbol}</span>
-                                                                        <span className="text-green-400 font-medium">{parseFloat(formatUnits(pos.tokensOwed1, t1.decimals)).toFixed(6)}</span>
-                                                                    </div>
-                                                                </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-500/5">
+                                                                <span className="text-xs text-gray-400">Price Range</span>
+                                                                <span className="text-xs font-medium text-purple-300">Full Range (all prices)</span>
                                                             </div>
                                                         )}
 
-                                                        {/* PnL Details */}
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="text-xs text-gray-500 mb-1">Deposited</div>
-                                                                <div className="font-semibold text-sm">{formatPrice(depositedUsd)}</div>
-                                                            </div>
-                                                            <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="text-xs text-gray-500 mb-1">PnL</div>
-                                                                <div className={`font-semibold text-sm ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                                    {pnlUsd >= 0 ? '+' : ''}{formatPrice(pnlUsd)}
+                                                        {/* PnL Summary */}
+                                                        <div className="p-3 rounded-xl bg-white/5 space-y-1.5">
+                                                            {depositedUsd > 0 && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Invested</span>
+                                                                    <span className="text-gray-300">{formatPrice(depositedUsd)}</span>
                                                                 </div>
-                                                                <div className={`text-xs ${pnlUsd >= 0 ? 'text-green-400/60' : 'text-red-400/60'}`}>
-                                                                    {pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%
+                                                            )}
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-gray-500">Current value</span>
+                                                                <span className="text-gray-300">{formatPrice(pos.amountUSD || 0)}</span>
+                                                            </div>
+                                                            {feesEarnedUsd > 0 && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Fees collected</span>
+                                                                    <span className="text-green-400">+{formatPrice(feesEarnedUsd)}</span>
                                                                 </div>
-                                                            </div>
-                                                            <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="text-xs text-gray-500 mb-1">Fees Earned</div>
-                                                                <div className="font-semibold text-sm text-green-400">{formatPrice(collectedUsd)}</div>
-                                                            </div>
-                                                            <div className="p-3 rounded-xl bg-white/5">
-                                                                <div className="text-xs text-gray-500 mb-1">Withdrawn</div>
-                                                                <div className="font-semibold text-sm">{formatPrice(withdrawnUsd)}</div>
-                                                            </div>
+                                                            )}
+                                                            {pos.totalWindEarned > 0 && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">WIND earned</span>
+                                                                    <span className="text-yellow-400">+{pos.totalWindEarned.toFixed(4)} WIND</span>
+                                                                </div>
+                                                            )}
+                                                            {depositedUsd > 0 ? (
+                                                                <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs">
+                                                                    <span className="text-gray-400 font-medium">P&L</span>
+                                                                    <span className={`font-semibold ${pnlUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                        {pnlUsd >= 0 ? '+' : ''}{formatPrice(pnlUsd)} ({pnlUsd >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+                                                                    </span>
+                                                                </div>
+                                                            ) : null}
                                                         </div>
 
-                                                        {/* Stake CTA - subtle inline */}
-                                                        <div className="flex items-center justify-between p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/15">
-                                                            <div className="text-xs">
-                                                                <span className="text-gray-300">Earning fees</span>
-                                                                <span className="text-gray-500"> · Stake for bonus WIND</span>
-                                                            </div>
+                                                        {/* Actions */}
+                                                        <div className="grid grid-cols-4 gap-2">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleStakePosition(pos); }}
                                                                 disabled={actionLoading}
-                                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition disabled:opacity-50"
+                                                                className="py-2.5 text-xs font-medium rounded-xl bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition disabled:opacity-50"
                                                             >
-                                                                Stake
-                                                            </button>
-                                                        </div>
-
-                                                        {/* Action Buttons */}
-                                                        <div className="grid grid-cols-3 gap-2 pt-1">
-                                                            <button
-                                                                onClick={() => openIncreaseLiquidityModal(pos)}
-                                                                disabled={actionLoading}
-                                                                className="py-2.5 text-xs font-medium rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 transition disabled:opacity-50"
-                                                            >
-                                                                {actionLoading ? '...' : 'Increase'}
+                                                                {actionLoading ? '...' : 'Stake'}
                                                             </button>
                                                             <button
                                                                 onClick={() => handleCollectFees(pos)}
                                                                 disabled={actionLoading || (pos.tokensOwed0 <= BigInt(0) && pos.tokensOwed1 <= BigInt(0))}
                                                                 className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
                                                             >
-                                                                {actionLoading ? '...' : 'Collect Fees'}
+                                                                {actionLoading ? '...' : 'Collect'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => openIncreaseLiquidityModal(pos)}
+                                                                disabled={actionLoading}
+                                                                className="py-2.5 text-xs font-medium rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 transition disabled:opacity-50"
+                                                            >
+                                                                {actionLoading ? '...' : 'Add'}
                                                             </button>
                                                             <button
                                                                 onClick={() => handleRemoveLiquidity(pos)}
-                                                                disabled={actionLoading || pos.liquidity <= BigInt(0)}
+                                                                disabled={actionLoading}
                                                                 className="py-2.5 text-xs font-medium rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition disabled:opacity-50"
                                                             >
                                                                 {actionLoading ? '...' : 'Remove'}
                                                             </button>
                                                         </div>
+                                                        </>
+                                                      )}
                                                     </div>
                                                 )}
                                             </div>
@@ -2207,18 +2456,6 @@ export default function PortfolioPage() {
                                                     </span>
                                                 </div>
 
-                                                {/* Range visualization */}
-                                                {!stakedIsFullRange && (
-                                                    <div className="mb-2">
-                                                        <PriceRangeBar
-                                                            currentPrice={stakedCurrentPrice}
-                                                            priceLower={stakedPriceLower}
-                                                            priceUpper={stakedPriceUpper}
-                                                            isFullRange={stakedIsFullRange}
-                                                        />
-                                                    </div>
-                                                )}
-
                                                 {/* Token Amounts & Rewards Row */}
                                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                                     <div className="p-2.5 rounded-xl bg-white/5">
@@ -2243,14 +2480,103 @@ export default function PortfolioPage() {
                                                             {amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 4 : 2)}
                                                         </div>
                                                     </div>
-                                                    <div className="p-2.5 rounded-xl bg-green-500/5 border border-green-500/10">
+                                                    <div className="p-2.5 rounded-xl bg-yellow-500/5 border border-yellow-500/10">
                                                         <div className="text-xs text-gray-400 mb-1">Rewards</div>
-                                                        <div className="font-bold text-sm text-green-400">
+                                                        <div className="font-bold text-sm text-yellow-400">
                                                             {rewardsAmount.toFixed(rewardsAmount < 0.01 ? 6 : 4)}
                                                         </div>
-                                                        <div className="text-[10px] text-green-400/60">WIND</div>
+                                                        <div className="text-[10px] text-yellow-400/60">WIND</div>
                                                     </div>
                                                 </div>
+
+                                                {/* Range visualization */}
+                                                {!stakedIsFullRange && stakedCurrentPrice > 0 && (() => {
+                                                    const rangeSpan = stakedPriceUpper - stakedPriceLower;
+                                                    const padding = rangeSpan * 0.25;
+                                                    const dMin = stakedPriceLower - padding;
+                                                    const dSpan = (stakedPriceUpper + padding) - dMin;
+                                                    const lPct = ((stakedPriceLower - dMin) / dSpan) * 100;
+                                                    const rPct = ((stakedPriceUpper - dMin) / dSpan) * 100;
+                                                    const cPct = Math.max(2, Math.min(98, ((stakedCurrentPrice - dMin) / dSpan) * 100));
+                                                    const pctDown = ((stakedCurrentPrice - stakedPriceLower) / stakedCurrentPrice * 100);
+                                                    const pctUp = ((stakedPriceUpper - stakedCurrentPrice) / stakedCurrentPrice * 100);
+                                                    return (
+                                                        <div className="p-3 rounded-xl bg-white/5 mb-3">
+                                                            <div className="flex items-end justify-between mb-1.5">
+                                                                <div className="text-[10px] text-gray-600">{pos.token1Symbol}/{pos.token0Symbol}</div>
+                                                                <div className={`text-xs font-semibold ${inRange ? 'text-green-400' : 'text-orange-400'}`}>
+                                                                    {formatPrice(stakedCurrentPrice)}
+                                                                </div>
+                                                            </div>
+                                                            <div className="relative h-8 rounded-lg overflow-hidden bg-white/[0.03]">
+                                                                <div className="absolute top-0 h-full rounded-lg" style={{ left: `${lPct}%`, width: `${rPct - lPct}%`, background: inRange ? 'linear-gradient(90deg, rgba(74,222,128,0.12), rgba(74,222,128,0.06))' : 'rgba(251,146,60,0.08)', borderLeft: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.1)' }} />
+                                                                <div className="absolute top-0 h-full flex items-center" style={{ left: `${lPct + 1}%` }}>
+                                                                    <span className="text-[10px] text-gray-500 pl-1">{formatPrice(stakedPriceLower)}</span>
+                                                                </div>
+                                                                <div className="absolute top-0 h-full flex items-center" style={{ right: `${100 - rPct + 1}%` }}>
+                                                                    <span className="text-[10px] text-gray-500 pr-1">{formatPrice(stakedPriceUpper)}</span>
+                                                                </div>
+                                                                <div className="absolute top-0 h-full" style={{ left: `${cPct}%` }}>
+                                                                    <div className={`w-px h-full ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                    <div className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 border-[#0d0d14] ${inRange ? 'bg-green-400' : 'bg-orange-400'}`} />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex justify-between mt-1.5">
+                                                                <span className="text-[10px] text-gray-500">−{pctDown.toFixed(1)}%</span>
+                                                                {!inRange && <span className="text-[10px] text-orange-400/80">{stakedCurrentPrice < stakedPriceLower ? `100% ${pos.token0Symbol}` : `100% ${pos.token1Symbol}`}</span>}
+                                                                <span className="text-[10px] text-gray-500">+{pctUp.toFixed(1)}%</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {/* PnL Summary */}
+                                                {(() => {
+                                                    const sDepUsd = pos.depositedUSD || 0;
+                                                    const sColUsd = pos.collectedUSD || 0;
+                                                    const sWitUsd = pos.withdrawnUSD || 0;
+                                                    const sFeesUsd = Math.max(0, sColUsd - sWitUsd);
+                                                    const sWindUsd = (pos.totalWindEarned || 0) * (windPrice || 0);
+                                                    const sCurrentUsd = (pos.amountUSD > 0) ? pos.amountUSD
+                                                        : amounts.amount0 * pos.token0PriceUSD + amounts.amount1 * pos.token1PriceUSD;
+                                                    const hasHistorical = sDepUsd > 0;
+                                                    const sPnl = hasHistorical ? sCurrentUsd + sColUsd + sWindUsd - sDepUsd : 0;
+                                                    const sPnlPct = hasHistorical && sDepUsd > 0 ? (sPnl / sDepUsd) * 100 : 0;
+                                                    return (
+                                                        <div className="p-3 rounded-xl bg-white/5 space-y-1.5 mb-3">
+                                                            {hasHistorical && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Invested</span>
+                                                                    <span className="text-gray-300">{formatPrice(sDepUsd)}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-gray-500">Current value</span>
+                                                                <span className="text-gray-300">{formatPrice(sCurrentUsd)}</span>
+                                                            </div>
+                                                            {sFeesUsd > 0 && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">Fees collected</span>
+                                                                    <span className="text-green-400">+{formatPrice(sFeesUsd)}</span>
+                                                                </div>
+                                                            )}
+                                                            {(pos.totalWindEarned > 0 || rewardsAmount > 0) && (
+                                                                <div className="flex justify-between text-xs">
+                                                                    <span className="text-gray-500">WIND earned</span>
+                                                                    <span className="text-yellow-400">+{((pos.totalWindEarned || 0) + rewardsAmount).toFixed(4)} WIND</span>
+                                                                </div>
+                                                            )}
+                                                            {hasHistorical && (
+                                                                <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs">
+                                                                    <span className="text-gray-400 font-medium">P&L</span>
+                                                                    <span className={`font-semibold ${sPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                                                        {sPnl >= 0 ? '+' : ''}{formatPrice(sPnl)} ({sPnl >= 0 ? '+' : ''}{sPnlPct.toFixed(2)}%)
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {/* Action Buttons */}
                                                 <div className="grid grid-cols-3 gap-2">

@@ -15,7 +15,7 @@ const AddLiquidityModal = dynamic(
 );
 import { Token, SEI } from '@/config/tokens';
 import { getTokenByAddress } from '@/utils/tokens';
-import { calculatePoolAPRFallback, formatAPR } from '@/utils/aprCalculator';
+import { calculatePoolAPR, formatAPR } from '@/utils/aprCalculator';
 
 type PoolType = 'all' | 'v2' | 'cl';
 type Category = 'all' | 'stable' | 'wind' | 'btc' | 'eth' | 'other';
@@ -104,35 +104,31 @@ export default function PoolsPage() {
                 continue;
             }
 
-            const s0 = pool.token0.symbol.toUpperCase();
-            const s1 = pool.token1.symbol.toUpperCase();
-
-            let tvlUsd = parseFloat(pool.tvl) || 0;
-
-            if (tvlUsd <= 0) {
-                const r0 = parseFloat(pool.reserve0) || 0;
-                const r1 = parseFloat(pool.reserve1) || 0;
-                const d0 = pool.token0.decimals || 18;
-                const d1 = pool.token1.decimals || 18;
-                const adj0 = r0 > 1e12 ? r0 / Math.pow(10, d0) : r0;
-                const adj1 = r1 > 1e12 ? r1 / Math.pow(10, d1) : r1;
-
-                const getTokenValue = (symbol: string, amount: number): number => {
-                    if (symbol === 'USDC' || symbol === 'USDT' || symbol === 'USDT0' || symbol === 'USDC.N') return amount;
-                    if (symbol === 'WSEI' || symbol === 'SEI') return amount * seiPrice;
-                    if (symbol === 'WIND') return amount * windPrice;
-                    if (symbol.includes('BTC') || symbol.includes('WBTC')) return amount * 95000;
-                    if (symbol.includes('ETH') || symbol.includes('WETH')) return amount * 3500;
-                    return amount * seiPrice;
-                };
-
-                tvlUsd = getTokenValue(s0, adj0) + getTokenValue(s1, adj1);
+            const totalTvl = parseFloat(pool.tvl) || 0;
+            if (totalTvl <= 0) {
+                aprMap.set(pool.address, null);
+                continue;
             }
 
-            if (tvlUsd <= 0) tvlUsd = 1;
-
+            // APR = annual rewards / staked TVL (only stakers earn rewards)
             const stakedLiq = stakedLiquidity.get(pool.address.toLowerCase());
-            const apr = calculatePoolAPRFallback(rewardRate, windPrice, tvlUsd, stakedLiq, undefined, pool.tickSpacing);
+            const poolLiq = pool.liquidity ? BigInt(pool.liquidity) : BigInt(0);
+
+            let stakedTvl: number;
+            if (stakedLiq && stakedLiq > BigInt(0) && poolLiq > BigInt(0)) {
+                // stakedTVL = (stakedLiquidity / totalPoolLiquidity) * totalTVL
+                stakedTvl = (Number(stakedLiq) / Number(poolLiq)) * totalTvl;
+            } else {
+                // No one staked yet — assume $1000 staked to show attractive APR
+                // Rewards are high when few/no stakers, so reflect that
+                stakedTvl = 1000;
+            }
+            if (stakedTvl <= 0) {
+                aprMap.set(pool.address, null);
+                continue;
+            }
+
+            const apr = calculatePoolAPR(rewardRate, windPrice, stakedTvl, pool.tickSpacing);
             aprMap.set(pool.address, apr);
         }
         return aprMap;

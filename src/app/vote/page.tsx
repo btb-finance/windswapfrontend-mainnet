@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
+import { formatBalance } from '@/utils/format';
 import { useVeWIND, LOCK_DURATIONS } from '@/hooks/useVeWIND';
 import { useTokenBalance } from '@/hooks/useToken';
 import { useVoter } from '@/hooks/useVoter';
@@ -1375,13 +1376,13 @@ export default function VotePage() {
                                                                         <span className="text-green-400/80">
                                                                             {fees.map((reward, idx) => (
                                                                                 <span key={reward.address}>
-                                                                                    {parseFloat(formatUnits(reward.amount, reward.decimals)).toLocaleString(undefined, { maximumFractionDigits: 2 })} {reward.symbol}
+                                                                                    {formatBalance(parseFloat(formatUnits(reward.amount, reward.decimals)))} {reward.symbol}
                                                                                     {(idx < fees.length - 1 || hasBribes) && ' + '}
                                                                                 </span>
                                                                             ))}
                                                                             {bribes.map((b, i) => (
                                                                                 <span key={b.token.id}>
-                                                                                    {parseFloat(b.totalAmount).toLocaleString(undefined, { maximumFractionDigits: 2 })} {b.token.symbol}
+                                                                                    {formatBalance(parseFloat(b.totalAmount))} {b.token.symbol}
                                                                                     {i < bribes.length - 1 && ' + '}
                                                                                 </span>
                                                                             ))}
@@ -1601,7 +1602,7 @@ export default function VotePage() {
                                                                         const symbol = token?.symbol || tokenAddr.slice(0, 6);
                                                                         return (
                                                                             <span key={tokenAddr}>
-                                                                                {parseFloat(formatUnits(amount, decimals)).toLocaleString(undefined, { maximumFractionDigits: 6 })} {symbol}
+                                                                                {formatBalance(parseFloat(formatUnits(amount, decimals)))} {symbol}
                                                                                 {idx < Object.keys(tokens).length - 1 && ' + '}
                                                                             </span>
                                                                         );

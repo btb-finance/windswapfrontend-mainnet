@@ -28,7 +28,8 @@ interface SubgraphGauge {
     isActive?: boolean;
     feeVotingReward?: string;
     bribeVotingReward?: string;
-    epochData?: Array<{ feeRewardToken0?: string; feeRewardToken1?: string }>;
+    epochData?: Array<{ epoch?: string; feeRewardToken0?: string; feeRewardToken1?: string; totalBribes?: string; emissions?: string }>;
+    epochBribes?: Array<{ token?: { id?: string; symbol?: string; decimals?: number }; totalAmount?: string; totalAmountUSD?: string }>;
     rewardTokens?: Array<{ token?: { id?: string; symbol?: string; decimals?: string }; rewardRate?: string }>;
     claimableRewards?: string;
     externalBribes?: string;
@@ -43,12 +44,16 @@ async function fetchPoolsFromSubgraph(): Promise<{
         token1: { id: string; symbol: string; decimals: number };
         tickSpacing: number;
         totalValueLockedUSD: string;
+        totalValueLockedToken0: string;
+        totalValueLockedToken1: string;
+        liquidity: string;
         volumeUSD: string;
         poolDayData: Array<{
             date: number;
             volumeUSD: string;
         }>;
     }>;
+    ethPrice: number;
 } | null> {
     try {
         const response = await fetch(SUBGRAPH_URL, {
@@ -56,12 +61,16 @@ async function fetchPoolsFromSubgraph(): Promise<{
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query: `{
-                    pools(first: 100, orderBy: totalValueLockedUSD, orderDirection: desc, where: { tickSpacing_in: [1, 2, 3, 4, 5] }) {
+                    bundles(first: 1) { ethPrice }
+                    pools(first: 100, orderBy: liquidity, orderDirection: desc, where: { tickSpacing_in: [1, 2, 3, 4, 5] }) {
                         id
                         token0 { id symbol decimals }
                         token1 { id symbol decimals }
                         tickSpacing
                         totalValueLockedUSD
+                        totalValueLockedToken0
+                        totalValueLockedToken1
+                        liquidity
                         volumeUSD
                         poolDayData(first: 1, orderBy: date, orderDirection: desc) {
                             date
@@ -76,7 +85,8 @@ async function fetchPoolsFromSubgraph(): Promise<{
             console.warn('[Subgraph] Query errors:', json.errors);
             return null;
         }
-        return json.data;
+        const ethPrice = parseFloat(json.data?.bundles?.[0]?.ethPrice || '0');
+        return { pools: json.data?.pools || [], ethPrice };
     } catch (err) {
         console.warn('[Subgraph] Fetch error:', err);
         return null;
@@ -107,6 +117,7 @@ interface PoolData {
     reserve1: string;
     tvl: string;
     volume24h?: string;
+    liquidity?: string;
     rewardRate?: bigint;
 }
 
@@ -116,6 +127,14 @@ export interface RewardToken {
     symbol: string;
     amount: bigint;
     decimals: number;
+}
+
+export interface IncentiveToken {
+    address: Address;
+    symbol: string;
+    decimals: number;
+    amount: number;       // token amount
+    amountUSD: number;    // USD value
 }
 
 export interface GaugeInfo {
@@ -133,6 +152,8 @@ export interface GaugeInfo {
     feeReward: Address;
     bribeReward: Address;
     rewardTokens: RewardToken[];
+    incentives: IncentiveToken[];
+    totalBribesUSD: number;
 }
 
 export interface StakedPosition {
@@ -152,6 +173,13 @@ export interface StakedPosition {
     liquidity: bigint;
     pendingRewards: bigint;
     rewardRate: bigint;
+    token0PriceUSD: number;
+    token1PriceUSD: number;
+    amountUSD: number;
+    depositedUSD: number;
+    withdrawnUSD: number;
+    collectedUSD: number;
+    totalWindEarned: number;
 }
 
 export interface VeNFT {
@@ -560,6 +588,13 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
             liquidity: toBigIntSafe(sp.position?.liquidity || sp.amount || '0'),
             pendingRewards: earnedFromRpc,
             rewardRate: BigInt(0),
+            token0PriceUSD: pool?.token0?.priceUSD ? parseFloat(pool.token0.priceUSD) : 0,
+            token1PriceUSD: pool?.token1?.priceUSD ? parseFloat(pool.token1.priceUSD) : 0,
+            amountUSD: sp.position?.amountUSD ? parseFloat(sp.position.amountUSD) : 0,
+            depositedUSD: sp.position?.depositedUSD ? parseFloat(sp.position.depositedUSD) : 0,
+            withdrawnUSD: sp.position?.withdrawnUSD ? parseFloat(sp.position.withdrawnUSD) : 0,
+            collectedUSD: sp.position?.collectedUSD ? parseFloat(sp.position.collectedUSD) : 0,
+            totalWindEarned: sp.position?.totalWindEarned ? parseFloat(sp.position.totalWindEarned) : 0,
         };
     });
 
@@ -592,8 +627,35 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                     const known0 = KNOWN_TOKENS[p.token0.id.toLowerCase()];
                     const known1 = KNOWN_TOKENS[p.token1.id.toLowerCase()];
 
-                    // Parse TVL (subgraph gives us USD value directly)
-                    const tvl = parseFloat(p.totalValueLockedUSD || '0');
+                    // Parse TVL - subgraph only tracks USD for tokens with known prices.
+                    // For pairs like USDC/WIND, it only values the USDC side.
+                    // We estimate full TVL by doubling the known-price side (balanced pool assumption).
+                    const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
+                    const STABLECOIN_ADDRESSES = ['0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', '0xfde4c96c8593536e31f229ea8f37b2ada2699bb2']; // USDC, USDT
+                    const t0Addr = p.token0.id.toLowerCase();
+                    const t1Addr = p.token1.id.toLowerCase();
+                    const token0IsETH = t0Addr === WETH_ADDRESS.toLowerCase();
+                    const token1IsETH = t1Addr === WETH_ADDRESS.toLowerCase();
+                    const token0IsStable = STABLECOIN_ADDRESSES.includes(t0Addr);
+                    const token1IsStable = STABLECOIN_ADDRESSES.includes(t1Addr);
+                    const t0Locked = parseFloat(p.totalValueLockedToken0 || '0');
+                    const t1Locked = parseFloat(p.totalValueLockedToken1 || '0');
+
+                    let tvl = parseFloat(p.totalValueLockedUSD || '0');
+
+                    if (token0IsETH || token1IsETH) {
+                        // ETH pair: value ETH side * ethPrice * 2
+                        const ethLocked = token0IsETH ? t0Locked : t1Locked;
+                        if (ethLocked > 0 && subgraphData.ethPrice > 0) {
+                            tvl = ethLocked * subgraphData.ethPrice * 2;
+                        }
+                    } else if ((token0IsStable || token1IsStable) && !(token0IsStable && token1IsStable)) {
+                        // One-sided stablecoin pair (e.g. USDC/WIND): double the stablecoin side
+                        const stableLocked = token0IsStable ? t0Locked : t1Locked;
+                        if (stableLocked > 0) {
+                            tvl = stableLocked * 2;
+                        }
+                    }
 
                     // Approx. 24h volume from latest PoolDayData (UTC day bucket)
                     const latestDay = p.poolDayData && p.poolDayData.length > 0 ? p.poolDayData[0] : undefined;
@@ -629,6 +691,7 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                         reserve0: '0', // Subgraph doesn't give individual reserves
                         reserve1: '0',
                         tvl: tvl > 0 ? tvl.toFixed(2) : '0',
+                        liquidity: p.liquidity || '0',
                         volume24h: volume24h > 0 ? volume24h.toFixed(2) : undefined,
                     };
                 });
@@ -691,7 +754,16 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                         epoch
                         feeRewardToken0
                         feeRewardToken1
+                        totalBribes
+                        emissions
                     }
+                }
+                gaugeEpochBribes(first: 100, orderBy: totalAmountUSD, orderDirection: desc) {
+                    gauge { id }
+                    epoch
+                    token { id symbol decimals }
+                    totalAmount
+                    totalAmountUSD
                 }
             }`;
 
@@ -736,6 +808,26 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
 
             const gaugeRows: SubgraphGauge[] = json.data?.gauges || [];
             const totalWeight = protocol?.totalVotingWeight ? BigInt(protocol.totalVotingWeight) : BigInt(0);
+
+            // Build incentive map: gaugeId -> IncentiveToken[]
+            const bribeRows = json.data?.gaugeEpochBribes || [];
+            const incentiveMap = new Map<string, IncentiveToken[]>();
+            const totalBribesMap = new Map<string, number>();
+            for (const b of bribeRows) {
+                const gaugeId = String(b.gauge?.id || '').toLowerCase();
+                if (!gaugeId || !b.token) continue;
+                const incentive: IncentiveToken = {
+                    address: String(b.token.id) as Address,
+                    symbol: String(b.token.symbol || 'UNK'),
+                    decimals: Number(b.token.decimals ?? 18),
+                    amount: parseFloat(b.totalAmount || '0'),
+                    amountUSD: parseFloat(b.totalAmountUSD || '0'),
+                };
+                const existing = incentiveMap.get(gaugeId) || [];
+                existing.push(incentive);
+                incentiveMap.set(gaugeId, existing);
+                totalBribesMap.set(gaugeId, (totalBribesMap.get(gaugeId) || 0) + incentive.amountUSD);
+            }
 
             const newRewards = new Map<string, bigint>();
             const newStakedLiquidity = new Map<string, bigint>();
@@ -789,6 +881,8 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                     feeReward: (String(g.feeVotingReward || '0x0000000000000000000000000000000000000000')) as Address,
                     bribeReward: (String(g.bribeVotingReward || '0x0000000000000000000000000000000000000000')) as Address,
                     rewardTokens,
+                    incentives: incentiveMap.get(String(g.id).toLowerCase()) || [],
+                    totalBribesUSD: totalBribesMap.get(String(g.id).toLowerCase()) || 0,
                 };
             });
 

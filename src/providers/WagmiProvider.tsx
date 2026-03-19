@@ -1,7 +1,8 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WagmiProvider, http, fallback } from 'wagmi';
+import { WagmiProvider } from 'wagmi';
+import { http, fallback } from 'viem';
 import {
     RainbowKitProvider,
     darkTheme,
