@@ -28,7 +28,8 @@ interface SubgraphGauge {
     isActive?: boolean;
     feeVotingReward?: string;
     bribeVotingReward?: string;
-    epochData?: Array<{ feeRewardToken0?: string; feeRewardToken1?: string }>;
+    epochData?: Array<{ epoch?: string; feeRewardToken0?: string; feeRewardToken1?: string; totalBribes?: string; emissions?: string }>;
+    epochBribes?: Array<{ token?: { id?: string; symbol?: string; decimals?: number }; totalAmount?: string; totalAmountUSD?: string }>;
     rewardTokens?: Array<{ token?: { id?: string; symbol?: string; decimals?: string }; rewardRate?: string }>;
     claimableRewards?: string;
     externalBribes?: string;
@@ -128,6 +129,14 @@ export interface RewardToken {
     decimals: number;
 }
 
+export interface IncentiveToken {
+    address: Address;
+    symbol: string;
+    decimals: number;
+    amount: number;       // token amount
+    amountUSD: number;    // USD value
+}
+
 export interface GaugeInfo {
     pool: Address;
     gauge: Address;
@@ -143,6 +152,8 @@ export interface GaugeInfo {
     feeReward: Address;
     bribeReward: Address;
     rewardTokens: RewardToken[];
+    incentives: IncentiveToken[];
+    totalBribesUSD: number;
 }
 
 export interface StakedPosition {
@@ -729,7 +740,16 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                         epoch
                         feeRewardToken0
                         feeRewardToken1
+                        totalBribes
+                        emissions
                     }
+                }
+                gaugeEpochBribes(first: 100, orderBy: totalAmountUSD, orderDirection: desc) {
+                    gauge { id }
+                    epoch
+                    token { id symbol decimals }
+                    totalAmount
+                    totalAmountUSD
                 }
             }`;
 
@@ -774,6 +794,26 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
 
             const gaugeRows: SubgraphGauge[] = json.data?.gauges || [];
             const totalWeight = protocol?.totalVotingWeight ? BigInt(protocol.totalVotingWeight) : BigInt(0);
+
+            // Build incentive map: gaugeId -> IncentiveToken[]
+            const bribeRows = json.data?.gaugeEpochBribes || [];
+            const incentiveMap = new Map<string, IncentiveToken[]>();
+            const totalBribesMap = new Map<string, number>();
+            for (const b of bribeRows) {
+                const gaugeId = String(b.gauge?.id || '').toLowerCase();
+                if (!gaugeId || !b.token) continue;
+                const incentive: IncentiveToken = {
+                    address: String(b.token.id) as Address,
+                    symbol: String(b.token.symbol || 'UNK'),
+                    decimals: Number(b.token.decimals ?? 18),
+                    amount: parseFloat(b.totalAmount || '0'),
+                    amountUSD: parseFloat(b.totalAmountUSD || '0'),
+                };
+                const existing = incentiveMap.get(gaugeId) || [];
+                existing.push(incentive);
+                incentiveMap.set(gaugeId, existing);
+                totalBribesMap.set(gaugeId, (totalBribesMap.get(gaugeId) || 0) + incentive.amountUSD);
+            }
 
             const newRewards = new Map<string, bigint>();
             const newStakedLiquidity = new Map<string, bigint>();
@@ -827,25 +867,10 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                     feeReward: (String(g.feeVotingReward || '0x0000000000000000000000000000000000000000')) as Address,
                     bribeReward: (String(g.bribeVotingReward || '0x0000000000000000000000000000000000000000')) as Address,
                     rewardTokens,
+                    incentives: incentiveMap.get(String(g.id).toLowerCase()) || [],
+                    totalBribesUSD: totalBribesMap.get(String(g.id).toLowerCase()) || 0,
                 };
             });
-
-            // Fetch stakedLiquidity on-chain from each CL pool (subgraph may lag)
-            const poolAddresses = [...new Set(gaugeRows.map(g => String(g.pool?.id || '').toLowerCase()).filter(Boolean))];
-            const STAKED_LIQ_SELECTOR = '0x3ab04b20'; // stakedLiquidity()
-            await Promise.all(poolAddresses.map(async (poolAddr) => {
-                try {
-                    const result = await rpcCall<string>('eth_call', [{ to: poolAddr, data: STAKED_LIQ_SELECTOR }, 'latest']);
-                    if (result && result !== '0x' && result !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
-                        const staked = BigInt(result);
-                        if (staked > BigInt(0)) {
-                            newStakedLiquidity.set(poolAddr, staked);
-                        }
-                    }
-                } catch {
-                    // Keep subgraph value if on-chain call fails
-                }
-            }));
 
             setGauges(gaugeList);
             setPoolRewards(newRewards);
