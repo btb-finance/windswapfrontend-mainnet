@@ -43,12 +43,16 @@ async function fetchPoolsFromSubgraph(): Promise<{
         token1: { id: string; symbol: string; decimals: number };
         tickSpacing: number;
         totalValueLockedUSD: string;
+        totalValueLockedToken0: string;
+        totalValueLockedToken1: string;
+        liquidity: string;
         volumeUSD: string;
         poolDayData: Array<{
             date: number;
             volumeUSD: string;
         }>;
     }>;
+    ethPrice: number;
 } | null> {
     try {
         const response = await fetch(SUBGRAPH_URL, {
@@ -56,12 +60,16 @@ async function fetchPoolsFromSubgraph(): Promise<{
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query: `{
-                    pools(first: 100, orderBy: totalValueLockedUSD, orderDirection: desc, where: { tickSpacing_in: [1, 2, 3, 4, 5] }) {
+                    bundles(first: 1) { ethPrice }
+                    pools(first: 100, orderBy: liquidity, orderDirection: desc, where: { tickSpacing_in: [1, 2, 3, 4, 5] }) {
                         id
                         token0 { id symbol decimals }
                         token1 { id symbol decimals }
                         tickSpacing
                         totalValueLockedUSD
+                        totalValueLockedToken0
+                        totalValueLockedToken1
+                        liquidity
                         volumeUSD
                         poolDayData(first: 1, orderBy: date, orderDirection: desc) {
                             date
@@ -76,7 +84,8 @@ async function fetchPoolsFromSubgraph(): Promise<{
             console.warn('[Subgraph] Query errors:', json.errors);
             return null;
         }
-        return json.data;
+        const ethPrice = parseFloat(json.data?.bundles?.[0]?.ethPrice || '0');
+        return { pools: json.data?.pools || [], ethPrice };
     } catch (err) {
         console.warn('[Subgraph] Fetch error:', err);
         return null;
@@ -107,6 +116,7 @@ interface PoolData {
     reserve1: string;
     tvl: string;
     volume24h?: string;
+    liquidity?: string;
     rewardRate?: bigint;
 }
 
@@ -592,8 +602,35 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                     const known0 = KNOWN_TOKENS[p.token0.id.toLowerCase()];
                     const known1 = KNOWN_TOKENS[p.token1.id.toLowerCase()];
 
-                    // Parse TVL (subgraph gives us USD value directly)
-                    const tvl = parseFloat(p.totalValueLockedUSD || '0');
+                    // Parse TVL - subgraph only tracks USD for tokens with known prices.
+                    // For pairs like USDC/WIND, it only values the USDC side.
+                    // We estimate full TVL by doubling the known-price side (balanced pool assumption).
+                    const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
+                    const STABLECOIN_ADDRESSES = ['0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', '0xfde4c96c8593536e31f229ea8f37b2ada2699bb2']; // USDC, USDT
+                    const t0Addr = p.token0.id.toLowerCase();
+                    const t1Addr = p.token1.id.toLowerCase();
+                    const token0IsETH = t0Addr === WETH_ADDRESS.toLowerCase();
+                    const token1IsETH = t1Addr === WETH_ADDRESS.toLowerCase();
+                    const token0IsStable = STABLECOIN_ADDRESSES.includes(t0Addr);
+                    const token1IsStable = STABLECOIN_ADDRESSES.includes(t1Addr);
+                    const t0Locked = parseFloat(p.totalValueLockedToken0 || '0');
+                    const t1Locked = parseFloat(p.totalValueLockedToken1 || '0');
+
+                    let tvl = parseFloat(p.totalValueLockedUSD || '0');
+
+                    if (token0IsETH || token1IsETH) {
+                        // ETH pair: value ETH side * ethPrice * 2
+                        const ethLocked = token0IsETH ? t0Locked : t1Locked;
+                        if (ethLocked > 0 && subgraphData.ethPrice > 0) {
+                            tvl = ethLocked * subgraphData.ethPrice * 2;
+                        }
+                    } else if ((token0IsStable || token1IsStable) && !(token0IsStable && token1IsStable)) {
+                        // One-sided stablecoin pair (e.g. USDC/WIND): double the stablecoin side
+                        const stableLocked = token0IsStable ? t0Locked : t1Locked;
+                        if (stableLocked > 0) {
+                            tvl = stableLocked * 2;
+                        }
+                    }
 
                     // Approx. 24h volume from latest PoolDayData (UTC day bucket)
                     const latestDay = p.poolDayData && p.poolDayData.length > 0 ? p.poolDayData[0] : undefined;
@@ -629,6 +666,7 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                         reserve0: '0', // Subgraph doesn't give individual reserves
                         reserve1: '0',
                         tvl: tvl > 0 ? tvl.toFixed(2) : '0',
+                        liquidity: p.liquidity || '0',
                         volume24h: volume24h > 0 ? volume24h.toFixed(2) : undefined,
                     };
                 });
