@@ -280,10 +280,11 @@ export function useMixedRouteQuoter() {
             }
 
             let bestSplit: SplitRouteResult | null = null;
+            let bestSplitOut = parseFloat(bestSingle.amountOut);
 
+            // === 2-way splits ===
             if (splitRequests.length > 0) {
                 const splitResults = await batchQuote(splitRequests);
-                const singleBestOut = parseFloat(bestSingle.amountOut);
 
                 for (const { pct1, idx1, idx2, r1, r2 } of splitMeta) {
                     const res1 = splitResults[idx1];
@@ -292,11 +293,12 @@ export function useMixedRouteQuoter() {
 
                     const totalOut = parseFloat(res1.amountOut) + parseFloat(res2.amountOut);
 
-                    if (totalOut > singleBestOut && (!bestSplit || totalOut > parseFloat(bestSplit.totalAmountOut))) {
+                    if (totalOut > bestSplitOut) {
                         const pct2 = 100 - pct1;
                         const amount1Str = formatUnits((fullAmountWei * BigInt(pct1)) / BigInt(100), actualTokenIn.decimals);
                         const amount2Str = formatUnits(fullAmountWei - (fullAmountWei * BigInt(pct1)) / BigInt(100), actualTokenIn.decimals);
 
+                        bestSplitOut = totalOut;
                         bestSplit = {
                             totalAmountOut: totalOut.toString(),
                             legs: [
@@ -304,6 +306,60 @@ export function useMixedRouteQuoter() {
                                 { route: r2, amountIn: amount2Str, amountOut: res2.amountOut, percent: pct2 },
                             ],
                         };
+                    }
+                }
+            }
+
+            // === 3-way splits (top 3 distinct routes, coarser granularity) ===
+            if (distinctRoutes.length >= 3) {
+                const triRequests: BatchQuoteRequest[] = [];
+                const triMeta: { pcts: number[]; idxs: number[]; routes: RouteQuote[] }[] = [];
+
+                // Generate 3-way splits: step by 10%, all combos that sum to 100
+                const triSplits: number[][] = [];
+                for (let a = 10; a <= 80; a += 10) {
+                    for (let b = 10; b <= 90 - a; b += 10) {
+                        const c = 100 - a - b;
+                        if (c >= 5) triSplits.push([a, b, c]);
+                    }
+                }
+
+                // Try top 3 routes in all triple combos
+                const top3 = distinctRoutes.slice(0, 3);
+                const templates = top3.map(r => findTemplate(r));
+                if (templates.every(t => t !== undefined)) {
+                    for (const pcts of triSplits) {
+                        const idxs: number[] = [];
+                        for (let i = 0; i < 3; i++) {
+                            const amt = (fullAmountWei * BigInt(pcts[i])) / BigInt(100);
+                            idxs.push(triRequests.length);
+                            triRequests.push({ ...templates[i]!, amountIn: amt });
+                        }
+                        triMeta.push({ pcts, idxs, routes: top3 });
+                    }
+                }
+
+                if (triRequests.length > 0) {
+                    const triResults = await batchQuote(triRequests);
+
+                    for (const { pcts, idxs, routes: triRoutes } of triMeta) {
+                        const results3 = idxs.map(i => triResults[i]);
+                        if (results3.some(r => !r)) continue;
+
+                        const totalOut = results3.reduce((sum, r) => sum + parseFloat(r!.amountOut), 0);
+
+                        if (totalOut > bestSplitOut) {
+                            bestSplitOut = totalOut;
+                            bestSplit = {
+                                totalAmountOut: totalOut.toString(),
+                                legs: pcts.map((pct, i) => ({
+                                    route: triRoutes[i],
+                                    amountIn: formatUnits((fullAmountWei * BigInt(pct)) / BigInt(100), actualTokenIn.decimals),
+                                    amountOut: results3[i]!.amountOut,
+                                    percent: pct,
+                                })),
+                            };
+                        }
                     }
                 }
             }
