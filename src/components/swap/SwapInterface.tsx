@@ -177,6 +177,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const needsApproval = !tokenIn?.isNative &&
         amountInWei > BigInt(0) &&
         bestRoute !== null && // Only check approval when we have a route
+        bestRoute.type !== 'wrap' && // Wrap/unwrap calls WETH directly, no router approval needed
         (currentAllowance === undefined || (currentAllowance as bigint) < amountInWei);
 
     // Track pending approval transaction hash
