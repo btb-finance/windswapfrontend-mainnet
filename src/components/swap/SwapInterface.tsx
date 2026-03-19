@@ -460,7 +460,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     const v3Route = await findMultiHopRoute(tokenIn, tokenOut, amountIn);
 
                     if (v3Route && parseFloat(v3Route.amountOut) > 0) {
-                        const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
+                        const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
                         if (v3Route.routeType === 'direct') {
                             routes.push({
                                 type: 'v3',
@@ -512,7 +512,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     // 1. V3 Exact Output
                     const v3Quote = await getQuoteExactOutputV3(tokenIn, tokenOut, amountOut);
                     if (v3Quote && v3Quote.poolExists && v3Quote.amountIn) {
-                        const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
+                        const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
                         routes.push({
                             type: 'v3',
                             amountOut: amountOut, // Targeted output

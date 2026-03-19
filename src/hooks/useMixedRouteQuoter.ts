@@ -10,7 +10,7 @@ import { getRpcForQuotes } from '@/utils/rpc';
 const INTERMEDIATE_TOKENS = [WSEI, USDC, WIND];
 
 // CL tick spacings from CLFactory contract
-const TICK_SPACINGS = [1, 50, 100, 200, 2000] as const;
+const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
 
 interface RouteQuote {
     amountOut: string;

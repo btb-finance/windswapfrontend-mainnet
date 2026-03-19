@@ -11,7 +11,7 @@ import { SWAP_ROUTER_ABI, ERC20_ABI, QUOTER_V2_ABI } from '@/config/abis';
 import { swrCache, getQuoteCacheKey } from '@/utils/cache';
 
 // CL tick spacings from CLFactory contract
-const TICK_SPACINGS = [1, 50, 100, 200, 2000] as const;
+const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
 
 interface SwapQuoteV3 {
     amountOut: string;
