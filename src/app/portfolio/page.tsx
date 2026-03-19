@@ -698,7 +698,7 @@ export default function PortfolioPage() {
             const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
-            // Build batch: decrease liquidity + collect + burn
+            // Build batch: decrease liquidity + collect (NO burn — burn is separate & optional)
             const batchCalls = [
                 encodeContractCall(
                     CL_CONTRACTS.NonfungiblePositionManager as Address,
@@ -723,19 +723,13 @@ export default function PortfolioPage() {
                         amount1Max: maxUint128,
                     }]
                 ),
-                encodeContractCall(
-                    CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    NFT_POSITION_MANAGER_ABI,
-                    'burn',
-                    [position.tokenId]
-                )
             ];
 
             // Try batch first
             const batchResult = await executeBatch(batchCalls);
 
             if (batchResult.usedBatching && batchResult.success) {
-                toast.success('Liquidity removed & fees collected in one transaction!');
+                toast.success('Liquidity removed & fees collected!');
             } else {
                 // Fall back to sequential
                 console.log('Batch not available, using sequential remove + collect');
@@ -767,15 +761,7 @@ export default function PortfolioPage() {
                     }],
                 });
 
-                // Then burn the empty NFT
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'burn',
-                    args: [position.tokenId],
-                });
-
-                toast.success('Liquidity removed!');
+                toast.success('Liquidity removed & fees collected!');
             }
 
             refetchCL();
@@ -1017,14 +1003,8 @@ export default function PortfolioPage() {
                 }]
             ));
 
-            // 4. Burn the empty NFT
-            batchCalls.push(encodeContractCall(
-                CL_CONTRACTS.NonfungiblePositionManager as Address,
-                NFT_POSITION_MANAGER_ABI,
-                'burn',
-                [pos.tokenId]
-            ));
-            // Note: Rewards are auto-claimed when unstaking, no separate claim needed
+            // Note: No burn — user can burn separately if they want
+            // Rewards are auto-claimed when unstaking, no separate claim needed
 
             // Execute batch
             const batchResult = await executeBatch(batchCalls);
@@ -1076,14 +1056,6 @@ export default function PortfolioPage() {
                         amount0Max: maxUint128,
                         amount1Max: maxUint128,
                     }],
-                });
-
-                // 4. Burn the empty NFT
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'burn',
-                    args: [pos.tokenId],
                 });
 
                 toast.success('Position fully exited!');
@@ -1901,7 +1873,11 @@ export default function PortfolioPage() {
                                                                 <div className="flex items-center gap-2 mt-0.5">
                                                                     <span className="text-xs text-gray-500">#{pos.tokenId.toString()}</span>
                                                                     {isEmpty ? (
-                                                                        <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-500/15 text-gray-500">Closed</span>
+                                                                        (pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) ? (
+                                                                            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-green-500/15 text-green-400">Has Fees</span>
+                                                                        ) : (
+                                                                            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-gray-500/15 text-gray-500">Closed</span>
+                                                                        )
                                                                     ) : (
                                                                         <span className={`text-xs px-1.5 py-0.5 rounded-md font-medium ${
                                                                             isExtremeTickRange(pos.tickLower, pos.tickUpper) ? 'bg-purple-500/15 text-purple-400' :
@@ -1985,33 +1961,42 @@ export default function PortfolioPage() {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Burn CTA */}
-                                                            <div className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
-                                                                <div className="text-xs text-orange-400/90">
-                                                                    Hey! This LP is useless — it costs us money to track and wastes your time loading. Do yourself a favor and burn it!
-                                                                </div>
-                                                                {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
-                                                                    <div className="text-xs text-green-400 mt-1">Has uncollected fees — collect before burning!</div>
-                                                                )}
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-2 pt-1">
-                                                                {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) && (
-                                                                    <button
-                                                                        onClick={() => handleCollectFees(pos)}
-                                                                        disabled={actionLoading}
-                                                                        className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
-                                                                    >
-                                                                        {actionLoading ? '...' : 'Collect Fees'}
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={() => handleBurnPosition(pos)}
-                                                                    disabled={actionLoading}
-                                                                    className="py-2.5 text-xs font-medium rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition disabled:opacity-50"
-                                                                >
-                                                                    {actionLoading ? '...' : (pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) ? 'Collect & Burn' : 'Burn Position'}
-                                                                </button>
-                                                            </div>
+                                                            {/* CTA based on fee status */}
+                                                            {(pos.tokensOwed0 > BigInt(0) || pos.tokensOwed1 > BigInt(0)) ? (
+                                                                <>
+                                                                    <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/15">
+                                                                        <div className="text-xs text-green-400/90">
+                                                                            You have uncollected fees in this position. Collect them before considering a burn.
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-1 gap-2 pt-1">
+                                                                        <button
+                                                                            onClick={() => handleCollectFees(pos)}
+                                                                            disabled={actionLoading}
+                                                                            className="py-2.5 text-xs font-medium rounded-xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition disabled:opacity-50"
+                                                                        >
+                                                                            {actionLoading ? '...' : 'Collect Fees'}
+                                                                        </button>
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
+                                                                        <div className="text-xs text-orange-400/90">
+                                                                            This position is empty with no fees. You can burn it to clean up.
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-1 gap-2 pt-1">
+                                                                        <button
+                                                                            onClick={() => handleBurnPosition(pos)}
+                                                                            disabled={actionLoading}
+                                                                            className="py-2.5 text-xs font-medium rounded-xl bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 transition disabled:opacity-50"
+                                                                        >
+                                                                            {actionLoading ? '...' : 'Burn Position'}
+                                                                        </button>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </>
                                                       ) : (
                                                         <>
