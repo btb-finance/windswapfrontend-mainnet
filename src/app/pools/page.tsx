@@ -24,10 +24,10 @@ type SortBy = 'default' | 'tvl' | 'apr';
 // Fee tier mapping for CL pools (from CLFactory contract)
 const FEE_TIERS: Record<number, string> = {
     1: '0.005%',     // Stables
-    50: '0.02%',     // Correlated pairs
-    100: '0.045%',   // Standard pairs
-    200: '0.25%',    // Medium volatility
-    2000: '1%',      // High volatility
+    2: '1%',         // Exotic
+    3: '0.03%',      // Standard pairs
+    4: '0.05%',      // Medium volatility
+    5: '0.26%',      // Volatile
 };
 
 // Pool config for modal

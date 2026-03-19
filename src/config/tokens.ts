@@ -60,23 +60,8 @@ export const LINK: Token = { address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e19
 export const USDT0 = USDT;
 export const USDCN = USDC;
 export const cbBTC = WBTC;
-export const cbADA: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'cbADA', name: 'cbADA', decimals: 6 };
-export const SOL: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'SOL', name: 'SOL', decimals: 9 };
-export const cbXRP: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'cbXRP', name: 'cbXRP', decimals: 6 };
-export const uSUI: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'uSUI', name: 'uSUI', decimals: 18 };
-export const DRG: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'DRG', name: 'DRG', decimals: 18 };
-export const MILLI: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'MILLI', name: 'MILLI', decimals: 6 };
-export const GGC: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'GGC', name: 'GGC', decimals: 18 };
-export const POPO: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'POPO', name: 'POPO', decimals: 18 };
-export const FROG: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'Frog', name: 'Frog', decimals: 18 };
-export const SEIYAN: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'SEIYAN', name: 'SEIYAN', decimals: 6 };
-export const S8N: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'S8N', name: 'S8N', decimals: 18 };
-export const SUPERSEIZ: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'SUPERSEIZ', name: 'SUPERSEIZ', decimals: 18 };
-export const BAT: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'BAT', name: 'BAT', decimals: 18 };
-export const YKP: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'YKP', name: 'YKP', decimals: 18 };
-export const LARRY: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LARRY', name: 'LARRY', decimals: 18 };
-export const WILSON: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'WILSON', name: 'WILSON', decimals: 6 };
 export const LORE: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LORE', name: 'LORE', decimals: 18 };
+export const USDVE: Token = { address: '0xbFCD661Be34C99920036F176876746b9f5B68c26', symbol: 'USDVE', name: 'USDVE', decimals: 18, logoURI: '/logo/USDVE.png' };
 
 // Default token list - only core tokens
 export const DEFAULT_TOKEN_LIST: Token[] = [
@@ -84,6 +69,7 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
     WSEI,
     WIND,
     USDC,
+    USDVE,
 ];
 
 // Token addresses for quick lookup
@@ -103,20 +89,5 @@ export const TOKEN_ADDRESSES = {
     LINK: LINK.address,
     LORE: LORE.address,
     cbBTC: cbBTC.address,
-    cbADA: cbADA.address,
-    SOL: SOL.address,
-    cbXRP: cbXRP.address,
-    uSUI: uSUI.address,
-    DRG: DRG.address,
-    MILLI: MILLI.address,
-    GGC: GGC.address,
-    POPO: POPO.address,
-    FROG: FROG.address,
-    SEIYAN: SEIYAN.address,
-    S8N: S8N.address,
-    SUPERSEIZ: SUPERSEIZ.address,
-    BAT: BAT.address,
-    YKP: YKP.address,
-    LARRY: LARRY.address,
-    WILSON: WILSON.address,
+    USDVE: USDVE.address,
 } as const;

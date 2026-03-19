@@ -50,7 +50,7 @@ export function calculateBaseAPR(
  * 
  * For display on pools page, we assume a "typical" position width of 1 tick spacing unit.
  * 
- * @param tickSpacing - The pool's tick spacing (1, 50, 100, 200, 2000)
+ * @param tickSpacing - The pool's tick spacing (1, 2, 3, 4, 5)
  * @returns Concentration multiplier
  */
 export function getConcentrationMultiplier(tickSpacing: number): number {

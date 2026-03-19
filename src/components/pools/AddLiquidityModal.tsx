@@ -193,12 +193,12 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
         const isAStable = STABLES.includes(tokenA.symbol.toUpperCase());
         const isBStable = STABLES.includes(tokenB.symbol.toUpperCase());
 
-        // If both are stablecoins, use 0.02% (tick spacing 50)
+        // If both are stablecoins, use 0.005% (tick spacing 1)
         if (isAStable && isBStable) {
-            setTickSpacing(50);
+            setTickSpacing(1);
         } else {
-            // Otherwise default to 0.25% (tick spacing 200)
-            setTickSpacing(200);
+            // Otherwise default to 0.03% (tick spacing 3)
+            setTickSpacing(3);
         }
     }, [isOpen, tokenA, tokenB, poolType, initialPool]);
 
@@ -1459,9 +1459,9 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                             {[
                                                 { spacing: 1, fee: '0.005%', best: 'Stables' },
-                                                { spacing: 50, fee: '0.02%', best: 'Correlated' },
-                                                { spacing: 100, fee: '0.045%', best: 'Standard' },
-                                                { spacing: 200, fee: '0.25%', best: 'Medium' },
+                                                { spacing: 3, fee: '0.03%', best: 'Standard' },
+                                                { spacing: 4, fee: '0.05%', best: 'Medium' },
+                                                { spacing: 5, fee: '0.26%', best: 'Volatile' },
                                                 { spacing: 2, fee: '1%', best: 'Exotic' },
                                             ].map(({ spacing, fee, best }) => (
                                                 <button
@@ -1514,8 +1514,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                     : null;
                                                 const isFullRange = !priceLower && !priceUpper;
 
-                                                // Stablecoin pools use tickSpacing 1 (0.005%) or 50 (0.02%)
-                                                const isStablecoinPool = tickSpacing === 1 || tickSpacing === 50;
+                                                // Stablecoin pools use tickSpacing 1 (0.005%)
+                                                const isStablecoinPool = tickSpacing === 1;
 
                                                 // Different presets based on pool type
                                                 // Stablecoins: no Full range, use tight percentages
@@ -1571,13 +1571,13 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 const belowToken = isAToken0 ? tokenB : tokenA; // token1
 
                                                 // Determine range based on tick spacing
-                                                // Stable pairs (tick 1) = tight range (0.5%) - very little movement
-                                                // Exotic pairs (tick 2) = wide range (10%) - high volatility with tight LP ranges
-                                                // Correlated pairs (tick 50) = tight range (0.5%)
-                                                // Standard pairs (tick 100, 200) = medium range (5%) - some movement
-                                                // Legacy exotic (tick 2000) = wide range (10%)
-                                                const rangePercent = tickSpacing === 1 ? 0.005 : tickSpacing === 2 ? 0.01 : tickSpacing <= 50 ? 0.005 : tickSpacing <= 200 ? 0.05 : 0.10;
-                                                const rangeLabel = tickSpacing === 1 ? '±0.5%' : tickSpacing === 2 ? '±1%' : tickSpacing <= 50 ? '±0.5%' : tickSpacing <= 200 ? '±5%' : '±10%';
+                                                // Stable pairs (tick 1) = tight range (0.5%)
+                                                // Standard pairs (tick 3) = medium range (3%)
+                                                // Medium pairs (tick 4) = medium range (5%)
+                                                // Volatile pairs (tick 5) = wider range (5%)
+                                                // Exotic pairs (tick 2) = wide range (10%)
+                                                const rangePercent = tickSpacing === 1 ? 0.005 : tickSpacing === 3 ? 0.03 : tickSpacing === 4 ? 0.05 : tickSpacing === 5 ? 0.05 : tickSpacing === 2 ? 0.10 : 0.10;
+                                                const rangeLabel = tickSpacing === 1 ? '±0.5%' : tickSpacing === 3 ? '±3%' : tickSpacing === 4 ? '±5%' : tickSpacing === 5 ? '±5%' : tickSpacing === 2 ? '±10%' : '±10%';
 
                                                 return (
                                                     <div className="mt-3">

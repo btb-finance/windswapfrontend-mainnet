@@ -1048,7 +1048,7 @@ export default function AdminPage() {
                                     <div className="text-sm text-yellow-400 font-medium mb-2">Important Notes:</div>
                                     <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
                                         <li>Tick spacing must be divisible into 887272 (max tick)</li>
-                                        <li>Common valid spacings: 1, 2, 5, 10, 20, 50, 60, 100, 200, 500, 1000, 2000</li>
+                                        <li>Default tick spacings: 1 (0.005%), 2 (1%), 3 (0.03%), 4 (0.05%), 5 (0.26%)</li>
                                         <li>Lower fees attract more volume but less revenue per trade</li>
                                         <li>Match tick spacing to expected price movement frequency</li>
                                     </ul>

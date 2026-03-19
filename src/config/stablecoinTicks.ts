@@ -5,11 +5,10 @@
  * For stablecoins that should trade 1:1 (like USDC/USDT, USDC/USDC.n):
  * - Tick 0 = price ratio of 1.0000 (exactly 1:1)
  * - Each tick represents ~0.01% price movement
- * - Tick spacing of 50 = 0.5% per tick step
- * 
- * Current on-chain data:
- * - USDC/USDT0 pool (0x3C2567b15FD9133Cf9101E043C58e2B444aF900b): tick = -5, spacing = 50
- * - USDC/USDC.n pool (0x0aeb4016e61987c48F63e9e03Df79f0f0b54eb5c): tick = 0, spacing = 50
+ * - Tick spacing of 1 = tightest granularity for stablecoin pairs
+ *
+ * On-chain tick spacings (Base CLFactory 0x88888493d3e3a133cB80da23610f23a6D563D083):
+ * - 1 = 0.005%, 2 = 1%, 3 = 0.03%, 4 = 0.05%, 5 = 0.26%
  */
 
 // Stablecoin token addresses (6 decimal stablecoins) - Base
@@ -62,7 +61,7 @@ export const STABLECOIN_TICK_CONFIG = {
     CENTER_TICK: 0,
 
     // Default tick spacing for stablecoin pools (matches on-chain config)
-    TICK_SPACING: 50,
+    TICK_SPACING: 1,
 
     // Default price range for stablecoins (tight since they should be 1:1)
     // ±0.2% from center = 0.998 to 1.002 (stays in range better)
@@ -117,7 +116,7 @@ export const STABLECOIN_RANGE_PRESETS = {
  * @param tickSpacing The pool's tick spacing
  * @returns Object with tickLower and tickUpper aligned to tick spacing
  */
-export function getStablecoinDefaultTicks(tickSpacing: number = 50): { tickLower: number; tickUpper: number } {
+export function getStablecoinDefaultTicks(tickSpacing: number = 1): { tickLower: number; tickUpper: number } {
     // Use tight range by default
     const config = STABLECOIN_RANGE_PRESETS.tight;
 
@@ -131,7 +130,7 @@ export function getStablecoinDefaultTicks(tickSpacing: number = 50): { tickLower
 /**
  * Get price range preset for stablecoin pair
  */
-export function getStablecoinPreset(preset: keyof typeof STABLECOIN_RANGE_PRESETS, tickSpacing: number = 50) {
+export function getStablecoinPreset(preset: keyof typeof STABLECOIN_RANGE_PRESETS, tickSpacing: number = 1) {
     const config = STABLECOIN_RANGE_PRESETS[preset];
 
     // Align to tick spacing
