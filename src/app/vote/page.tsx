@@ -495,19 +495,19 @@ export default function VotePage() {
         if (!lockAmount || parseFloat(lockAmount) <= 0) return;
         const result = await createLock(lockAmount, LOCK_DURATIONS[lockDuration]);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setLockAmount('');
         }
     };
 
     const handleWithdraw = async (tokenId: bigint) => {
         const result = await withdraw(tokenId);
-        if (result) setTxHash(result.hash);
+        if (result) setTxHash(result.hash ?? null);
     };
 
     const handleClaimRebases = async (tokenId: bigint) => {
         const result = await claimRebases(tokenId);
-        if (result) setTxHash(result.hash);
+        if (result) setTxHash(result.hash ?? null);
     };
 
     const handleIncreaseAmount = async (tokenId: bigint) => {
@@ -516,7 +516,7 @@ export default function VotePage() {
         const amountToAdd = isMaxAmount ? (rawWindBalance || increaseAmountValue) : increaseAmountValue;
         const result = await increaseAmount(tokenId, amountToAdd);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setIncreaseAmountValue('');
             setIsMaxAmount(false);
             setManagingNFT(null);
@@ -526,7 +526,7 @@ export default function VotePage() {
     const handleExtendLock = async (tokenId: bigint) => {
         const result = await extendLock(tokenId, LOCK_DURATIONS[extendDuration]);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setManagingNFT(null);
         }
     };
@@ -535,14 +535,14 @@ export default function VotePage() {
         // Max lock is 4 years
         const result = await extendLock(tokenId, LOCK_DURATIONS['4Y']);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
         }
     };
 
     const handleMerge = async (fromTokenId: bigint, toTokenId: bigint) => {
         const result = await merge(fromTokenId, toTokenId);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setMergeTarget(null);
             setManagingNFT(null);
         }
@@ -551,7 +551,7 @@ export default function VotePage() {
     const handleLockPermanent = async (tokenId: bigint) => {
         const result = await lockPermanent(tokenId);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setManagingNFT(null);
         }
     };
@@ -559,7 +559,7 @@ export default function VotePage() {
     const handleUnlockPermanent = async (tokenId: bigint) => {
         const result = await unlockPermanent(tokenId);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setManagingNFT(null);
         }
     };
@@ -573,7 +573,7 @@ export default function VotePage() {
 
         const result = await castVote(selectedVeNFT, poolVotes);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             setVoteWeights({});
         }
         setIsVoting(false);
@@ -585,7 +585,7 @@ export default function VotePage() {
         setIsVoting(true);
         const result = await resetVotes(targetTokenId);
         if (result) {
-            setTxHash(result.hash);
+            setTxHash(result.hash ?? null);
             // Refetch veNFT data to update hasVoted status
             refetch();
         }
@@ -625,7 +625,7 @@ export default function VotePage() {
                 incentiveToken.decimals
             );
             if (result) {
-                setTxHash(result.hash);
+                setTxHash(result.hash ?? null);
                 setIncentivePool(null);
                 setIncentiveToken(null);
                 setIncentiveAmount('');
