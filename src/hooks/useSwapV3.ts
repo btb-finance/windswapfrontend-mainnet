@@ -11,7 +11,7 @@ import { SWAP_ROUTER_ABI, ERC20_ABI, QUOTER_V2_ABI } from '@/config/abis';
 import { swrCache, getQuoteCacheKey } from '@/utils/cache';
 
 // CL tick spacings from CLFactory contract
-const TICK_SPACINGS = [1, 50, 100, 200, 2000] as const;
+const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
 
 interface SwapQuoteV3 {
     amountOut: string;
@@ -606,11 +606,116 @@ export function useSwapV3() {
         }
     }, [address, writeContractAsync, checkPoolExists]);
 
+    // Execute split swap: two legs via multicall in one tx
+    const executeSplitSwapV3 = useCallback(async (
+        tokenIn: Token,
+        tokenOut: Token,
+        legs: {
+            amountIn: string;
+            amountOutMin: string;
+            routeType: 'direct' | 'multi-hop';
+            tickSpacing1: number;
+            tickSpacing2?: number;
+            intermediate?: Token;
+        }[],
+        slippage: number = 0.5
+    ) => {
+        if (!address || legs.length === 0) return null;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+
+            const swapCalls: `0x${string}`[] = [];
+            let totalValueWei = BigInt(0);
+            let totalMinOut = BigInt(0);
+
+            for (const leg of legs) {
+                const amountInWei = parseUnits(leg.amountIn, actualTokenIn.decimals);
+                const amountOutMinWei = parseUnits(leg.amountOutMin, actualTokenOut.decimals);
+                totalMinOut += amountOutMinWei;
+
+                if (tokenIn.isNative) totalValueWei += amountInWei;
+
+                if (leg.routeType === 'direct') {
+                    swapCalls.push(encodeFunctionData({
+                        abi: SWAP_ROUTER_ABI,
+                        functionName: 'exactInputSingle',
+                        args: [{
+                            tokenIn: actualTokenIn.address as Address,
+                            tokenOut: actualTokenOut.address as Address,
+                            tickSpacing: leg.tickSpacing1,
+                            recipient: tokenOut.isNative ? CL_CONTRACTS.SwapRouter as Address : address,
+                            deadline,
+                            amountIn: amountInWei,
+                            amountOutMinimum: amountOutMinWei,
+                            sqrtPriceLimitX96: BigInt(0),
+                        }],
+                    }));
+                } else if (leg.routeType === 'multi-hop' && leg.intermediate) {
+                    const actualIntermediate = leg.intermediate.isNative ? WSEI : leg.intermediate;
+                    const encodeTS = (ts: number) => {
+                        return ts >= 0 ? ts.toString(16).padStart(6, '0') : ((1 << 24) + ts).toString(16);
+                    };
+                    const path = ('0x' +
+                        actualTokenIn.address.slice(2).toLowerCase() +
+                        encodeTS(leg.tickSpacing1) +
+                        actualIntermediate.address.slice(2).toLowerCase() +
+                        encodeTS(leg.tickSpacing2 || leg.tickSpacing1) +
+                        actualTokenOut.address.slice(2).toLowerCase()) as `0x${string}`;
+
+                    swapCalls.push(encodeFunctionData({
+                        abi: SWAP_ROUTER_ABI,
+                        functionName: 'exactInput',
+                        args: [{
+                            path,
+                            recipient: tokenOut.isNative ? CL_CONTRACTS.SwapRouter as Address : address,
+                            deadline,
+                            amountIn: amountInWei,
+                            amountOutMinimum: amountOutMinWei,
+                        }],
+                    }));
+                }
+            }
+
+            // If output is native, add unwrap call
+            if (tokenOut.isNative) {
+                swapCalls.push(encodeFunctionData({
+                    abi: SWAP_ROUTER_ABI,
+                    functionName: 'unwrapWETH9',
+                    args: [totalMinOut, address],
+                }));
+            }
+
+            const hash = await writeContractAsync({
+                address: CL_CONTRACTS.SwapRouter as Address,
+                abi: SWAP_ROUTER_ABI,
+                functionName: 'multicall',
+                args: [swapCalls],
+                value: tokenIn.isNative ? totalValueWei : undefined,
+            });
+
+            setTxHash(hash);
+            setIsLoading(false);
+            return { hash };
+        } catch (err: unknown) {
+            console.error('Split swap error:', err);
+            setError((err instanceof Error ? err.message : undefined) || 'Split swap failed');
+            setIsLoading(false);
+            return null;
+        }
+    }, [address, writeContractAsync]);
+
     return {
         getQuoteV3,
         getQuoteExactOutputV3,
         executeSwapV3,
         executeMultiHopSwapV3,
+        executeSplitSwapV3,
         checkPoolExists,
         isLoading,
         error,

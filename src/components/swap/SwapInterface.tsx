@@ -29,17 +29,27 @@ interface Route {
 }
 
 interface BestRoute {
-    type: 'v2' | 'v3' | 'multi-hop' | 'wrap';
+    type: 'v2' | 'v3' | 'multi-hop' | 'wrap' | 'split';
     amountOut: string;
     tickSpacing?: number;
     tickSpacing1?: number;
     tickSpacing2?: number;
     feeLabel: string;
     stable?: boolean;
-    via?: string; // Intermediate token symbol for multi-hop
-    intermediate?: Token; // Intermediate token object for multi-hop execution
-    isWrap?: boolean; // true = SEI->WSEI (wrap), false = WSEI->SEI (unwrap)
-    amountInComputed?: string; // Calculated input amount for exact output swaps
+    via?: string;
+    intermediate?: Token;
+    isWrap?: boolean;
+    amountInComputed?: string;
+    splitLegs?: {
+        amountIn: string;
+        amountOut: string;
+        percent: number;
+        routeType: 'direct' | 'multi-hop';
+        tickSpacing1: number;
+        tickSpacing2?: number;
+        intermediate?: Token;
+        label: string;
+    }[];
 }
 
 interface SwapInterfaceProps {
@@ -125,8 +135,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
     // Hooks
     const { executeSwap, getQuoteExactOutput, isLoading: isLoadingV2, error: errorV2 } = useSwap();
-    const { getQuoteV3, getQuoteExactOutputV3, executeSwapV3, executeMultiHopSwapV3, isLoading: isLoadingV3, error: errorV3 } = useSwapV3();
-    const { findBestRoute: findMultiHopRoute, getIntermediateToken } = useMixedRouteQuoter();
+    const { getQuoteV3, getQuoteExactOutputV3, executeSwapV3, executeMultiHopSwapV3, executeSplitSwapV3, isLoading: isLoadingV3, error: errorV3 } = useSwapV3();
+    const { findOptimalRoute, getSpotRate, getIntermediateToken } = useMixedRouteQuoter();
     const { raw: rawBalanceIn, formatted: formattedBalanceIn } = useTokenBalance(tokenIn);
     const { formatted: formattedBalanceOut } = useTokenBalance(tokenOut);
     const { writeContractAsync } = useWriteContract();
@@ -177,6 +187,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const needsApproval = !tokenIn?.isNative &&
         amountInWei > BigInt(0) &&
         bestRoute !== null && // Only check approval when we have a route
+        bestRoute.type !== 'wrap' && // Wrap/unwrap calls WETH directly, no router approval needed
         (currentAllowance === undefined || (currentAllowance as bigint) < amountInWei);
 
     // Track pending approval transaction hash
@@ -454,30 +465,51 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 }
 
                 if (independentField === 'INPUT') {
-                    // === EXACT INPUT logic (existing) ===
+                    // === EXACT INPUT: unified V3 route finder (single + split in 2 RPC batches) ===
+                    const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
+                    const optimal = await findOptimalRoute(tokenIn, tokenOut, amountIn);
 
-                    // === Get best V3 route (direct or multi-hop) - SINGLE call handles both ===
-                    const v3Route = await findMultiHopRoute(tokenIn, tokenOut, amountIn);
-
-                    if (v3Route && parseFloat(v3Route.amountOut) > 0) {
-                        const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
-                        if (v3Route.routeType === 'direct') {
+                    if (optimal) {
+                        if (optimal.winner === 'split' && optimal.bestSplit) {
+                            // Split route wins
                             routes.push({
-                                type: 'v3',
-                                amountOut: v3Route.amountOut,
-                                tickSpacing: v3Route.tickSpacing1,
-                                feeLabel: `V3 ${feeMap[v3Route.tickSpacing1 || 10] || ''}`,
+                                type: 'split',
+                                amountOut: optimal.bestSplit.totalAmountOut,
+                                feeLabel: `Split ${optimal.bestSplit.legs.map(l => `${l.percent}%`).join('/')}`,
+                                splitLegs: optimal.bestSplit.legs.map(l => ({
+                                    amountIn: l.amountIn,
+                                    amountOut: l.amountOut,
+                                    percent: l.percent,
+                                    routeType: l.route.routeType,
+                                    tickSpacing1: l.route.tickSpacing1 || 0,
+                                    tickSpacing2: l.route.tickSpacing2,
+                                    intermediate: l.route.intermediate,
+                                    label: l.route.routeType === 'direct'
+                                        ? `${tokenIn.symbol} → ${tokenOut.symbol} ${feeMap[l.route.tickSpacing1 || 0] || ''}`
+                                        : `${tokenIn.symbol} → ${l.route.via} → ${tokenOut.symbol}`,
+                                })),
                             });
-                        } else if (v3Route.routeType === 'multi-hop' && v3Route.intermediate) {
-                            routes.push({
-                                type: 'multi-hop',
-                                amountOut: v3Route.amountOut,
-                                feeLabel: v3Route.via ? `via ${v3Route.via}` : 'Multi-hop',
-                                via: v3Route.via,
-                                intermediate: v3Route.intermediate,
-                                tickSpacing1: v3Route.tickSpacing1,
-                                tickSpacing2: v3Route.tickSpacing2,
-                            });
+                        } else if (optimal.bestSingle) {
+                            // Single route wins
+                            const v3Route = optimal.bestSingle;
+                            if (v3Route.routeType === 'direct') {
+                                routes.push({
+                                    type: 'v3',
+                                    amountOut: v3Route.amountOut,
+                                    tickSpacing: v3Route.tickSpacing1,
+                                    feeLabel: `V3 ${feeMap[v3Route.tickSpacing1 || 10] || ''}`,
+                                });
+                            } else if (v3Route.routeType === 'multi-hop' && v3Route.intermediate) {
+                                routes.push({
+                                    type: 'multi-hop',
+                                    amountOut: v3Route.amountOut,
+                                    feeLabel: v3Route.via ? `via ${v3Route.via}` : 'Multi-hop',
+                                    via: v3Route.via,
+                                    intermediate: v3Route.intermediate,
+                                    tickSpacing1: v3Route.tickSpacing1,
+                                    tickSpacing2: v3Route.tickSpacing2,
+                                });
+                            }
                         }
                     }
 
@@ -512,7 +544,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     // 1. V3 Exact Output
                     const v3Quote = await getQuoteExactOutputV3(tokenIn, tokenOut, amountOut);
                     if (v3Quote && v3Quote.poolExists && v3Quote.amountIn) {
-                        const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
+                        const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
                         routes.push({
                             type: 'v3',
                             amountOut: amountOut, // Targeted output
@@ -563,15 +595,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                         setAmountIn(best.amountInComputed || '');
                     }
 
-                    // Fetch spot rate with a small reference amount for price impact
+                    // Fetch spot rate (tiny amount, 1 batch RPC, no split overhead)
                     try {
-                        const refAmount = '0.01';
-                        const spotRoute = await findMultiHopRoute(tokenIn, tokenOut, refAmount);
-                        if (spotRoute && parseFloat(spotRoute.amountOut) > 0) {
-                            setSpotRate(parseFloat(spotRoute.amountOut) / parseFloat(refAmount));
-                        } else {
-                            setSpotRate(null);
-                        }
+                        const spot = await getSpotRate(tokenIn, tokenOut);
+                        setSpotRate(spot);
                     } catch {
                         setSpotRate(null);
                     }
@@ -592,7 +619,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
         const debounce = setTimeout(findBestRoute, DEBOUNCE_MS.QUOTE);
         return () => clearTimeout(debounce);
-    }, [tokenIn, tokenOut, amountIn, amountOut, actualTokenOut, v2VolatileQuote, v2StableQuote, findMultiHopRoute, routeLocked, independentField, getQuoteExactOutput, getQuoteExactOutputV3]);
+    }, [tokenIn, tokenOut, amountIn, amountOut, actualTokenOut, v2VolatileQuote, v2StableQuote, findOptimalRoute, getSpotRate, routeLocked, independentField, getQuoteExactOutput, getQuoteExactOutputV3]);
 
     // Handle slippage change with validation
     const handleSlippageChange = useCallback((value: number) => {
@@ -646,10 +673,12 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         // Require acceptance for high price impact
         (!highPriceImpact || priceImpactAccepted);
 
-    // Calculate rate
-    const rate = amountIn && amountOut && parseFloat(amountIn) > 0
-        ? (parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6)
-        : null;
+    // Calculate rate — use USDC spot rate (market price) when available, fallback to exec rate
+    const rate = spotRate
+        ? spotRate.toString()
+        : (amountIn && amountOut && parseFloat(amountIn) > 0
+            ? (parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6)
+            : null);
 
     const handleSwap = async () => {
         if (!tokenIn || !tokenOut || !bestRoute) return;
@@ -727,6 +756,20 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 bestRoute.tickSpacing2,
                 slippage
             );
+        } else if (bestRoute.type === 'split' && bestRoute.splitLegs) {
+            // Split route - execute multiple legs via multicall
+            const legs = bestRoute.splitLegs.map(leg => {
+                const legOutMin = (parseFloat(leg.amountOut) * (1 - slippage / 100)).toFixed(6);
+                return {
+                    amountIn: leg.amountIn,
+                    amountOutMin: legOutMin,
+                    routeType: leg.routeType,
+                    tickSpacing1: leg.tickSpacing1,
+                    tickSpacing2: leg.tickSpacing2,
+                    intermediate: leg.intermediate,
+                };
+            });
+            result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
         }
 
         if (result) {
@@ -839,7 +882,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 <div className="mt-3 p-2 rounded-lg bg-white/5 text-xs space-y-1">
                     <div className="flex justify-between">
                         <span className="text-gray-400">Rate</span>
-                        <span>1 {tokenIn.symbol} = {parseFloat(rate).toFixed(4)} {tokenOut.symbol}</span>
+                        <span>1 {tokenIn.symbol} = {parseFloat(rate) < 0.0001 ? parseFloat(rate).toExponential(2) : parseFloat(rate).toFixed(4)} {tokenOut.symbol}</span>
                     </div>
                     <div className="flex justify-between">
                         <span className="text-gray-400">Min. received</span>
@@ -850,6 +893,32 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                             <span className="text-gray-400">Price Impact</span>
                             <span className={priceImpact > 5 ? 'text-red-500 font-bold' : priceImpact > 2 ? 'text-orange-400 font-semibold' : 'text-green-400'}>
                                 {priceImpact < 0.01 ? '<0.01' : priceImpact.toFixed(2)}%
+                            </span>
+                        </div>
+                    )}
+                    <div className="flex justify-between">
+                        <span className="text-gray-400">Slippage</span>
+                        <span>{slippage}%</span>
+                    </div>
+                    {bestRoute && (
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">Route</span>
+                            <span className="text-right">
+                                {bestRoute.type === 'split' && bestRoute.splitLegs ? (
+                                    <span className="flex flex-col items-end gap-0.5">
+                                        {bestRoute.splitLegs.map((leg, i) => (
+                                            <span key={i} className="text-[10px]">
+                                                {leg.percent}% {leg.label}
+                                            </span>
+                                        ))}
+                                    </span>
+                                ) : bestRoute.type === 'multi-hop' && bestRoute.via ? (
+                                    `${tokenIn.symbol} → ${bestRoute.via} → ${tokenOut.symbol}`
+                                ) : bestRoute.type === 'wrap' ? (
+                                    bestRoute.isWrap ? 'Wrap' : 'Unwrap'
+                                ) : (
+                                    `${tokenIn.symbol} → ${tokenOut.symbol}`
+                                )}
                             </span>
                         </div>
                     )}
