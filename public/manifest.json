@@ -1,7 +1,8 @@
 {
     "name": "Wind Swap",
     "short_name": "WindSwap",
-    "description": "The premier AMM and ve-tokenomics DEX on Sei Network. Swap, provide liquidity, and earn rewards with WIND.",
+    "description": "Swap, provide liquidity, and earn rewards on Base with WIND.",
+    "iconPath": "/logo.png",
     "icons": [
         {
             "src": "/logo.png",
@@ -13,7 +14,7 @@
     "theme_color": "#00d4ff",
     "background_color": "#0a0a14",
     "display": "standalone",
-    "start_url": "/",
+    "start_url": "/swap",
     "scope": "/",
     "orientation": "portrait-primary",
     "categories": [
@@ -24,6 +25,6 @@
     "prefer_related_applications": false,
     "providedBy": {
         "name": "Wind Swap",
-        "url": "https://windswap.org"
+        "url": "https://base.windswap.org"
     }
 }

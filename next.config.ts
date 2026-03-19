@@ -3,9 +3,17 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactCompiler: true,
 
-  // CORS headers for Safe Apps iframe support
+  // Headers for Safe Apps iframe support
   async headers() {
     return [
+      {
+        source: '/manifest.json',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET' },
+          { key: 'Content-Type', value: 'application/json' },
+        ],
+      },
       {
         source: '/:path*',
         headers: [
