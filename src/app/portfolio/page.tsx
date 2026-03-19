@@ -5,7 +5,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
-import { Address, formatUnits } from 'viem';
+import { Address, formatUnits, createPublicClient, http, encodeFunctionData } from 'viem';
+import { base } from 'viem/chains';
 import Link from 'next/link';
 import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
 import { WSEI, Token } from '@/config/tokens';
@@ -289,6 +290,7 @@ export default function PortfolioPage() {
     const toast = useToast();
     const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'staked' | 'locks' | 'rewards'>('overview');
     const [actionLoading, setActionLoading] = useState(false);
+    const [burnStatus, setBurnStatus] = useState<string | null>(null);
 
     // Use global pool data for token info, staked positions, AND veNFTs (all prefetched!)
     const {
@@ -630,61 +632,60 @@ export default function PortfolioPage() {
     const handleBurnPosition = async (position: typeof clPositions[0]) => {
         if (!address) return;
         setActionLoading(true);
+        setBurnStatus('Checking position on-chain...');
         try {
-            // If there are uncollected fees, collect first then burn
-            if (position.tokensOwed0 > BigInt(0) || position.tokensOwed1 > BigInt(0)) {
-                const maxUint128 = BigInt('340282366920938463463374607431768211455');
-                const batchCalls = [
-                    encodeContractCall(
-                        CL_CONTRACTS.NonfungiblePositionManager as Address,
-                        NFT_POSITION_MANAGER_ABI,
-                        'collect',
-                        [{
-                            tokenId: position.tokenId,
-                            recipient: address,
-                            amount0Max: maxUint128,
-                            amount1Max: maxUint128,
-                        }]
-                    ),
-                    encodeContractCall(
-                        CL_CONTRACTS.NonfungiblePositionManager as Address,
-                        NFT_POSITION_MANAGER_ABI,
-                        'burn',
-                        [position.tokenId]
-                    )
-                ];
-                const batchResult = await executeBatch(batchCalls);
-                if (!batchResult.usedBatching || !batchResult.success) {
-                    await writeContractAsync({
-                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                        abi: NFT_POSITION_MANAGER_ABI,
-                        functionName: 'collect',
-                        args: [{
-                            tokenId: position.tokenId,
-                            recipient: address,
-                            amount0Max: maxUint128,
-                            amount1Max: maxUint128,
-                        }],
-                    });
-                    await writeContractAsync({
-                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                        abi: NFT_POSITION_MANAGER_ABI,
-                        functionName: 'burn',
-                        args: [position.tokenId],
-                    });
-                }
-            } else {
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'burn',
-                    args: [position.tokenId],
-                });
+            const client = createPublicClient({ chain: base, transport: http(getRpcForPoolData()) });
+            const onChainPos = await client.readContract({
+                address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                abi: NFT_POSITION_MANAGER_ABI,
+                functionName: 'positions',
+                args: [position.tokenId],
+            }) as readonly any[];
+
+            const liquidity = BigInt(onChainPos[7] || 0);
+            const tokensOwed0 = BigInt(onChainPos[11] || 0);
+            const tokensOwed1 = BigInt(onChainPos[12] || 0);
+
+            // Block burn if position still has liquidity
+            if (liquidity > BigInt(0)) {
+                setBurnStatus('Has liquidity — remove it first!');
+                setActionLoading(false);
+                return;
             }
-            toast.success('Position burned!');
+
+            const hasFees = tokensOwed0 > BigInt(0) || tokensOwed1 > BigInt(0);
+            setBurnStatus(hasFees ? 'Found fees — collecting & burning...' : 'No funds at risk — burning...');
+
+            // Single multicall tx: collect (safe no-op if no fees) + burn
+            const maxUint128 = BigInt('340282366920938463463374607431768211455');
+            const collectData = encodeFunctionData({
+                abi: NFT_POSITION_MANAGER_ABI,
+                functionName: 'collect',
+                args: [{
+                    tokenId: position.tokenId,
+                    recipient: address,
+                    amount0Max: maxUint128,
+                    amount1Max: maxUint128,
+                }],
+            });
+            const burnData = encodeFunctionData({
+                abi: NFT_POSITION_MANAGER_ABI,
+                functionName: 'burn',
+                args: [position.tokenId],
+            });
+
+            await writeContractAsync({
+                address: CL_CONTRACTS.NonfungiblePositionManager as Address,
+                abi: NFT_POSITION_MANAGER_ABI,
+                functionName: 'multicall',
+                args: [[collectData, burnData]],
+            });
+            setBurnStatus(null);
+            toast.success(hasFees ? 'Fees collected & position burned!' : 'Position burned!');
             refetchCL();
         } catch (err) {
             console.error('Burn position error:', err);
+            setBurnStatus(null);
             toast.error('Failed to burn position');
         }
         setActionLoading(false);
@@ -1996,6 +1997,12 @@ export default function PortfolioPage() {
                                                                         </button>
                                                                     </div>
                                                                 </>
+                                                            )}
+                                                            {burnStatus && (
+                                                                <div className="p-2.5 rounded-xl bg-blue-500/5 border border-blue-500/15 flex items-center gap-2">
+                                                                    <svg className="w-3.5 h-3.5 text-blue-400 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4 31.4" strokeLinecap="round"/></svg>
+                                                                    <span className="text-xs text-blue-400">{burnStatus}</span>
+                                                                </div>
                                                             )}
                                                         </>
                                                       ) : (
