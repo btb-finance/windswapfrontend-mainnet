@@ -114,14 +114,18 @@ export default function PoolsPage() {
             const stakedLiq = stakedLiquidity.get(pool.address.toLowerCase());
             const poolLiq = pool.liquidity ? BigInt(pool.liquidity) : BigInt(0);
 
-            let stakedTvl = totalTvl; // fallback to total TVL if no staking data
+            let stakedTvl: number;
             if (stakedLiq && stakedLiq > BigInt(0) && poolLiq > BigInt(0)) {
                 // stakedTVL = (stakedLiquidity / totalPoolLiquidity) * totalTVL
                 stakedTvl = (Number(stakedLiq) / Number(poolLiq)) * totalTvl;
-            } else if (!stakedLiq || stakedLiq === BigInt(0)) {
-                // Nobody staked yet — show what APR would be if you were the only staker
-                // Use total TVL as a rough estimate (first staker gets all rewards)
-                stakedTvl = totalTvl;
+            } else {
+                // No one staked yet — assume $1000 staked to show attractive APR
+                // Rewards are high when few/no stakers, so reflect that
+                stakedTvl = 1000;
+            }
+            if (stakedTvl <= 0) {
+                aprMap.set(pool.address, null);
+                continue;
             }
 
             const apr = calculatePoolAPR(rewardRate, windPrice, stakedTvl, pool.tickSpacing);

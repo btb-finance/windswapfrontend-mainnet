@@ -830,6 +830,23 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                 };
             });
 
+            // Fetch stakedLiquidity on-chain from each CL pool (subgraph may lag)
+            const poolAddresses = [...new Set(gaugeRows.map(g => String(g.pool?.id || '').toLowerCase()).filter(Boolean))];
+            const STAKED_LIQ_SELECTOR = '0x3ab04b20'; // stakedLiquidity()
+            await Promise.all(poolAddresses.map(async (poolAddr) => {
+                try {
+                    const result = await rpcCall<string>('eth_call', [{ to: poolAddr, data: STAKED_LIQ_SELECTOR }, 'latest']);
+                    if (result && result !== '0x' && result !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                        const staked = BigInt(result);
+                        if (staked > BigInt(0)) {
+                            newStakedLiquidity.set(poolAddr, staked);
+                        }
+                    }
+                } catch {
+                    // Keep subgraph value if on-chain call fails
+                }
+            }));
+
             setGauges(gaugeList);
             setPoolRewards(newRewards);
             setStakedLiquidity(newStakedLiquidity);
