@@ -59,7 +59,7 @@ const OLD_USER_DATA_QUERY = `
     query GetOldUserData($userId: ID!) {
         user(id: $userId) {
             id
-            positions(first: 1000, where: { closed: false }) {
+            positions(first: 1000) {
                 id
                 tokenId
                 pool {
@@ -79,7 +79,7 @@ const OLD_USER_DATA_QUERY = `
                 tokensOwed1
                 staked
             }
-            veNFTs(first: 50, where: { closed: false }) {
+            veNFTs(first: 50) {
                 id
                 tokenId
                 lockedAmount
