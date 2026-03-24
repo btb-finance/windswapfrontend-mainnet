@@ -1,55 +1,55 @@
 // Wind Swap Contract Addresses - Base
-// All contracts deployed via CreateX CREATE3 with vanity addresses
+// V2 deployed via windv2, V3/CL via windv3swap (CreateX CREATE3)
 
 // ============================================
-// V2 Core Contracts
+// V2 Core Contracts (new deployment - bug fixes)
 // ============================================
 export const V2_CONTRACTS = {
     // Protocol Token (WIND)
-    WIND: '0x888859FEaAb4922DFBB9Add836172ec6f38caBb2',
-    YAKA: '0x888859FEaAb4922DFBB9Add836172ec6f38caBb2', // Legacy alias
+    WIND: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888',
+    YAKA: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888', // Legacy alias
 
     // Core Voting Escrow
-    VotingEscrow: '0x88889e34e5Eb7a8F0f986DDce5f2711220A0c02F',
+    VotingEscrow: '0x88889C4Be508cA88eba6ad802340C0563891D426',
 
     // Router for V2 swaps and liquidity
-    Router: '0x88880576315176b632b0D7a4DD291d6b5e317692',
+    Router: '0x88883154C9F8eb3bd34fb760bda1EB7556a20e14',
 
     // Voter for gauge voting
-    Voter: '0x888843352588d670F0e0c009Ec276d5F055aE9Ed',
+    Voter: '0x88881EB4b5dD3461fC0CFBc44606E3b401197E38',
 
     // Token minter
-    Minter: '0x88882CEe351fA534C1b2DB2c72A6762F6c80c4BC',
+    Minter: '0x8888a8585d2Ab886800409fF97Ce84564CbFeF47',
 
     // V2 Pool Factory
-    PoolFactory: '0x88881EF7Fd02FaC4C3321bb9f65Be887008290f0',
+    PoolFactory: '0x88880e3dA8676C879c3D019EDE0b5a74586813be',
 
     // Pool implementation
-    Pool: '0x8888f98b168dA48a0cb5C6Ba20A132Cf1149E579',
+    Pool: '0x888846064b562b1d41F0CbA3B55e28699B1F6d86',
 
     // Rewards distributor for veNFT rebases
-    RewardsDistributor: '0x88881105D16f242B791fE8D713C254D3992b2A6E',
+    RewardsDistributor: '0x8888f1e8908F7B268439289091b3Fd1dE2B4c124',
 
     // Factory registry
-    FactoryRegistry: '0x8888500b00C5f5eCCa7BbCD2fFB04619F6b8b4cc',
+    FactoryRegistry: '0x8888220B5E60586D09bc1D0738d964B3c73b3AC1',
 
     // Gauge Factory
-    GaugeFactory: '0x8888fc8623ca00349e4f947Dd99330F3AF75a941',
+    GaugeFactory: '0x88886e546d9024C53Cfb0FbD87DE83FA9BF9e857',
 
     // Voting Rewards Factory
-    VotingRewardsFactory: '0x888834b351dfE9953Ddac7c427640B0Ff70Fc34D',
+    VotingRewardsFactory: '0x8888Cc3Dc53BDdA5F8E97E10d9d2bD881662BA31',
 
     // Managed Rewards Factory
-    ManagedRewardsFactory: '0x888890188ea6473c0E31AB762140F49D4368B96D',
+    ManagedRewardsFactory: '0x8888f67c3A3d7F1F1F4B5440184c3D26e3eD4143',
 
     // VeArt Proxy for NFT art
-    VeArtProxy: '0x8888232436766e1b6EEabC37ff7913ee3D90A455',
+    VeArtProxy: '0x888855bf9D1C6e575Ec0e7916D848E225D51BAe9',
 
     // Airdrop Distributor
-    AirdropDistributor: '0x88888EE2c6e04586a1DfE15e5e89eD1288149e68',
+    AirdropDistributor: '0x8888d1016C41c6Fe72F968939B02F055284b200e',
 
     // Forwarder
-    Forwarder: '0x888886dDfbb2aDa679c70F03907D1c789b991593',
+    Forwarder: '0x888823B4514D65c035f4528255d0e514C2A57b98',
 
     // StablecoinZap (stub)
     StablecoinZap: '0x0000000000000000000000000000000000000000',
@@ -60,34 +60,33 @@ export const V2_CONTRACTS = {
 } as const;
 
 // ============================================
-// V2 Libraries
+// V2 Libraries (new deployment)
 // ============================================
 export const V2_LIBRARIES = {
-    PerlinNoise: '0x8888C66B93A3217d19b625A7A8ccE528A268Dbed',
-    Trig: '0x88881F4e88922d05ad6E0b482F483398a921B4b7',
-    BalanceLogicLibrary: '0x888890Fa180cA82BfFe132dB159B8B94f3fC0edD',
-    DelegationLogicLibrary: '0x8888AeB5726d29A114829f86165dCE7bbBD6a636',
+    BalanceLogicLibrary: '0x8888957497A69F02004aB78834279E37e66D790A',
+    DelegationLogicLibrary: '0x88885ce56AD5836629466AD0429c386a47676FD8',
 } as const;
 
 // ============================================
-// Slipstream (Concentrated Liquidity) Contracts
+// Slipstream (Concentrated Liquidity) Contracts (new deployment)
 // ============================================
 export const CL_CONTRACTS = {
-    CLFactory: '0x88888493d3e3a133cB80da23610f23a6D563D083',
-    CLPool: '0x8888001A78925a533ebd01efFdF5538B75D95D07',
-    CLGaugeFactory: '0x888898D1d00867F2FEe511A30Fa56913F8e88728',
-    CLGauge: '0x8888bb5ef5428eB7c3Bb71663E630a9f696fDBE0',
-    SwapRouter: '0x8888bf918c9c97cAD175a3A2037451f471a479E6',
-    NonfungiblePositionManager: '0x8888ef0BbF7aF08bBbaca8d6596F8Df18C78AE19',
-    NonfungibleTokenPositionDescriptor: '0x8888F243B25dA58f97Ffb885872Dc4D369903408',
-    QuoterV2: '0x8888eda381972e924F9331413a3BF84215e34A83',
-    MixedRouteQuoterV1: '0x88888a4a1e5c54A21A875BD5676bEc211D902dba',
-    SugarHelper: '0x88887E0C9819719897050228F181e992f7a07bd9',
-    CustomSwapFeeModule: '0x8888C00889B0Fff1A8D41f29F2F999AF2413fe83',
-    CustomUnstakedFeeModule: '0x88888Ff05C141C690319ED7B12D555ec97565389',
-    NFTDescriptor: '0x88886Ea0791846EcC1f97121755319A86042Cdc0',
-    NFTSVG: '0x888854d60a7CCE9e1aA18B3F1a702B37B06A33C9',
-    TickLens: '0x888865Bae438E0E194b9a2d774140290776B48Dd',
+    CLFactory: '0x8888A3D87EF6aBC5F50572661E4729A45b255cF6',
+    CLPool: '0x8888125154253b50bE0958EDE6648524f92DcEBe',
+    CLGaugeFactory: '0x8888B7b5731EBB4E7962cC20b186C92C94bCAFbd',
+    CLGauge: '0x88889Dc37A0829d2c5f0F59363ba1De6b6E4E7c8',
+    SwapRouter: '0x8888EEA5C97AF36f764259557d2D4CA23e6b19Ff',
+    NonfungiblePositionManager: '0x8888bB79b80e6B48014493819656Ffc1444d7687',
+    NonfungibleTokenPositionDescriptor: '0x8888e88A64CF0404b523944f8cf7182947D4261d',
+    QuoterV2: '0x888831E6a70C71009765bAa1C3d86031539d6B15',
+    MixedRouteQuoterV1: '0x88884631783f44261ba37da9a37ffa65dcB1A676',
+    SugarHelper: '0x8888F211bC93753a9287f64bdD45a7184C1766Ad',
+    CustomSwapFeeModule: '0x8888397cA7c951f700CAFc2E8B657761B92D2aDe',
+    CustomUnstakedFeeModule: '0x88889731C6faDb268e0BB34d9f104B54e6d32154',
+    NFTDescriptor: '0x88881883ff4d81C6E72978673104934D0852a44a',
+    NFTSVG: '0x8888719B0870570DAaCc37473c2290635F37D5E9',
+    TickLens: '0x8888C63496a29A46c8E005983886D2552d4c3D03',
+    CLInterfaceMulticall: '0x8888Ce7DE18b513DBe6935E0C82aAaE08ADc6127',
 } as const;
 
 // ============================================

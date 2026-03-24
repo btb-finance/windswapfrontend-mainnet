@@ -15,7 +15,7 @@ import { V2_CONTRACTS } from '@/config/contracts';
 import { getRpcForVoting, rpcCall } from '@/utils/rpc';
 import { EmptyState } from '@/components/common/InfoCard';
 import { LockVoteEarnSteps } from '@/components/common/StepIndicator';
-import { SUBGRAPH_URL, readSubgraphJson } from '@/config/subgraph';
+import { SUBGRAPH_URL, SUBGRAPH_HEADERS, readSubgraphJson } from '@/config/subgraph';
 import { usePoolData } from '@/providers/PoolDataProvider';
 import { VOTER_DISTRIBUTE_ABI, FEE_REWARD_ABI } from '@/config/abis';
 import { TIME } from '@/config/constants';
@@ -171,7 +171,7 @@ export default function VotePage() {
 
             const votesRes = await fetch(SUBGRAPH_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: SUBGRAPH_HEADERS,
                 body: JSON.stringify({ query: votesQuery, variables: { tokenIds } }),
             });
             const votesJson = await readSubgraphJson(votesRes, 'veVotes(for rewards)') as any;
@@ -324,7 +324,7 @@ export default function VotePage() {
 
             const response = await fetch(SUBGRAPH_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: SUBGRAPH_HEADERS,
                 body: JSON.stringify({ query, variables: { tokenIds } }),
             });
             const json = await readSubgraphJson(response, 'veVotes(vote status)') as any;
@@ -376,7 +376,7 @@ export default function VotePage() {
         }`;
         fetch(SUBGRAPH_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: SUBGRAPH_HEADERS,
             body: JSON.stringify({ query }),
         })
             .then(r => r.json())

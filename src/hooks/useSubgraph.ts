@@ -571,6 +571,6 @@ export function useUserPositions(userAddress: string | undefined) {
     };
 }
 
-// Export the subgraph URL for direct use
-export { SUBGRAPH_URL };
+// Export the subgraph URL and headers for direct use
+export { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
 

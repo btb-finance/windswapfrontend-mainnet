@@ -8,7 +8,7 @@ import { useWindPrice as useWindPriceHook } from '@/hooks/useWindPrice';
 import { useUserPositions } from '@/hooks/useSubgraph';
 import { getRpcForUserData, rpcCall } from '@/utils/rpc';
 import { V2_CONTRACTS, NOTABLE_POOLS, NOTABLE_GAUGES } from '@/config/contracts';
-import { SUBGRAPH_URL } from '@/config/subgraph';
+import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
 
 interface SubgraphGauge {
     id: string;
@@ -58,7 +58,7 @@ async function fetchPoolsFromSubgraph(): Promise<{
     try {
         const response = await fetch(SUBGRAPH_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: SUBGRAPH_HEADERS,
             body: JSON.stringify({
                 query: `{
                     bundles(first: 1) { ethPrice }
@@ -769,7 +769,7 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
 
             const response = await fetch(SUBGRAPH_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: SUBGRAPH_HEADERS,
                 body: JSON.stringify({ query }),
             });
             const json = await response.json();

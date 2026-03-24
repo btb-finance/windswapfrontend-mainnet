@@ -8,7 +8,7 @@ import { Address } from 'viem';
 import { V2_CONTRACTS, CL_CONTRACTS } from '@/config/contracts';
 import { DEFAULT_TOKEN_LIST, Token } from '@/config/tokens';
 import { getRpcForVoting } from '@/utils/rpc';
-import { SUBGRAPH_URL } from '@/config/subgraph';
+import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
 import { VOTER_ABI, FACTORY_REGISTRY_ABI, CL_FACTORY_ABI, MINTER_ABI } from '@/config/abis';
 import { TIME } from '@/config/constants';
 
@@ -99,7 +99,7 @@ export default function AdminPage() {
             try {
                 const res = await fetch(SUBGRAPH_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: SUBGRAPH_HEADERS,
                     body: JSON.stringify({
                         query: `{ protocol(id: "windswap") { weeklyEmissions activePeriod epochCount tailEmissionRate } }`
                     }),

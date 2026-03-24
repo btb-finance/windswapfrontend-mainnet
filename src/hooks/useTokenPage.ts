@@ -7,7 +7,7 @@ import { Token, SEI, WSEI } from '@/config/tokens';
 import { getTokenByAddress } from '@/utils/tokens';
 import { GAUGE_LIST, GaugeConfig } from '@/config/gauges';
 import { usePoolData } from '@/providers/PoolDataProvider';
-import { SUBGRAPH_URL } from '@/hooks/useSubgraph';
+import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/hooks/useSubgraph';
 import { ERC20_ABI } from '@/config/abis';
 
 export interface TokenPool {
@@ -77,7 +77,7 @@ export function useTokenPage(address: string | undefined): UseTokenPageResult {
 
                 const response = await fetch(SUBGRAPH_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: SUBGRAPH_HEADERS,
                     body: JSON.stringify({ query, variables: { id: checksumAddr.toLowerCase() } }),
                 });
                 const json = await response.json();

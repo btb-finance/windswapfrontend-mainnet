@@ -5,7 +5,7 @@ import { usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { Address, encodeFunctionData, keccak256, toBytes, parseUnits } from 'viem';
 import { V2_CONTRACTS, CL_CONTRACTS } from '@/config/contracts';
-import { SUBGRAPH_URL } from '@/hooks/useSubgraph';
+import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/hooks/useSubgraph';
 import { GOVERNOR_ABI, VOTER_ABI } from '@/config/abis';
 
 // Subgraph proposal shape
@@ -85,7 +85,7 @@ export function useGovernance() {
             try {
                 const res = await fetch(SUBGRAPH_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: SUBGRAPH_HEADERS,
                     body: JSON.stringify({
                         query: `{ protocol(id: "windswap") { proposalThreshold votingDelay votingPeriod } }`
                     }),
@@ -131,7 +131,7 @@ export function useGovernance() {
 
             const response = await fetch(SUBGRAPH_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: SUBGRAPH_HEADERS,
                 body: JSON.stringify({ query }),
             });
 
