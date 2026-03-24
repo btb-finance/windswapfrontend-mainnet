@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { OLD_SUBGRAPH_URL, OLD_V2_CONTRACTS } from '@/config/oldContracts';
+import { encodeFunctionData, decodeFunctionResult } from 'viem';
+import { OLD_SUBGRAPH_URL, OLD_V2_CONTRACTS, OLD_CL_CONTRACTS } from '@/config/oldContracts';
 import { getRpcForPoolData } from '@/utils/rpc';
 
 // ============================================
@@ -173,6 +174,137 @@ async function fetchOldWindBalance(userAddress: string): Promise<string> {
 }
 
 // ============================================
+// Helper: batch fetch earned rewards from old gauge contracts
+// ============================================
+
+const EARNED_ABI = [{
+    inputs: [{ name: 'account', type: 'address' }, { name: 'tokenId', type: 'uint256' }],
+    name: 'earned',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+}] as const;
+
+const NFT_POSITIONS_ABI = [{
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    name: 'positions',
+    outputs: [
+        { name: 'nonce', type: 'uint96' },
+        { name: 'operator', type: 'address' },
+        { name: 'token0', type: 'address' },
+        { name: 'token1', type: 'address' },
+        { name: 'tickSpacing', type: 'int24' },
+        { name: 'tickLower', type: 'int24' },
+        { name: 'tickUpper', type: 'int24' },
+        { name: 'liquidity', type: 'uint128' },
+        { name: 'feeGrowthInside0LastX128', type: 'uint256' },
+        { name: 'feeGrowthInside1LastX128', type: 'uint256' },
+        { name: 'tokensOwed0', type: 'uint128' },
+        { name: 'tokensOwed1', type: 'uint128' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+}] as const;
+
+async function batchRpcCalls(calls: Array<{ to: string; data: string }>): Promise<string[]> {
+    const rpc = getRpcForPoolData();
+    const batch = calls.map((c, i) => ({
+        jsonrpc: '2.0' as const,
+        method: 'eth_call',
+        params: [{ to: c.to, data: c.data }, 'latest'],
+        id: i,
+    }));
+
+    const response = await fetch(rpc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+    });
+
+    const results = await response.json();
+    const arr = Array.isArray(results) ? results : [results];
+    arr.sort((a: { id: number }, b: { id: number }) => a.id - b.id);
+    return arr.map((r: { result?: string }) => r.result || '0x');
+}
+
+async function fetchOnChainEarned(
+    userAddress: string,
+    stakedPositions: Array<{ gaugeAddress: string; tokenId: string }>
+): Promise<Map<string, string>> {
+    if (stakedPositions.length === 0) return new Map();
+
+    const calls = stakedPositions.map((sp) => ({
+        to: sp.gaugeAddress,
+        data: encodeFunctionData({
+            abi: EARNED_ABI,
+            functionName: 'earned',
+            args: [userAddress as `0x${string}`, BigInt(sp.tokenId)],
+        }),
+    }));
+
+    try {
+        const results = await batchRpcCalls(calls);
+        const map = new Map<string, string>();
+        for (let i = 0; i < stakedPositions.length; i++) {
+            const hex = results[i];
+            if (hex && hex !== '0x' && hex.length > 2) {
+                try {
+                    const decoded = decodeFunctionResult({ abi: EARNED_ABI, functionName: 'earned', data: hex as `0x${string}` });
+                    map.set(stakedPositions[i].tokenId, decoded.toString());
+                } catch {
+                    map.set(stakedPositions[i].tokenId, '0');
+                }
+            } else {
+                map.set(stakedPositions[i].tokenId, '0');
+            }
+        }
+        return map;
+    } catch (err) {
+        console.error('[useOldPositions] Failed to fetch on-chain earned:', err);
+        return new Map();
+    }
+}
+
+async function fetchOnChainPositions(
+    tokenIds: string[]
+): Promise<Map<string, { liquidity: string; tokensOwed0: string; tokensOwed1: string }>> {
+    if (tokenIds.length === 0) return new Map();
+
+    const calls = tokenIds.map((tokenId) => ({
+        to: OLD_CL_CONTRACTS.NonfungiblePositionManager,
+        data: encodeFunctionData({
+            abi: NFT_POSITIONS_ABI,
+            functionName: 'positions',
+            args: [BigInt(tokenId)],
+        }),
+    }));
+
+    try {
+        const results = await batchRpcCalls(calls);
+        const map = new Map<string, { liquidity: string; tokensOwed0: string; tokensOwed1: string }>();
+        for (let i = 0; i < tokenIds.length; i++) {
+            const hex = results[i];
+            if (hex && hex !== '0x' && hex.length > 2) {
+                try {
+                    const decoded = decodeFunctionResult({ abi: NFT_POSITIONS_ABI, functionName: 'positions', data: hex as `0x${string}` });
+                    map.set(tokenIds[i], {
+                        liquidity: decoded[7].toString(),
+                        tokensOwed0: decoded[10].toString(),
+                        tokensOwed1: decoded[11].toString(),
+                    });
+                } catch {
+                    // skip
+                }
+            }
+        }
+        return map;
+    } catch (err) {
+        console.error('[useOldPositions] Failed to fetch on-chain positions:', err);
+        return new Map();
+    }
+}
+
+// ============================================
 // Hook
 // ============================================
 
@@ -262,51 +394,80 @@ export function useOldPositions(userAddress: string | undefined) {
                 fetchOldWindBalance(userAddress),
             ]);
 
-            // Map positions
-            const positions: OldPosition[] = (subgraphData.user?.positions || []).map((p) => ({
-                tokenId: p.tokenId,
-                poolId: p.pool.id,
-                token0: p.pool.token0,
-                token1: p.pool.token1,
-                tickSpacing: p.pool.tickSpacing,
-                currentTick: p.pool.tick,
-                tickLower: p.tickLower,
-                tickUpper: p.tickUpper,
-                liquidity: p.liquidity,
-                amount0: p.amount0,
-                amount1: p.amount1,
-                amountUSD: p.amountUSD,
-                tokensOwed0: p.tokensOwed0,
-                tokensOwed1: p.tokensOwed1,
-                staked: p.staked,
-            }));
+            const isNonZero = (v: string | undefined) => !!v && v !== '0' && parseFloat(v) > 0;
 
-            // Map veNFTs
-            const veNFTs: OldVeNFT[] = (subgraphData.user?.veNFTs || []).map((v) => ({
-                tokenId: v.tokenId,
-                lockedAmount: v.lockedAmount,
-                lockEnd: v.lockEnd,
-                votingPower: v.votingPower,
-                isPermanent: v.isPermanent,
-            }));
+            // Get all position tokenIds for on-chain verification
+            const allPositionTokenIds = (subgraphData.user?.positions || []).map(p => p.tokenId);
 
-            // Map staked positions
-            const staked: OldStakedPosition[] = (subgraphData.gaugeStakedPositions || []).map((s) => ({
-                tokenId: s.tokenId,
+            // Get all staked position info for on-chain earned check
+            const stakedForEarned = (subgraphData.gaugeStakedPositions || []).map(s => ({
                 gaugeAddress: s.gauge.id,
-                poolId: s.gauge.pool.id,
-                token0: s.gauge.pool.token0,
-                token1: s.gauge.pool.token1,
-                tickSpacing: s.gauge.pool.tickSpacing,
-                currentTick: s.gauge.pool.tick,
-                amount: s.amount,
-                earned: s.earned,
-                isActive: s.isActive,
-                liquidity: s.position.liquidity,
-                amount0: s.position.amount0,
-                amount1: s.position.amount1,
-                amountUSD: s.position.amountUSD,
+                tokenId: s.tokenId,
             }));
+
+            // Fetch on-chain data in parallel: real liquidity/fees for positions + real earned for staked
+            const [onChainPositions, onChainEarned] = await Promise.all([
+                fetchOnChainPositions(allPositionTokenIds),
+                fetchOnChainEarned(userId, stakedForEarned),
+            ]);
+
+            // Map positions — use on-chain liquidity/fees for accurate filtering
+            const positions: OldPosition[] = (subgraphData.user?.positions || [])
+                .map((p) => {
+                    const onChain = onChainPositions.get(p.tokenId);
+                    return {
+                        tokenId: p.tokenId,
+                        poolId: p.pool.id,
+                        token0: p.pool.token0,
+                        token1: p.pool.token1,
+                        tickSpacing: p.pool.tickSpacing,
+                        currentTick: p.pool.tick,
+                        tickLower: p.tickLower,
+                        tickUpper: p.tickUpper,
+                        liquidity: onChain?.liquidity ?? p.liquidity,
+                        amount0: p.amount0,
+                        amount1: p.amount1,
+                        amountUSD: p.amountUSD,
+                        tokensOwed0: onChain?.tokensOwed0 ?? p.tokensOwed0,
+                        tokensOwed1: onChain?.tokensOwed1 ?? p.tokensOwed1,
+                        staked: p.staked,
+                    };
+                })
+                .filter((p) => isNonZero(p.liquidity) || isNonZero(p.tokensOwed0) || isNonZero(p.tokensOwed1));
+
+            // Map veNFTs — filter out already-withdrawn (zero locked amount)
+            const veNFTs: OldVeNFT[] = (subgraphData.user?.veNFTs || [])
+                .filter((v) => isNonZero(v.lockedAmount))
+                .map((v) => ({
+                    tokenId: v.tokenId,
+                    lockedAmount: v.lockedAmount,
+                    lockEnd: v.lockEnd,
+                    votingPower: v.votingPower,
+                    isPermanent: v.isPermanent,
+                }));
+
+            // Map staked positions — use on-chain earned for accurate values and filtering
+            const staked: OldStakedPosition[] = (subgraphData.gaugeStakedPositions || [])
+                .map((s) => {
+                    const realEarned = onChainEarned.get(s.tokenId) ?? s.earned;
+                    return {
+                        tokenId: s.tokenId,
+                        gaugeAddress: s.gauge.id,
+                        poolId: s.gauge.pool.id,
+                        token0: s.gauge.pool.token0,
+                        token1: s.gauge.pool.token1,
+                        tickSpacing: s.gauge.pool.tickSpacing,
+                        currentTick: s.gauge.pool.tick,
+                        amount: s.amount,
+                        earned: realEarned,
+                        isActive: s.isActive,
+                        liquidity: s.position.liquidity,
+                        amount0: s.position.amount0,
+                        amount1: s.position.amount1,
+                        amountUSD: s.position.amountUSD,
+                    };
+                })
+                .filter((s) => isNonZero(s.liquidity) || isNonZero(s.amount) || isNonZero(s.earned));
 
             setOldPositions(positions);
             setOldVeNFTs(veNFTs);

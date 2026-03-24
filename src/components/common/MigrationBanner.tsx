@@ -169,20 +169,23 @@ export default function MigrationBanner() {
     const key = `remove-${position.tokenId}`
     setPendingAction(key)
     try {
-      await writeContractAsync({
-        address: OLD_CL_CONTRACTS.NonfungiblePositionManager as Address,
-        abi: DECREASE_LIQUIDITY_ABI,
-        functionName: 'decreaseLiquidity',
-        args: [
-          {
-            tokenId: BigInt(position.tokenId),
-            liquidity: BigInt(position.liquidity),
-            amount0Min: 0n,
-            amount1Min: 0n,
-            deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
-          },
-        ],
-      })
+      const hasLiquidity = BigInt(position.liquidity) > 0n
+      if (hasLiquidity) {
+        await writeContractAsync({
+          address: OLD_CL_CONTRACTS.NonfungiblePositionManager as Address,
+          abi: DECREASE_LIQUIDITY_ABI,
+          functionName: 'decreaseLiquidity',
+          args: [
+            {
+              tokenId: BigInt(position.tokenId),
+              liquidity: BigInt(position.liquidity),
+              amount0Min: 0n,
+              amount1Min: 0n,
+              deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
+            },
+          ],
+        })
+      }
       await writeContractAsync({
         address: OLD_CL_CONTRACTS.NonfungiblePositionManager as Address,
         abi: COLLECT_ABI,
@@ -299,35 +302,55 @@ export default function MigrationBanner() {
 
         {hasOldCL && (
           <CollapsibleSection title="Old CL Positions" count={unstakedPositions.length}>
-            {unstakedPositions.map((pos: OldPosition) => (
-              <div
-                key={pos.tokenId.toString()}
-                className="bg-white/[0.03] rounded-xl p-4 flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-white text-sm font-medium">
-                    {pos.token0.symbol}/{pos.token1.symbol}
-                  </p>
-                  <p className="text-white/40 text-xs mt-0.5">
-                    ~${Number(pos.amountUSD).toFixed(2)}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleRemoveLiquidity(pos)}
-                  disabled={pendingAction === `remove-${pos.tokenId}`}
-                  className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            {unstakedPositions.map((pos: OldPosition) => {
+              const hasLiquidity = BigInt(pos.liquidity) > 0n
+              const owed0 = BigInt(pos.tokensOwed0 || '0')
+              const owed1 = BigInt(pos.tokensOwed1 || '0')
+              const hasClaimable = owed0 > 0n || owed1 > 0n
+              const isClaimOnly = !hasLiquidity && hasClaimable
+
+              return (
+                <div
+                  key={pos.tokenId.toString()}
+                  className="bg-white/[0.03] rounded-xl p-4 flex items-center justify-between"
                 >
-                  {pendingAction === `remove-${pos.tokenId}` ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
-                      Removing...
-                    </span>
-                  ) : (
-                    'Remove Liquidity'
-                  )}
-                </button>
-              </div>
-            ))}
+                  <div>
+                    <p className="text-white text-sm font-medium">
+                      {pos.token0.symbol}/{pos.token1.symbol}
+                      {isClaimOnly && (
+                        <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded ml-2">
+                          FEES READY
+                        </span>
+                      )}
+                    </p>
+                    {hasLiquidity ? (
+                      <p className="text-white/40 text-xs mt-0.5">
+                        ~${Number(pos.amountUSD).toFixed(2)}
+                      </p>
+                    ) : (
+                      <p className="text-white/40 text-xs mt-0.5">
+                        Claimable: {Number(formatUnits(owed0, pos.token0.decimals)).toFixed(4)} {pos.token0.symbol}
+                        {owed1 > 0n && ` + ${Number(formatUnits(owed1, pos.token1.decimals)).toFixed(4)} ${pos.token1.symbol}`}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveLiquidity(pos)}
+                    disabled={pendingAction === `remove-${pos.tokenId}`}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pendingAction === `remove-${pos.tokenId}` ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                        {isClaimOnly ? 'Claiming...' : 'Removing...'}
+                      </span>
+                    ) : (
+                      isClaimOnly ? 'Claim Fees' : 'Remove Liquidity'
+                    )}
+                  </button>
+                </div>
+              )
+            })}
           </CollapsibleSection>
         )}
 
@@ -343,7 +366,7 @@ export default function MigrationBanner() {
                     {sp.token0.symbol}/{sp.token1.symbol}
                   </p>
                   <p className="text-white/40 text-xs mt-0.5">
-                    Earned: {Number(sp.earned).toFixed(4)} WIND
+                    Earned: {(() => { try { return Number(formatUnits(BigInt(sp.earned || '0'), 18)).toFixed(4); } catch { return Number(sp.earned).toFixed(4); } })()} WIND
                   </p>
                 </div>
                 <button
