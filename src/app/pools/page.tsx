@@ -46,11 +46,23 @@ const TOP_POOL_ADDRESSES: Record<string, boolean> = Object.fromEntries(
 const TOP_POOL_PRIORITY: Record<string, number> = {};
 
 // Helper to find token by address - use SEI for WSEI in UI
-const findTokenForUI = (addr: string): Token | undefined => {
+// Falls back to building a Token from pool data for unlisted tokens
+const findTokenForUI = (addr: string, poolToken?: { address: string; symbol: string; decimals: number; logoURI?: string }): Token | undefined => {
     const token = getTokenByAddress(addr);
     // Show SEI for WSEI in UI for better UX
     if (token?.symbol === 'WSEI') return SEI;
-    return token || undefined;
+    if (token) return token;
+    // For unlisted tokens, build a Token from pool subgraph data
+    if (poolToken) {
+        return {
+            address: poolToken.address,
+            symbol: poolToken.symbol,
+            name: poolToken.symbol,
+            decimals: poolToken.decimals,
+            logoURI: poolToken.logoURI,
+        };
+    }
+    return undefined;
 };
 
 // Format compact number (e.g. $245K, $1.2M)
@@ -136,8 +148,8 @@ export default function PoolsPage() {
 
     // Open modal for a specific pool
     const openAddLiquidityModal = (pool: typeof allPools[0]) => {
-        const token0 = findTokenForUI(pool.token0.address);
-        const token1 = findTokenForUI(pool.token1.address);
+        const token0 = findTokenForUI(pool.token0.address, pool.token0);
+        const token1 = findTokenForUI(pool.token1.address, pool.token1);
         setSelectedPool({
             token0,
             token1,

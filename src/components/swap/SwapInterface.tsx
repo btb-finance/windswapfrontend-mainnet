@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWaitForTransactionReceipt, useWalletClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData } from 'viem';
 import { Token, SEI, USDC, WSEI, LORE } from '@/config/tokens';
@@ -20,6 +20,8 @@ import { haptic } from '@/hooks/useHaptic';
 import { SLIPPAGE, DEBOUNCE_MS, ACCESSIBILITY } from '@/config/constants';
 import { getSwapErrorMessage, isUserRejection } from '@/utils/errors';
 import { useToast } from '@/providers/ToastProvider';
+import { getWowMaxQuote, getWowMaxSwapData } from '@/utils/wowmax';
+import { useReferral } from '@/providers/ReferralProvider';
 
 interface Route {
     from: Address;
@@ -29,7 +31,7 @@ interface Route {
 }
 
 interface BestRoute {
-    type: 'v2' | 'v3' | 'multi-hop' | 'wrap' | 'split';
+    type: 'v2' | 'v3' | 'multi-hop' | 'wrap' | 'split' | 'wowmax';
     amountOut: string;
     tickSpacing?: number;
     tickSpacing1?: number;
@@ -92,6 +94,7 @@ export function SwapInterface({ initialTokenIn, initialTokenOut }: SwapInterface
 function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, onTokenOutChange }: SwapInterfaceInnerProps) {
     const { isConnected, address } = useAccount();
     const { success, error: showError } = useToast();
+    const { referralAddress, isReferred, referralLink } = useReferral();
 
     // Token state — local copy; changes bubble up via callbacks so parent can re-route to bonding curve
     const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
@@ -141,6 +144,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { formatted: formattedBalanceOut } = useTokenBalance(tokenOut);
     const { writeContractAsync } = useWriteContract();
     const { executeBatch, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
+    const { data: walletClient } = useWalletClient();
 
     const isLoading = isLoadingV2 || isLoadingV3 || isBatching;
     const hookError = errorV2 || errorV3;
@@ -184,10 +188,12 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const currentAllowance = bestRoute?.type === 'v2' ? allowanceV2 : allowanceV3;
 
     // Check if approval is needed for the CURRENT best route
+    // WowMax handles approval inline during swap execution
     const needsApproval = !tokenIn?.isNative &&
         amountInWei > BigInt(0) &&
-        bestRoute !== null && // Only check approval when we have a route
-        bestRoute.type !== 'wrap' && // Wrap/unwrap calls WETH directly, no router approval needed
+        bestRoute !== null &&
+        bestRoute.type !== 'wrap' &&
+        bestRoute.type !== 'wowmax' &&
         (currentAllowance === undefined || (currentAllowance as bigint) < amountInWei);
 
     // Track pending approval transaction hash
@@ -374,6 +380,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             : undefined,
         query: {
             enabled: !!actualTokenIn && !!actualTokenOut && !!amountIn && parseFloat(amountIn) > 0 && independentField === 'INPUT',
+            refetchInterval: false,
+            staleTime: 30_000,
         },
     });
 
@@ -394,6 +402,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             : undefined,
         query: {
             enabled: !!actualTokenIn && !!actualTokenOut && !!amountIn && parseFloat(amountIn) > 0 && independentField === 'INPUT',
+            refetchInterval: false,
+            staleTime: 30_000,
         },
     });
 
@@ -575,6 +585,28 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                             stable: true,
                             feeLabel: 'V2 Stable',
                         });
+                    }
+                }
+
+                // Always check WowMax aggregator alongside local routes (use raw token addresses — native 0xEeee for ETH)
+                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenOut) {
+                    try {
+                        const wmQuote = await getWowMaxQuote(
+                            tokenIn.address,
+                            tokenOut.address,
+                            amountIn,
+                        );
+                        if (wmQuote && parseFloat(wmQuote.amountOut) > 0) {
+                            const outDecimals = wmQuote.to?.decimals ?? actualTokenOut.decimals;
+                            const formattedOut = formatUnits(BigInt(wmQuote.amountOut), outDecimals);
+                            routes.push({
+                                type: 'wowmax',
+                                amountOut: formattedOut,
+                                feeLabel: 'via WowMax',
+                            });
+                        }
+                    } catch (wmErr) {
+                        console.warn('[WowMax] Quote failed:', wmErr);
                     }
                 }
 
@@ -770,6 +802,59 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 };
             });
             result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
+        } else if (bestRoute.type === 'wowmax') {
+            // WowMax aggregator route — use raw token addresses (native 0xEeee for ETH)
+            try {
+                if (!tokenIn || !tokenOut || !address) return;
+                const swapData = await getWowMaxSwapData(
+                    tokenIn.address,
+                    tokenOut.address,
+                    amountIn,
+                    slippage,
+                    address,
+                );
+                if (!swapData || !swapData.data) {
+                    setError('Failed to get swap data from WowMax');
+                    setRouteLocked(false);
+                    return;
+                }
+
+                // Approve WowMax router if needed:
+                // When value > 0, user is sending native ETH — no approval needed.
+                // When value == 0, WowMax uses transferFrom on the ERC20 — approval required.
+                const txValue = swapData.value ? BigInt(swapData.value) : BigInt(0);
+                if (txValue === BigInt(0) && swapData.amountIn && BigInt(swapData.amountIn) > BigInt(0)) {
+                    const wmApproveAddr = (actualTokenIn || tokenIn).address as Address;
+                    await writeContractAsync({
+                        address: wmApproveAddr,
+                        abi: ERC20_ABI,
+                        functionName: 'approve',
+                        args: [swapData.contract as Address, BigInt(swapData.amountIn)],
+                    });
+                }
+
+                // Execute the swap via WowMax router using raw calldata
+                if (!walletClient) {
+                    setError('Wallet not connected');
+                    setRouteLocked(false);
+                    return;
+                }
+                const hash = await walletClient.sendTransaction({
+                    to: swapData.contract as Address,
+                    data: swapData.data as `0x${string}`,
+                    value: txValue,
+                    chain: walletClient.chain,
+                    account: walletClient.account,
+                });
+                result = { hash };
+            } catch (err: unknown) {
+                console.error('WowMax swap error:', err);
+                if (!isUserRejection(err)) {
+                    const errorMsg = getSwapErrorMessage(err);
+                    setError(errorMsg);
+                }
+                result = null;
+            }
         }
 
         if (result) {
@@ -986,8 +1071,28 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             )}
 
             <div className="mt-3 text-center text-[10px] text-gray-500">
-                Auto-routes via V2 + V3 pools
+                Auto-routes via V2 + V3 pools + WowMax
             </div>
+
+            {/* Referral Badge */}
+            {isReferred && referralAddress && (
+                <div className="mt-2 text-center text-[10px] text-primary/70">
+                    Referred by {referralAddress.slice(0, 6)}…{referralAddress.slice(-4)}
+                </div>
+            )}
+
+            {/* Copy Referral Link */}
+            {isConnected && address && (
+                <button
+                    onClick={() => {
+                        navigator.clipboard.writeText(referralLink(address));
+                        success('Referral link copied!');
+                    }}
+                    className="mt-2 w-full text-center text-[10px] text-gray-500 hover:text-primary transition cursor-pointer"
+                >
+                    📋 Copy your referral link
+                </button>
+            )}
         </div>
     );
 }
