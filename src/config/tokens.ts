@@ -62,6 +62,11 @@ export const USDCN = USDC;
 export const cbBTC = WBTC;
 export const LORE: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LORE', name: 'LORE', decimals: 18 };
 export const USDVE: Token = { address: '0xbFCD661Be34C99920036F176876746b9f5B68c26', symbol: 'USDVE', name: 'USDVE', decimals: 18, logoURI: '/logo/USDVE.png' };
+export const SKI: Token = { address: '0x768BE13e1680b5ebE0024C42c896E3dB59ec0149', symbol: 'SKI', name: 'SKI', decimals: 18, logoURI: '/logo/ski.png' };
+export const VIRTUAL: Token = { address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b', symbol: 'VIRTUAL', name: 'VIRTUAL', decimals: 18, logoURI: '/logo/Virtuals.png' };
+export const BRETT: Token = { address: '0x532f27101965dd16442E59d40670FaF5eBB142E4', symbol: 'BRETT', name: 'BRETT', decimals: 18, logoURI: '/logo/brett.png' };
+export const BOOMER: Token = { address: '0xcdE172dc5ffC46D228838446c57C1227e0B82049', symbol: 'BOOMER', name: 'BOOMER', decimals: 18, logoURI: '/logo/boomer.png' };
+export const VVV: Token = { address: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf', symbol: 'VVV', name: 'VVV', decimals: 18, logoURI: '/logo/vvv.png' };
 
 // Default token list - only core tokens
 export const DEFAULT_TOKEN_LIST: Token[] = [
@@ -70,6 +75,11 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
     WIND,
     USDC,
     USDVE,
+    SKI,
+    VIRTUAL,
+    BRETT,
+    BOOMER,
+    VVV,
 ];
 
 // Token addresses for quick lookup
@@ -90,4 +100,9 @@ export const TOKEN_ADDRESSES = {
     LORE: LORE.address,
     cbBTC: cbBTC.address,
     USDVE: USDVE.address,
+    SKI: SKI.address,
+    VIRTUAL: VIRTUAL.address,
+    BRETT: BRETT.address,
+    BOOMER: BOOMER.address,
+    VVV: VVV.address,
 } as const;
