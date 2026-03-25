@@ -2276,3 +2276,28 @@ export const TICK_LENS_ABI = [
         type: 'function',
     },
 ] as const;
+
+// WindSwap Aggregator Proxy ABI
+export const AGGREGATOR_PROXY_ABI = [
+    {
+        inputs: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'minAmountOut', type: 'uint256' },
+            { name: 'router', type: 'address' },
+            { name: 'callData', type: 'bytes' },
+        ],
+        name: 'swap',
+        outputs: [],
+        stateMutability: 'payable',
+        type: 'function',
+    },
+    {
+        inputs: [],
+        name: 'feeBps',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function',
+    },
+] as const;

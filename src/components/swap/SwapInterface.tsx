@@ -2,13 +2,13 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useAccount, useReadContract, useWaitForTransactionReceipt, useWalletClient } from 'wagmi';
+import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData } from 'viem';
 import { Token, SEI, USDC, WSEI, LORE } from '@/config/tokens';
 import { LoreBondingCurveSwap } from './LoreBondingCurveSwap';
 import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
-import { ROUTER_ABI, ERC20_ABI, SWAP_ROUTER_ABI, WETH_ABI } from '@/config/abis';
+import { ROUTER_ABI, ERC20_ABI, SWAP_ROUTER_ABI, WETH_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
 import { TokenInput } from './TokenInput';
 import { SwapSettings } from './SwapSettings';
 import { useSwap } from '@/hooks/useSwap';
@@ -117,6 +117,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const [bestRoute, setBestRoute] = useState<BestRoute | null>(null);
     const [isQuoting, setIsQuoting] = useState(false);
     const [noRouteFound, setNoRouteFound] = useState(false);
+    const [quoteRefreshTick, setQuoteRefreshTick] = useState(0);
 
     // Track which field user is typing in
     const [independentField, setIndependentField] = useState<'INPUT' | 'OUTPUT'>('INPUT');
@@ -144,7 +145,6 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { formatted: formattedBalanceOut } = useTokenBalance(tokenOut);
     const { writeContractAsync } = useWriteContract();
     const { executeBatch, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
-    const { data: walletClient } = useWalletClient();
 
     const isLoading = isLoadingV2 || isLoadingV3 || isBatching;
     const hookError = errorV2 || errorV3;
@@ -651,7 +651,15 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
         const debounce = setTimeout(findBestRoute, DEBOUNCE_MS.QUOTE);
         return () => clearTimeout(debounce);
-    }, [tokenIn, tokenOut, amountIn, amountOut, actualTokenOut, v2VolatileQuote, v2StableQuote, findOptimalRoute, getSpotRate, routeLocked, independentField, getQuoteExactOutput, getQuoteExactOutputV3]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tokenIn, tokenOut, amountIn, amountOut, actualTokenOut, routeLocked, independentField, quoteRefreshTick]);
+
+    // Auto-refresh quote every 30 seconds (not on every RPC data change)
+    useEffect(() => {
+        if (!tokenIn || !tokenOut || !amountIn || parseFloat(amountIn) <= 0) return;
+        const interval = setInterval(() => setQuoteRefreshTick(t => t + 1), 30_000);
+        return () => clearInterval(interval);
+    }, [tokenIn, tokenOut, amountIn]);
 
     // Handle slippage change with validation
     const handleSlippageChange = useCallback((value: number) => {
@@ -803,15 +811,18 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             });
             result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
         } else if (bestRoute.type === 'wowmax') {
-            // WowMax aggregator route — use raw token addresses (native 0xEeee for ETH)
+            // WowMax aggregator route — routed through WindSwap Aggregator Proxy (1% fee)
             try {
-                if (!tokenIn || !tokenOut || !address) return;
+                if (!actualTokenIn || !actualTokenOut || !address) return;
+                const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
+
+                // Get swap calldata from WowMax (targeting the proxy as recipient)
                 const swapData = await getWowMaxSwapData(
-                    tokenIn.address,
-                    tokenOut.address,
+                    actualTokenIn.address,
+                    actualTokenOut.address,
                     amountIn,
                     slippage,
-                    address,
+                    proxyAddress, // proxy receives tokens, deducts fee, forwards to user
                 );
                 if (!swapData || !swapData.data) {
                     setError('Failed to get swap data from WowMax');
@@ -819,32 +830,41 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     return;
                 }
 
-                // Approve WowMax router if needed:
-                // When value > 0, user is sending native ETH — no approval needed.
-                // When value == 0, WowMax uses transferFrom on the ERC20 — approval required.
-                const txValue = swapData.value ? BigInt(swapData.value) : BigInt(0);
-                if (txValue === BigInt(0) && swapData.amountIn && BigInt(swapData.amountIn) > BigInt(0)) {
-                    const wmApproveAddr = (actualTokenIn || tokenIn).address as Address;
+                const isNativeIn = tokenIn.isNative;
+                const tokenInAddr = isNativeIn ? '0x0000000000000000000000000000000000000000' as Address : actualTokenIn.address as Address;
+                const tokenOutAddr = tokenOut?.isNative ? '0x0000000000000000000000000000000000000000' as Address : actualTokenOut.address as Address;
+
+                // Approve proxy to pull input tokens (ERC20 only)
+                if (!isNativeIn) {
                     await writeContractAsync({
-                        address: wmApproveAddr,
+                        address: actualTokenIn.address as Address,
                         abi: ERC20_ABI,
                         functionName: 'approve',
-                        args: [swapData.contract as Address, BigInt(swapData.amountIn)],
+                        args: [proxyAddress, amountInWei],
                     });
                 }
 
-                // Execute the swap via WowMax router using raw calldata
-                if (!walletClient) {
-                    setError('Wallet not connected');
-                    setRouteLocked(false);
-                    return;
-                }
-                const hash = await walletClient.sendTransaction({
-                    to: swapData.contract as Address,
-                    data: swapData.data as `0x${string}`,
-                    value: txValue,
-                    chain: walletClient.chain,
-                    account: walletClient.account,
+                // minAmountOut after 1% fee + slippage
+                const expectedOut = parseFloat(bestRoute.amountOut);
+                const minOut = parseUnits(
+                    (expectedOut * (1 - slippage / 100) * 0.99).toFixed(actualTokenOut.decimals),
+                    actualTokenOut.decimals
+                );
+
+                // Call proxy.swap() — it routes through WowMax, deducts 1% fee, sends rest to user
+                const hash = await writeContractAsync({
+                    address: proxyAddress,
+                    abi: AGGREGATOR_PROXY_ABI,
+                    functionName: 'swap',
+                    args: [
+                        tokenInAddr,
+                        tokenOutAddr,
+                        amountInWei,
+                        minOut,
+                        swapData.contract as Address, // WowMax router
+                        swapData.data as `0x${string}`, // swap calldata
+                    ],
+                    value: isNativeIn ? amountInWei : BigInt(0),
                 });
                 result = { hash };
             } catch (err: unknown) {

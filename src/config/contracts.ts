@@ -54,6 +54,9 @@ export const V2_CONTRACTS = {
     // StablecoinZap (stub)
     StablecoinZap: '0x0000000000000000000000000000000000000000',
 
+    // Aggregator Proxy — routes via WowMax/KyberSwap with 1% fee
+    AggregatorProxy: '0x26fE88F132C565054105069120caF0fBa9F77E2b',
+
     // Governance (stubs)
     ProtocolGovernor: '0x0000000000000000000000000000000000000000',
     EpochGovernor: '0x0000000000000000000000000000000000000000',
