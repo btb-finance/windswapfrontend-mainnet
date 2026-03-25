@@ -817,11 +817,13 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
                 // Get swap calldata from WowMax (targeting the proxy as recipient)
+                // Use higher slippage for aggregator route (user slippage + 1% fee buffer)
+                const wmSlippage = Math.max(slippage, 5) + 1; // min 5% + 1% fee buffer
                 const swapData = await getWowMaxSwapData(
                     actualTokenIn.address,
                     actualTokenOut.address,
                     amountIn,
-                    slippage,
+                    wmSlippage,
                     proxyAddress, // proxy receives tokens, deducts fee, forwards to user
                 );
                 if (!swapData || !swapData.data) {
@@ -844,10 +846,11 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     });
                 }
 
-                // minAmountOut after 1% fee + slippage
+                // minAmountOut: apply user's slippage + 1% fee on the quoted amount
+                // WowMax already handles slippage in its calldata, this is just the proxy's safety check
                 const expectedOut = parseFloat(bestRoute.amountOut);
                 const minOut = parseUnits(
-                    (expectedOut * (1 - slippage / 100) * 0.99).toFixed(actualTokenOut.decimals),
+                    (expectedOut * (1 - Math.max(slippage, 5) / 100) * 0.99).toFixed(actualTokenOut.decimals > 8 ? 8 : actualTokenOut.decimals),
                     actualTokenOut.decimals
                 );
 
