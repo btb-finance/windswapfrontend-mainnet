@@ -1,8 +1,10 @@
 'use client';
 
+import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { ToastProvider } from '@/providers/ToastProvider';
 import { WalletModalProvider } from '@/providers/WalletModalContext';
+import { ReferralProvider } from '@/providers/ReferralProvider';
 
 // Dynamic import with SSR disabled to prevent WalletConnect's idb-keyval
 // from accessing indexedDB during server-side rendering in serverless environments
@@ -23,7 +25,11 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
         <Providers>
             <WalletModalProvider>
                 <ToastProvider>
-                    {children}
+                    <Suspense>
+                        <ReferralProvider>
+                            {children}
+                        </ReferralProvider>
+                    </Suspense>
                 </ToastProvider>
             </WalletModalProvider>
         </Providers>
