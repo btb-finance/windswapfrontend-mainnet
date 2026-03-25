@@ -21,7 +21,6 @@ import { SLIPPAGE, DEBOUNCE_MS, ACCESSIBILITY } from '@/config/constants';
 import { getSwapErrorMessage, isUserRejection } from '@/utils/errors';
 import { useToast } from '@/providers/ToastProvider';
 import { getWowMaxQuote, getWowMaxSwapData } from '@/utils/wowmax';
-import { useReferral } from '@/providers/ReferralProvider';
 
 interface Route {
     from: Address;
@@ -94,7 +93,6 @@ export function SwapInterface({ initialTokenIn, initialTokenOut }: SwapInterface
 function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, onTokenOutChange }: SwapInterfaceInnerProps) {
     const { isConnected, address } = useAccount();
     const { success, error: showError } = useToast();
-    const { referralAddress, isReferred, referralLink } = useReferral();
 
     // Token state — local copy; changes bubble up via callbacks so parent can re-route to bonding curve
     const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
@@ -602,7 +600,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                             routes.push({
                                 type: 'wowmax',
                                 amountOut: formattedOut,
-                                feeLabel: 'via WowMax',
+                                feeLabel: 'Aggregated',
                             });
                         }
                     } catch (wmErr) {
@@ -1094,28 +1092,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             )}
 
             <div className="mt-3 text-center text-[10px] text-gray-500">
-                Auto-routes via V2 + V3 pools + WowMax
+                Auto-routes via V2 + V3 pools
             </div>
-
-            {/* Referral Badge */}
-            {isReferred && referralAddress && (
-                <div className="mt-2 text-center text-[10px] text-primary/70">
-                    Referred by {referralAddress.slice(0, 6)}…{referralAddress.slice(-4)}
-                </div>
-            )}
-
-            {/* Copy Referral Link */}
-            {isConnected && address && (
-                <button
-                    onClick={() => {
-                        navigator.clipboard.writeText(referralLink(address));
-                        success('Referral link copied!');
-                    }}
-                    className="mt-2 w-full text-center text-[10px] text-gray-500 hover:text-primary transition cursor-pointer"
-                >
-                    📋 Copy your referral link
-                </button>
-            )}
         </div>
     );
 }
