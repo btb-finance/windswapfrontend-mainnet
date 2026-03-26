@@ -56,6 +56,7 @@ interface BestRoute {
 interface SwapInterfaceProps {
     initialTokenIn?: Token;
     initialTokenOut?: Token;
+    onTokenPairChange?: (tokenIn?: Token, tokenOut?: Token) => void;
 }
 
 interface SwapInterfaceInnerProps extends SwapInterfaceProps {
@@ -70,12 +71,19 @@ function isLoreToken(t?: Token): boolean {
 }
 
 // Public entry point — owns tokenIn/tokenOut routing state, no other hooks
-export function SwapInterface({ initialTokenIn, initialTokenOut }: SwapInterfaceProps) {
+export function SwapInterface({ initialTokenIn, initialTokenOut, onTokenPairChange }: SwapInterfaceProps) {
     const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
     const [tokenOut, setTokenOut] = useState<Token | undefined>(initialTokenOut || USDC);
 
-    const handleTokenInChange = useCallback((t: Token) => { setTokenIn(t); }, []);
-    const handleTokenOutChange = useCallback((t: Token) => { setTokenOut(t); }, []);
+    const handleTokenInChange = useCallback((t: Token) => {
+        setTokenIn(t);
+        onTokenPairChange?.(t, tokenOut);
+    }, [tokenOut, onTokenPairChange]);
+
+    const handleTokenOutChange = useCallback((t: Token) => {
+        setTokenOut(t);
+        onTokenPairChange?.(tokenIn, t);
+    }, [tokenIn, onTokenPairChange]);
 
     if (isLoreToken(tokenIn) || isLoreToken(tokenOut)) {
         return <LoreBondingCurveSwap initialTokenIn={tokenIn} initialTokenOut={tokenOut} />;
