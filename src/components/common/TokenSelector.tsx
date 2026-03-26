@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { getAddress } from 'viem';
 import { Token, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
@@ -123,6 +124,12 @@ export function TokenSelector({
     const [loadingCustom, setLoadingCustom] = useState(false);
     const [customError, setCustomError] = useState<string | null>(null);
 
+    type TabType = 'All' | 'Trending' | 'Top Liquidity';
+    const [activeTab, setActiveTab] = useState<TabType>('All');
+    const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
+    const [liquidityTokens, setLiquidityTokens] = useState<Token[]>([]);
+    const [loadingTabs, setLoadingTabs] = useState(false);
+
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
 
@@ -164,11 +171,83 @@ export function TokenSelector({
         setLoadingCustom(false);
     }, []);
 
+    // Fetch external tokens for tabs
     useEffect(() => {
-        // Use sortedTokens (tokens with balance first)
-        const filtered = sortedTokens.filter((token) => {
+        if (activeTab === 'Trending' && trendingTokens.length === 0) {
+            setLoadingTabs(true);
+            fetch('https://api.geckoterminal.com/api/v2/networks/base/trending_pools?include=base_token')
+                .then(r => r.json())
+                .then(data => {
+                    if (data?.included) {
+                        const seen = new Set<string>();
+                        const tokens = data.included
+                            .filter((item: any) => item.type === 'token')
+                            .map((token: any) => {
+                                let validAddress = token.attributes.address;
+                                try { validAddress = getAddress(validAddress); } catch (e) {}
+                                return {
+                                    address: validAddress,
+                                    name: token.attributes.name,
+                                    symbol: token.attributes.symbol,
+                                    decimals: token.attributes.decimals || 18,
+                                    logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
+                                };
+                            })
+                            .filter((t: any) => {
+                                const key = t.address.toLowerCase();
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                            });
+                        setTrendingTokens(tokens);
+                    }
+                })
+                .catch(console.error)
+                .finally(() => setLoadingTabs(false));
+        }
+        if (activeTab === 'Top Liquidity' && liquidityTokens.length === 0) {
+            setLoadingTabs(true);
+            fetch('https://api.geckoterminal.com/api/v2/networks/base/pools?include=base_token')
+                .then(r => r.json())
+                .then(data => {
+                    if (data?.included) {
+                        const seen = new Set<string>();
+                        const tokens = data.included
+                            .filter((item: any) => item.type === 'token')
+                            .map((token: any) => {
+                                let validAddress = token.attributes.address;
+                                try { validAddress = getAddress(validAddress); } catch (e) {}
+                                return {
+                                    address: validAddress,
+                                    name: token.attributes.name,
+                                    symbol: token.attributes.symbol,
+                                    decimals: token.attributes.decimals || 18,
+                                    logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
+                                };
+                            })
+                            .filter((t: any) => {
+                                const key = t.address.toLowerCase();
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                            });
+                        setLiquidityTokens(tokens);
+                    }
+                })
+                .catch(console.error)
+                .finally(() => setLoadingTabs(false));
+        }
+    }, [activeTab]);
+
+    useEffect(() => {
+        let baseList = sortedTokens;
+        if (activeTab === 'Trending') baseList = trendingTokens;
+        else if (activeTab === 'Top Liquidity') baseList = liquidityTokens;
+
+        // Use baseList (tokens with balance first or from external APIs)
+        const filtered = baseList.filter((token) => {
             // Exclude the already selected token in the other input
-            if (excludeToken && token.address === excludeToken.address) return false;
+            if (excludeToken && token.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
 
             // Filter by search
             if (search) {
@@ -190,7 +269,7 @@ export function TokenSelector({
             setCustomToken(null);
             setCustomError(null);
         }
-    }, [search, excludeToken, fetchCustomToken, sortedTokens]);
+    }, [search, excludeToken, fetchCustomToken, sortedTokens, activeTab, trendingTokens, liquidityTokens]);
 
     const handleSelect = (token: Token) => {
         onSelect(token);
@@ -266,8 +345,25 @@ export function TokenSelector({
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search by name or paste address"
-                                    className="input-field text-base"
+                                    className="input-field text-base w-full p-3 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-primary/50"
                                 />
+                            </div>
+
+                            {/* Tabs */}
+                            <div className="flex gap-2 mb-4 shrink-0 overflow-x-auto no-scrollbar scroll-smooth">
+                                {(['All', 'Trending', 'Top Liquidity'] as TabType[]).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                                            activeTab === tab
+                                                ? 'bg-primary text-white'
+                                                : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
                             </div>
 
                             {/* Custom Token Import */}
@@ -326,7 +422,11 @@ export function TokenSelector({
                                     overscrollBehavior: 'contain'
                                 }}
                             >
-                                {filteredTokens.length === 0 && !customToken ? (
+                                {loadingTabs ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                ) : filteredTokens.length === 0 && !customToken ? (
                                     <div className="text-center py-8 text-gray-400">
                                         {isValidAddress(search) ? 'Checking address...' : 'No tokens found'}
                                     </div>
@@ -349,12 +449,14 @@ export function TokenSelector({
                                                         className="w-8 h-8 rounded-full"
                                                         loading="lazy"
                                                         onError={(e) => {
-                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                            const img = e.target as HTMLImageElement;
+                                                            img.style.display = 'none';
+                                                            const fallback = img.nextSibling as HTMLElement | null;
+                                                            if (fallback) fallback.style.display = '';
                                                         }}
                                                     />
-                                                ) : (
-                                                    <span className="text-lg font-bold">{token.symbol[0]}</span>
-                                                )}
+                                                ) : null}
+                                                <span className="text-lg font-bold" style={token.logoURI ? { display: 'none' } : {}}>{token.symbol[0]}</span>
                                             </div>
 
                                             {/* Token Info */}

@@ -586,12 +586,12 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     }
                 }
 
-                // Always check WowMax aggregator alongside local routes (use raw token addresses — native 0xEeee for ETH)
-                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenOut) {
+                // Always check WowMax aggregator alongside local routes
+                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenIn && actualTokenOut) {
                     try {
                         const wmQuote = await getWowMaxQuote(
-                            tokenIn.address,
-                            tokenOut.address,
+                            actualTokenIn.address,
+                            actualTokenOut.address,
                             amountIn,
                         );
                         if (wmQuote && parseFloat(wmQuote.amountOut) > 0) {
