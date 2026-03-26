@@ -144,7 +144,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { writeContractAsync } = useWriteContract();
     const { executeBatch, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
 
-    const isLoading = isLoadingV2 || isLoadingV3 || isBatching;
+    const [isSwappingWowmax, setIsSwappingWowmax] = useState(false);
+    const isLoading = isLoadingV2 || isLoadingV3 || isBatching || isSwappingWowmax;
     const hookError = errorV2 || errorV3;
 
     // Get actual token addresses (use WSEI for native SEI)
@@ -156,7 +157,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         ? parseUnits(amountIn, actualTokenIn.decimals)
         : BigInt(0);
 
-    // ===== Pre-check allowance for BOTH routers =====
+    // ===== Pre-check allowance for ALL routers =====
     const { data: allowanceV2, refetch: refetchAllowanceV2 } = useReadContract({
         address: actualTokenIn?.address as Address,
         abi: ERC20_ABI,
@@ -172,6 +173,16 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         abi: ERC20_ABI,
         functionName: 'allowance',
         args: address && actualTokenIn ? [address, CL_CONTRACTS.SwapRouter as Address] : undefined,
+        query: {
+            enabled: !!address && !!actualTokenIn && !tokenIn?.isNative,
+        },
+    });
+
+    const { data: allowanceProxy, refetch: refetchAllowanceProxy } = useReadContract({
+        address: actualTokenIn?.address as Address,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: address && actualTokenIn ? [address, V2_CONTRACTS.AggregatorProxy as Address] : undefined,
         query: {
             enabled: !!address && !!actualTokenIn && !tokenIn?.isNative,
         },
@@ -586,12 +597,12 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     }
                 }
 
-                // Always check WowMax aggregator alongside local routes (use raw token addresses — native 0xEeee for ETH)
-                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenOut) {
+                // Always check WowMax aggregator alongside local routes
+                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenIn && actualTokenOut) {
                     try {
                         const wmQuote = await getWowMaxQuote(
-                            tokenIn.address,
-                            tokenOut.address,
+                            actualTokenIn.address,
+                            actualTokenOut.address,
                             amountIn,
                         );
                         if (wmQuote && parseFloat(wmQuote.amountOut) > 0) {
@@ -810,13 +821,17 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
         } else if (bestRoute.type === 'wowmax') {
             // WowMax aggregator route — routed through WindSwap Aggregator Proxy (1% fee)
+            setIsSwappingWowmax(true);
             try {
-                if (!actualTokenIn || !actualTokenOut || !address) return;
+                if (!actualTokenIn || !actualTokenOut || !address) { setIsSwappingWowmax(false); return; }
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
                 // Get swap calldata from WowMax (targeting the proxy as recipient)
                 // Use higher slippage for aggregator route (user slippage + 1% fee buffer)
-                const wmSlippage = Math.max(slippage, 5) + 1; // min 5% + 1% fee buffer
+                // WowMax API expects slippage as a plain percentage number (6 = 6%)
+                // It multiplies by 100 internally; contract max is 2000 (= 20%)
+                // Add 1% buffer for the proxy fee on top of user's slippage, min 5%
+                const wmSlippage = Math.min(Math.max(slippage, 5) + 1, 15); // 6–15%
                 const swapData = await getWowMaxSwapData(
                     actualTokenIn.address,
                     actualTokenOut.address,
@@ -827,6 +842,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 if (!swapData || !swapData.data) {
                     setError('Failed to get swap data from WowMax');
                     setRouteLocked(false);
+                    setIsSwappingWowmax(false);
                     return;
                 }
 
@@ -834,23 +850,21 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 const tokenInAddr = isNativeIn ? '0x0000000000000000000000000000000000000000' as Address : actualTokenIn.address as Address;
                 const tokenOutAddr = tokenOut?.isNative ? '0x0000000000000000000000000000000000000000' as Address : actualTokenOut.address as Address;
 
-                // Approve proxy to pull input tokens (ERC20 only)
-                if (!isNativeIn) {
+                // Approve proxy to pull input tokens (ERC20 only, skip if already sufficient)
+                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
                     await writeContractAsync({
                         address: actualTokenIn.address as Address,
                         abi: ERC20_ABI,
                         functionName: 'approve',
                         args: [proxyAddress, amountInWei],
                     });
+                    refetchAllowanceProxy();
                 }
 
-                // minAmountOut: apply user's slippage + 1% fee on the quoted amount
-                // WowMax already handles slippage in its calldata, this is just the proxy's safety check
-                const expectedOut = parseFloat(bestRoute.amountOut);
-                const minOut = parseUnits(
-                    (expectedOut * (1 - Math.max(slippage, 5) / 100) * 0.99).toFixed(actualTokenOut.decimals > 8 ? 8 : actualTokenOut.decimals),
-                    actualTokenOut.decimals
-                );
+                // minAmountOut: amountOut[0] is already in wei — use BigInt to avoid double-scaling
+                const expectedOutWei = BigInt(swapData.amountOut[0] ?? '0');
+                const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100)); // e.g. 5% → 500
+                const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n; // subtract slippage + 1% fee
 
                 // Call proxy.swap() — it routes through WowMax, deducts 1% fee, sends rest to user
                 const hash = await writeContractAsync({
@@ -862,8 +876,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                         tokenOutAddr,
                         amountInWei,
                         minOut,
-                        swapData.contract as Address, // WowMax router
-                        swapData.data as `0x${string}`, // swap calldata
+                        swapData.contract as Address,
+                        swapData.data as `0x${string}`,
                     ],
                     value: isNativeIn ? amountInWei : BigInt(0),
                 });
@@ -875,6 +889,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     setError(errorMsg);
                 }
                 result = null;
+            } finally {
+                setIsSwappingWowmax(false);
             }
         }
 
@@ -1068,7 +1084,9 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     className="w-full btn-primary py-4 text-base mt-4 disabled:opacity-50"
                     aria-label="Execute swap"
                 >
-                    {isLoading
+                    {isSwappingWowmax
+                        ? 'Swapping...'
+                        : isLoading
                         ? 'Swapping...'
                         : !isConnected
                             ? 'Connect Wallet'

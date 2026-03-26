@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { getAddress } from 'viem';
 import { Token, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
@@ -123,8 +124,82 @@ export function TokenSelector({
     const [loadingCustom, setLoadingCustom] = useState(false);
     const [customError, setCustomError] = useState<string | null>(null);
 
+    type TabType = 'All' | 'Trending' | 'Top Liquidity';
+    const [activeTab, setActiveTab] = useState<TabType>('All');
+    const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
+    const [liquidityTokens, setLiquidityTokens] = useState<Token[]>([]);
+    const [loadingTabs, setLoadingTabs] = useState(false);
+    const [cgTokens, setCgTokens] = useState<Token[]>([]);
+
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
+
+    // Fetch Base tokens from Uniswap + Aerodrome (superchain) token lists and merge
+    useEffect(() => {
+        let cancelled = false;
+        const TOKEN_LISTS = [
+            'https://tokens.uniswap.org',
+            'https://static.optimism.io/optimism.tokenlist.json',
+        ];
+        const WOWMAX_URL = 'https://api-gateway.wowmax.exchange/chains/8453/tokens';
+
+        Promise.allSettled([
+            ...TOKEN_LISTS.map(url => fetch(url).then(r => r.json())),
+            fetch(WOWMAX_URL).then(r => r.json()),
+        ]).then(results => {
+                if (cancelled) return;
+                const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
+                const tokens: Token[] = [];
+
+                // Build a logo map from Uniswap + Superchain lists first
+                const logoMap = new Map<string, string>();
+                for (let i = 0; i < 2; i++) {
+                    const result = results[i];
+                    if (result.status !== 'fulfilled') continue;
+                    for (const t of result.value?.tokens || []) {
+                        if (t.chainId !== 8453 || !t.logoURI) continue;
+                        logoMap.set(t.address.toLowerCase(), t.logoURI);
+                    }
+                }
+
+                // Process Uniswap + Superchain (chainId-filtered, have logos)
+                for (let i = 0; i < 2; i++) {
+                    const result = results[i];
+                    if (result.status !== 'fulfilled') continue;
+                    for (const t of result.value?.tokens || []) {
+                        if (t.chainId !== 8453) continue;
+                        const key = t.address.toLowerCase();
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        let addr = t.address;
+                        try { addr = getAddress(addr); } catch {}
+                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
+                    }
+                }
+
+                // Process WowMax list (no chainId filter needed, already Base-only)
+                const wmResult = results[2];
+                if (wmResult.status === 'fulfilled' && Array.isArray(wmResult.value)) {
+                    for (const t of wmResult.value) {
+                        const key = t.address.toLowerCase();
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        let addr = t.address;
+                        try { addr = getAddress(addr); } catch {}
+                        tokens.push({
+                            address: addr,
+                            name: t.name,
+                            symbol: t.symbol,
+                            decimals: t.decimals,
+                            logoURI: logoMap.get(key),
+                        });
+                    }
+                }
+
+                setCgTokens(tokens);
+            });
+        return () => { cancelled = true; };
+    }, []);
 
     // Open token page in new context
     const openTokenPage = (e: React.MouseEvent, token: Token) => {
@@ -141,8 +216,9 @@ export function TokenSelector({
             return;
         }
 
-        // Check if it's already in the list
-        const existing = DEFAULT_TOKEN_LIST.find(t => t.address.toLowerCase() === addr.toLowerCase());
+        // Check if it's already in the list (including CG-fetched tokens)
+        const allKnown = [...DEFAULT_TOKEN_LIST, ...cgTokens];
+        const existing = allKnown.find(t => t.address.toLowerCase() === addr.toLowerCase());
         if (existing) {
             setCustomToken(null);
             setCustomError(null);
@@ -162,13 +238,85 @@ export function TokenSelector({
             setCustomError('Failed to load token');
         }
         setLoadingCustom(false);
-    }, []);
+    }, [cgTokens]);
+
+    // Fetch external tokens for tabs
+    useEffect(() => {
+        if (activeTab === 'Trending' && trendingTokens.length === 0) {
+            setLoadingTabs(true);
+            fetch('https://api.geckoterminal.com/api/v2/networks/base/trending_pools?include=base_token')
+                .then(r => r.json())
+                .then(data => {
+                    if (data?.included) {
+                        const seen = new Set<string>();
+                        const tokens = data.included
+                            .filter((item: any) => item.type === 'token')
+                            .map((token: any) => {
+                                let validAddress = token.attributes.address;
+                                try { validAddress = getAddress(validAddress); } catch (e) {}
+                                return {
+                                    address: validAddress,
+                                    name: token.attributes.name,
+                                    symbol: token.attributes.symbol,
+                                    decimals: token.attributes.decimals || 18,
+                                    logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
+                                };
+                            })
+                            .filter((t: any) => {
+                                const key = t.address.toLowerCase();
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                            });
+                        setTrendingTokens(tokens);
+                    }
+                })
+                .catch(console.error)
+                .finally(() => setLoadingTabs(false));
+        }
+        if (activeTab === 'Top Liquidity' && liquidityTokens.length === 0) {
+            setLoadingTabs(true);
+            fetch('https://api.geckoterminal.com/api/v2/networks/base/pools?include=base_token')
+                .then(r => r.json())
+                .then(data => {
+                    if (data?.included) {
+                        const seen = new Set<string>();
+                        const tokens = data.included
+                            .filter((item: any) => item.type === 'token')
+                            .map((token: any) => {
+                                let validAddress = token.attributes.address;
+                                try { validAddress = getAddress(validAddress); } catch (e) {}
+                                return {
+                                    address: validAddress,
+                                    name: token.attributes.name,
+                                    symbol: token.attributes.symbol,
+                                    decimals: token.attributes.decimals || 18,
+                                    logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
+                                };
+                            })
+                            .filter((t: any) => {
+                                const key = t.address.toLowerCase();
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                            });
+                        setLiquidityTokens(tokens);
+                    }
+                })
+                .catch(() => {})
+                .finally(() => setLoadingTabs(false));
+        }
+    }, [activeTab]);
 
     useEffect(() => {
-        // Use sortedTokens (tokens with balance first)
-        const filtered = sortedTokens.filter((token) => {
+        let baseList: Token[] = activeTab === 'All'
+            ? [...sortedTokens, ...cgTokens.filter(t => !sortedTokens.some(s => s.address.toLowerCase() === t.address.toLowerCase()))]
+            : activeTab === 'Trending' ? trendingTokens : liquidityTokens;
+
+        // Use baseList (tokens with balance first or from external APIs)
+        const filtered = baseList.filter((token) => {
             // Exclude the already selected token in the other input
-            if (excludeToken && token.address === excludeToken.address) return false;
+            if (excludeToken && token.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
 
             // Filter by search
             if (search) {
@@ -190,7 +338,7 @@ export function TokenSelector({
             setCustomToken(null);
             setCustomError(null);
         }
-    }, [search, excludeToken, fetchCustomToken, sortedTokens]);
+    }, [search, excludeToken, fetchCustomToken, sortedTokens, activeTab, trendingTokens, liquidityTokens, cgTokens]);
 
     const handleSelect = (token: Token) => {
         onSelect(token);
@@ -266,8 +414,25 @@ export function TokenSelector({
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search by name or paste address"
-                                    className="input-field text-base"
+                                    className="input-field text-base w-full p-3 rounded-xl bg-white/5 border border-white/10 outline-none focus:border-primary/50"
                                 />
+                            </div>
+
+                            {/* Tabs */}
+                            <div className="flex gap-2 mb-4 shrink-0 overflow-x-auto no-scrollbar scroll-smooth">
+                                {(['All', 'Trending', 'Top Liquidity'] as TabType[]).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setActiveTab(tab)}
+                                        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                                            activeTab === tab
+                                                ? 'bg-primary text-white'
+                                                : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
                             </div>
 
                             {/* Custom Token Import */}
@@ -326,7 +491,11 @@ export function TokenSelector({
                                     overscrollBehavior: 'contain'
                                 }}
                             >
-                                {filteredTokens.length === 0 && !customToken ? (
+                                {loadingTabs ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                ) : filteredTokens.length === 0 && !customToken ? (
                                     <div className="text-center py-8 text-gray-400">
                                         {isValidAddress(search) ? 'Checking address...' : 'No tokens found'}
                                     </div>
@@ -349,12 +518,14 @@ export function TokenSelector({
                                                         className="w-8 h-8 rounded-full"
                                                         loading="lazy"
                                                         onError={(e) => {
-                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                            const img = e.target as HTMLImageElement;
+                                                            img.style.display = 'none';
+                                                            const fallback = img.nextSibling as HTMLElement | null;
+                                                            if (fallback) fallback.style.display = '';
                                                         }}
                                                     />
-                                                ) : (
-                                                    <span className="text-lg font-bold">{token.symbol[0]}</span>
-                                                )}
+                                                ) : null}
+                                                <span className="text-lg font-bold" style={token.logoURI ? { display: 'none' } : {}}>{token.symbol[0]}</span>
                                             </div>
 
                                             {/* Token Info */}
