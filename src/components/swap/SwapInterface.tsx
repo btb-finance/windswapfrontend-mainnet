@@ -21,6 +21,7 @@ import { SLIPPAGE, DEBOUNCE_MS, ACCESSIBILITY } from '@/config/constants';
 import { getSwapErrorMessage, isUserRejection } from '@/utils/errors';
 import { useToast } from '@/providers/ToastProvider';
 import { getWowMaxQuote, getWowMaxSwapData } from '@/utils/wowmax';
+import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
 
 interface Route {
     from: Address;
@@ -30,7 +31,8 @@ interface Route {
 }
 
 interface BestRoute {
-    type: 'v2' | 'v3' | 'multi-hop' | 'wrap' | 'split' | 'wowmax';
+    type: 'v2' | 'v3' | 'multi-hop' | 'wrap' | 'split' | 'wowmax' | 'kyberswap';
+    kyberRouteSummary?: object;
     amountOut: string;
     tickSpacing?: number;
     tickSpacing1?: number;
@@ -211,6 +213,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         bestRoute !== null &&
         bestRoute.type !== 'wrap' &&
         bestRoute.type !== 'wowmax' &&
+        bestRoute.type !== 'kyberswap' &&
         (currentAllowance === undefined || (currentAllowance as bigint) < amountInWei);
 
     // Track pending approval transaction hash
@@ -605,25 +608,33 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     }
                 }
 
-                // Always check WowMax aggregator alongside local routes
+                // Check WowMax + KyberSwap aggregators in parallel alongside local routes
                 if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenIn && actualTokenOut) {
-                    try {
-                        const wmQuote = await getWowMaxQuote(
-                            actualTokenIn.address,
-                            actualTokenOut.address,
-                            amountIn,
-                        );
-                        if (wmQuote && parseFloat(wmQuote.amountOut) > 0) {
-                            const outDecimals = wmQuote.to?.decimals ?? actualTokenOut.decimals;
-                            const formattedOut = formatUnits(BigInt(wmQuote.amountOut), outDecimals);
-                            routes.push({
-                                type: 'wowmax',
-                                amountOut: formattedOut,
-                                feeLabel: 'Aggregated',
-                            });
-                        }
-                    } catch (wmErr) {
-                        console.warn('[WowMax] Quote failed:', wmErr);
+                    // WowMax takes human-readable amount, KyberSwap takes wei
+                    const amountInWeiStr = parseUnits(amountIn, actualTokenIn.decimals).toString();
+                    const kyberTokenIn = tokenIn.isNative ? '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : actualTokenIn.address;
+                    const kyberTokenOut = tokenOut.isNative ? '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : actualTokenOut.address;
+                    const [wmQuote, kyberQuote] = await Promise.allSettled([
+                        getWowMaxQuote(actualTokenIn.address, actualTokenOut.address, amountIn),
+                        getKyberQuote(kyberTokenIn, kyberTokenOut, amountInWeiStr),
+                    ]);
+
+                    if (wmQuote.status === 'fulfilled' && wmQuote.value && parseFloat(wmQuote.value.amountOut) > 0) {
+                        const outDecimals = wmQuote.value.to?.decimals ?? actualTokenOut.decimals;
+                        routes.push({
+                            type: 'wowmax',
+                            amountOut: formatUnits(BigInt(wmQuote.value.amountOut), outDecimals),
+                            feeLabel: 'Aggregated',
+                        });
+                    }
+
+                    if (kyberQuote.status === 'fulfilled' && kyberQuote.value && parseFloat(kyberQuote.value.amountOut) > 0) {
+                        routes.push({
+                            type: 'kyberswap',
+                            amountOut: formatUnits(BigInt(kyberQuote.value.amountOut), actualTokenOut.decimals),
+                            feeLabel: 'Aggregated',
+                            kyberRouteSummary: kyberQuote.value.routeSummary,
+                        });
                     }
                 }
 
@@ -896,6 +907,69 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     const errorMsg = getSwapErrorMessage(err);
                     setError(errorMsg);
                 }
+                result = null;
+            } finally {
+                setIsSwappingWowmax(false);
+            }
+        } else if (bestRoute.type === 'kyberswap') {
+            setIsSwappingWowmax(true);
+            try {
+                if (!actualTokenIn || !actualTokenOut || !address || !bestRoute.kyberRouteSummary) { setIsSwappingWowmax(false); return; }
+                const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
+                const isNativeIn = tokenIn.isNative;
+                const tokenInAddr = isNativeIn ? '0x0000000000000000000000000000000000000000' as Address : actualTokenIn.address as Address;
+                const tokenOutAddr = tokenOut?.isNative ? '0x0000000000000000000000000000000000000000' as Address : actualTokenOut.address as Address;
+
+                // KyberSwap slippage in bps (50 = 0.5%)
+                const kyberSlippage = Math.floor(Math.max(slippage, 0.5) * 100);
+
+                // Build swap data with proxy as recipient so it can deduct fee
+                const swapData = await getKyberSwapData(
+                    bestRoute.kyberRouteSummary,
+                    proxyAddress, // sender = proxy (proxy holds tokens during swap)
+                    proxyAddress, // recipient = proxy (proxy receives output, then forwards minus fee)
+                    kyberSlippage,
+                );
+                if (!swapData || !swapData.data) {
+                    setError('Failed to get swap data from KyberSwap');
+                    setRouteLocked(false);
+                    setIsSwappingWowmax(false);
+                    return;
+                }
+
+                // Approve proxy for ERC20 input
+                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
+                    await writeContractAsync({
+                        address: actualTokenIn.address as Address,
+                        abi: ERC20_ABI,
+                        functionName: 'approve',
+                        args: [proxyAddress, amountInWei],
+                    });
+                    refetchAllowanceProxy();
+                }
+
+                const expectedOutWei = BigInt(swapData.amountOut ?? '0');
+                const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100));
+                const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n;
+
+                const hash = await writeContractAsync({
+                    address: proxyAddress,
+                    abi: AGGREGATOR_PROXY_ABI,
+                    functionName: 'swap',
+                    args: [
+                        tokenInAddr,
+                        tokenOutAddr,
+                        amountInWei,
+                        minOut,
+                        swapData.routerAddress as Address,
+                        swapData.data as `0x${string}`,
+                    ],
+                    value: isNativeIn ? amountInWei : BigInt(0),
+                });
+                result = { hash };
+            } catch (err: unknown) {
+                console.error('KyberSwap swap error:', err);
+                if (!isUserRejection(err)) setError(getSwapErrorMessage(err));
                 result = null;
             } finally {
                 setIsSwappingWowmax(false);
