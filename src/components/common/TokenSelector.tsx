@@ -129,9 +129,47 @@ export function TokenSelector({
     const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
     const [liquidityTokens, setLiquidityTokens] = useState<Token[]>([]);
     const [loadingTabs, setLoadingTabs] = useState(false);
+    const [cgTokens, setCgTokens] = useState<Token[]>([]);
 
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
+
+    // Fetch Base tokens from Uniswap + Aerodrome (superchain) token lists and merge
+    useEffect(() => {
+        let cancelled = false;
+        const TOKEN_LISTS = [
+            'https://tokens.uniswap.org',
+            'https://static.optimism.io/optimism.tokenlist.json',
+        ];
+
+        Promise.allSettled(TOKEN_LISTS.map(url => fetch(url).then(r => r.json())))
+            .then(results => {
+                if (cancelled) return;
+                const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
+                const tokens: Token[] = [];
+                for (const result of results) {
+                    if (result.status !== 'fulfilled') continue;
+                    const list = result.value?.tokens || [];
+                    for (const t of list) {
+                        if (t.chainId !== 8453) continue;
+                        const key = t.address.toLowerCase();
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        let addr = t.address;
+                        try { addr = getAddress(addr); } catch {}
+                        tokens.push({
+                            address: addr,
+                            name: t.name,
+                            symbol: t.symbol,
+                            decimals: t.decimals,
+                            logoURI: t.logoURI || undefined,
+                        });
+                    }
+                }
+                setCgTokens(tokens);
+            });
+        return () => { cancelled = true; };
+    }, []);
 
     // Open token page in new context
     const openTokenPage = (e: React.MouseEvent, token: Token) => {
@@ -148,8 +186,9 @@ export function TokenSelector({
             return;
         }
 
-        // Check if it's already in the list
-        const existing = DEFAULT_TOKEN_LIST.find(t => t.address.toLowerCase() === addr.toLowerCase());
+        // Check if it's already in the list (including CG-fetched tokens)
+        const allKnown = [...DEFAULT_TOKEN_LIST, ...cgTokens];
+        const existing = allKnown.find(t => t.address.toLowerCase() === addr.toLowerCase());
         if (existing) {
             setCustomToken(null);
             setCustomError(null);
@@ -169,7 +208,7 @@ export function TokenSelector({
             setCustomError('Failed to load token');
         }
         setLoadingCustom(false);
-    }, []);
+    }, [cgTokens]);
 
     // Fetch external tokens for tabs
     useEffect(() => {
@@ -234,15 +273,15 @@ export function TokenSelector({
                         setLiquidityTokens(tokens);
                     }
                 })
-                .catch(console.error)
+                .catch(() => {})
                 .finally(() => setLoadingTabs(false));
         }
     }, [activeTab]);
 
     useEffect(() => {
-        let baseList = sortedTokens;
-        if (activeTab === 'Trending') baseList = trendingTokens;
-        else if (activeTab === 'Top Liquidity') baseList = liquidityTokens;
+        let baseList: Token[] = activeTab === 'All'
+            ? [...sortedTokens, ...cgTokens.filter(t => !sortedTokens.some(s => s.address.toLowerCase() === t.address.toLowerCase()))]
+            : activeTab === 'Trending' ? trendingTokens : liquidityTokens;
 
         // Use baseList (tokens with balance first or from external APIs)
         const filtered = baseList.filter((token) => {
@@ -269,7 +308,7 @@ export function TokenSelector({
             setCustomToken(null);
             setCustomError(null);
         }
-    }, [search, excludeToken, fetchCustomToken, sortedTokens, activeTab, trendingTokens, liquidityTokens]);
+    }, [search, excludeToken, fetchCustomToken, sortedTokens, activeTab, trendingTokens, liquidityTokens, cgTokens]);
 
     const handleSelect = (token: Token) => {
         onSelect(token);
