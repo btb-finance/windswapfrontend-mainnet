@@ -570,15 +570,24 @@ export function TokenSelector({
                                                 <p className="text-sm text-gray-400">{token.name}</p>
                                             </div>
 
-                                            {/* Balance */}
+                                            {/* Balance + USD value */}
                                             {(() => {
                                                 const balanceInfo = getBalance(token.address);
-                                                const bal = balanceInfo?.formatted || '0';
-                                                const numBal = parseFloat(bal);
+                                                const numBal = parseFloat(balanceInfo?.formatted || '0');
+                                                const usdValue = balanceInfo?.usdValue;
                                                 return numBal > 0 ? (
-                                                    <p className="text-sm text-white font-medium">
-                                                        {numBal > 1000 ? numBal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : numBal.toFixed(4)}
-                                                    </p>
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-white font-medium">
+                                                            {numBal > 1000 ? numBal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : numBal.toFixed(4)}
+                                                        </p>
+                                                        {usdValue !== undefined && usdValue > 0 && (
+                                                            <p className="text-xs text-gray-400">
+                                                                ${usdValue >= 1000
+                                                                    ? usdValue.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                                                                    : usdValue.toFixed(2)}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <p className="text-sm text-gray-500">0</p>
                                                 );
