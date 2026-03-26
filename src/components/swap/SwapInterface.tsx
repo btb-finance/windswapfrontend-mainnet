@@ -828,7 +828,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
                 // Get swap calldata from WowMax (targeting the proxy as recipient)
                 // Use higher slippage for aggregator route (user slippage + 1% fee buffer)
-                const wmSlippage = Math.max(slippage, 5) + 1; // min 5% + 1% fee buffer
+                // WowMax API expects slippage as a plain percentage number (6 = 6%)
+                // It multiplies by 100 internally; contract max is 2000 (= 20%)
+                // Add 1% buffer for the proxy fee on top of user's slippage, min 5%
+                const wmSlippage = Math.min(Math.max(slippage, 5) + 1, 15); // 6–15%
                 const swapData = await getWowMaxSwapData(
                     actualTokenIn.address,
                     actualTokenOut.address,
@@ -858,13 +861,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     refetchAllowanceProxy();
                 }
 
-                // minAmountOut: apply user's slippage + 1% fee on the quoted amount
-                // WowMax already handles slippage in its calldata, this is just the proxy's safety check
-                const expectedOut = parseFloat(bestRoute.amountOut);
-                const minOut = parseUnits(
-                    (expectedOut * (1 - Math.max(slippage, 5) / 100) * 0.99).toFixed(actualTokenOut.decimals > 8 ? 8 : actualTokenOut.decimals),
-                    actualTokenOut.decimals
-                );
+                // minAmountOut: amountOut[0] is already in wei — use BigInt to avoid double-scaling
+                const expectedOutWei = BigInt(swapData.amountOut[0] ?? '0');
+                const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100)); // e.g. 5% → 500
+                const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n; // subtract slippage + 1% fee
 
                 // Call proxy.swap() — it routes through WowMax, deducts 1% fee, sends rest to user
                 const hash = await writeContractAsync({
@@ -876,8 +876,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                         tokenOutAddr,
                         amountInWei,
                         minOut,
-                        swapData.contract as Address, // WowMax router
-                        swapData.data as `0x${string}`, // swap calldata
+                        swapData.contract as Address,
+                        swapData.data as `0x${string}`,
                     ],
                     value: isNativeIn ? amountInWei : BigInt(0),
                 });
