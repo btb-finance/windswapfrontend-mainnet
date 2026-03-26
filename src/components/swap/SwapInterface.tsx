@@ -849,10 +849,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
                 // Get swap calldata from WowMax (targeting the proxy as recipient)
                 // Use higher slippage for aggregator route (user slippage + 1% fee buffer)
-                // WowMax API expects slippage as a plain percentage number (6 = 6%)
-                // It multiplies by 100 internally; contract max is 2000 (= 20%)
-                // Add 1% buffer for the proxy fee on top of user's slippage, min 5%
-                const wmSlippage = Math.min(Math.max(slippage, 5) + 1, 15); // 6–15%
+                // WowMax API expects plain percentage (e.g. 20 = 20%), multiplies by 100 internally.
+                // Contract max is 2000 (= 20%). We pass max to let WowMax be lenient —
+                // our proxy's own minAmountOut check still enforces the user's actual slippage.
+                const wmSlippage = 20; // always max, proxy guards the real limit
                 const swapData = await getWowMaxSwapData(
                     actualTokenIn.address,
                     actualTokenOut.address,
