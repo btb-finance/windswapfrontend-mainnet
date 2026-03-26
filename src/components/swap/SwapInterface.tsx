@@ -156,7 +156,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         ? parseUnits(amountIn, actualTokenIn.decimals)
         : BigInt(0);
 
-    // ===== Pre-check allowance for BOTH routers =====
+    // ===== Pre-check allowance for ALL routers =====
     const { data: allowanceV2, refetch: refetchAllowanceV2 } = useReadContract({
         address: actualTokenIn?.address as Address,
         abi: ERC20_ABI,
@@ -172,6 +172,16 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         abi: ERC20_ABI,
         functionName: 'allowance',
         args: address && actualTokenIn ? [address, CL_CONTRACTS.SwapRouter as Address] : undefined,
+        query: {
+            enabled: !!address && !!actualTokenIn && !tokenIn?.isNative,
+        },
+    });
+
+    const { data: allowanceProxy, refetch: refetchAllowanceProxy } = useReadContract({
+        address: actualTokenIn?.address as Address,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: address && actualTokenIn ? [address, V2_CONTRACTS.AggregatorProxy as Address] : undefined,
         query: {
             enabled: !!address && !!actualTokenIn && !tokenIn?.isNative,
         },
@@ -834,14 +844,15 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 const tokenInAddr = isNativeIn ? '0x0000000000000000000000000000000000000000' as Address : actualTokenIn.address as Address;
                 const tokenOutAddr = tokenOut?.isNative ? '0x0000000000000000000000000000000000000000' as Address : actualTokenOut.address as Address;
 
-                // Approve proxy to pull input tokens (ERC20 only)
-                if (!isNativeIn) {
+                // Approve proxy to pull input tokens (ERC20 only, skip if already sufficient)
+                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
                     await writeContractAsync({
                         address: actualTokenIn.address as Address,
                         abi: ERC20_ABI,
                         functionName: 'approve',
                         args: [proxyAddress, amountInWei],
                     });
+                    refetchAllowanceProxy();
                 }
 
                 // minAmountOut: apply user's slippage + 1% fee on the quoted amount
