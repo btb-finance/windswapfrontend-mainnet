@@ -145,14 +145,18 @@ async function fetchExtendedTokenList(): Promise<Token[]> {
     ];
     const WOWMAX_URL = 'https://api-gateway.wowmax.exchange/chains/8453/tokens';
     const HYDREX_URL = 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json';
+    const PANCAKE_URL = 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json';
 
     const results = await Promise.allSettled([
         ...TOKEN_LISTS.map(url => fetch(url).then(r => r.json())),
         fetch(WOWMAX_URL).then(r => r.json()),
         fetch(HYDREX_URL).then(r => r.json()),
+        fetch(PANCAKE_URL).then(r => r.json()),
     ]);
 
-    // Build logo map from Uniswap + Superchain + Hydrex
+    // results indices: 0=uniswap, 1=superchain, 2=wowmax, 3=hydrex, 4=pancake
+
+    // Build logo map from all lists with chainId-filtered logos
     const logoMap = new Map<string, string>();
     for (let i = 0; i < 2; i++) {
         const r = results[i];
@@ -167,6 +171,14 @@ async function fetchExtendedTokenList(): Promise<Token[]> {
     if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
         for (const t of hydrexResult.value) {
             if (t.logoURI) logoMap.set(t.address.toLowerCase(), t.logoURI);
+        }
+    }
+    // PancakeSwap logos (chainId=8453)
+    const pancakeResult = results[4];
+    if (pancakeResult.status === 'fulfilled') {
+        for (const t of pancakeResult.value?.tokens || []) {
+            if (t.chainId !== 8453 || !t.logoURI) continue;
+            logoMap.set(t.address.toLowerCase(), t.logoURI);
         }
     }
 
@@ -198,9 +210,22 @@ async function fetchExtendedTokenList(): Promise<Token[]> {
         }
     }
 
-    // Add Hydrex-only tokens (already Base-only)
+    // Add Hydrex-only tokens
     if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
         for (const t of hydrexResult.value) {
+            const key = t.address.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            let addr = t.address;
+            try { addr = getAddress(addr); } catch {}
+            tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
+        }
+    }
+
+    // Add PancakeSwap-only tokens (chainId=8453)
+    if (pancakeResult.status === 'fulfilled') {
+        for (const t of pancakeResult.value?.tokens || []) {
+            if (t.chainId !== 8453) continue;
             const key = t.address.toLowerCase();
             if (seen.has(key)) continue;
             seen.add(key);

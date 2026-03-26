@@ -143,17 +143,19 @@ export function TokenSelector({
         ];
         const WOWMAX_URL = 'https://api-gateway.wowmax.exchange/chains/8453/tokens';
         const HYDREX_URL = 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json';
+        const PANCAKE_URL = 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json';
 
         Promise.allSettled([
             ...TOKEN_LISTS.map(url => fetch(url).then(r => r.json())),
             fetch(WOWMAX_URL).then(r => r.json()),
             fetch(HYDREX_URL).then(r => r.json()),
+            fetch(PANCAKE_URL).then(r => r.json()),
         ]).then(results => {
                 if (cancelled) return;
                 const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
                 const tokens: Token[] = [];
 
-                // Build logo map from Uniswap + Superchain + Hydrex
+                // Build logo map from all lists
                 const logoMap = new Map<string, string>();
                 for (let i = 0; i < 2; i++) {
                     const result = results[i];
@@ -169,8 +171,15 @@ export function TokenSelector({
                         if (t.logoURI) logoMap.set(t.address.toLowerCase(), t.logoURI);
                     }
                 }
+                const pancakeResult = results[4];
+                if (pancakeResult.status === 'fulfilled') {
+                    for (const t of pancakeResult.value?.tokens || []) {
+                        if (t.chainId !== 8453 || !t.logoURI) continue;
+                        logoMap.set(t.address.toLowerCase(), t.logoURI);
+                    }
+                }
 
-                // Process Uniswap + Superchain (chainId-filtered, have logos)
+                // Process Uniswap + Superchain
                 for (let i = 0; i < 2; i++) {
                     const result = results[i];
                     if (result.status !== 'fulfilled') continue;
@@ -185,7 +194,7 @@ export function TokenSelector({
                     }
                 }
 
-                // Process WowMax list
+                // Process WowMax
                 const wmResult = results[2];
                 if (wmResult.status === 'fulfilled' && Array.isArray(wmResult.value)) {
                     for (const t of wmResult.value) {
@@ -198,9 +207,22 @@ export function TokenSelector({
                     }
                 }
 
-                // Process Hydrex list
+                // Process Hydrex
                 if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
                     for (const t of hydrexResult.value) {
+                        const key = t.address.toLowerCase();
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        let addr = t.address;
+                        try { addr = getAddress(addr); } catch {}
+                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
+                    }
+                }
+
+                // Process PancakeSwap
+                if (pancakeResult.status === 'fulfilled') {
+                    for (const t of pancakeResult.value?.tokens || []) {
+                        if (t.chainId !== 8453) continue;
                         const key = t.address.toLowerCase();
                         if (seen.has(key)) continue;
                         seen.add(key);
