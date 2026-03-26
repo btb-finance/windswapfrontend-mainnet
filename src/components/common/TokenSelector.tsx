@@ -142,16 +142,18 @@ export function TokenSelector({
             'https://static.optimism.io/optimism.tokenlist.json',
         ];
         const WOWMAX_URL = 'https://api-gateway.wowmax.exchange/chains/8453/tokens';
+        const HYDREX_URL = 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json';
 
         Promise.allSettled([
             ...TOKEN_LISTS.map(url => fetch(url).then(r => r.json())),
             fetch(WOWMAX_URL).then(r => r.json()),
+            fetch(HYDREX_URL).then(r => r.json()),
         ]).then(results => {
                 if (cancelled) return;
                 const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
                 const tokens: Token[] = [];
 
-                // Build a logo map from Uniswap + Superchain lists first
+                // Build logo map from Uniswap + Superchain + Hydrex
                 const logoMap = new Map<string, string>();
                 for (let i = 0; i < 2; i++) {
                     const result = results[i];
@@ -159,6 +161,12 @@ export function TokenSelector({
                     for (const t of result.value?.tokens || []) {
                         if (t.chainId !== 8453 || !t.logoURI) continue;
                         logoMap.set(t.address.toLowerCase(), t.logoURI);
+                    }
+                }
+                const hydrexResult = results[3];
+                if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
+                    for (const t of hydrexResult.value) {
+                        if (t.logoURI) logoMap.set(t.address.toLowerCase(), t.logoURI);
                     }
                 }
 
@@ -177,7 +185,7 @@ export function TokenSelector({
                     }
                 }
 
-                // Process WowMax list (no chainId filter needed, already Base-only)
+                // Process WowMax list
                 const wmResult = results[2];
                 if (wmResult.status === 'fulfilled' && Array.isArray(wmResult.value)) {
                     for (const t of wmResult.value) {
@@ -186,13 +194,19 @@ export function TokenSelector({
                         seen.add(key);
                         let addr = t.address;
                         try { addr = getAddress(addr); } catch {}
-                        tokens.push({
-                            address: addr,
-                            name: t.name,
-                            symbol: t.symbol,
-                            decimals: t.decimals,
-                            logoURI: logoMap.get(key),
-                        });
+                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: logoMap.get(key) });
+                    }
+                }
+
+                // Process Hydrex list
+                if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
+                    for (const t of hydrexResult.value) {
+                        const key = t.address.toLowerCase();
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        let addr = t.address;
+                        try { addr = getAddress(addr); } catch {}
+                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
                     }
                 }
 
