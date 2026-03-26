@@ -144,7 +144,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { writeContractAsync } = useWriteContract();
     const { executeBatch, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
 
-    const isLoading = isLoadingV2 || isLoadingV3 || isBatching;
+    const [isSwappingWowmax, setIsSwappingWowmax] = useState(false);
+    const isLoading = isLoadingV2 || isLoadingV3 || isBatching || isSwappingWowmax;
     const hookError = errorV2 || errorV3;
 
     // Get actual token addresses (use WSEI for native SEI)
@@ -820,8 +821,9 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
         } else if (bestRoute.type === 'wowmax') {
             // WowMax aggregator route — routed through WindSwap Aggregator Proxy (1% fee)
+            setIsSwappingWowmax(true);
             try {
-                if (!actualTokenIn || !actualTokenOut || !address) return;
+                if (!actualTokenIn || !actualTokenOut || !address) { setIsSwappingWowmax(false); return; }
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
                 // Get swap calldata from WowMax (targeting the proxy as recipient)
@@ -837,6 +839,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 if (!swapData || !swapData.data) {
                     setError('Failed to get swap data from WowMax');
                     setRouteLocked(false);
+                    setIsSwappingWowmax(false);
                     return;
                 }
 
@@ -886,6 +889,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     setError(errorMsg);
                 }
                 result = null;
+            } finally {
+                setIsSwappingWowmax(false);
             }
         }
 
@@ -1079,7 +1084,9 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     className="w-full btn-primary py-4 text-base mt-4 disabled:opacity-50"
                     aria-label="Execute swap"
                 >
-                    {isLoading
+                    {isSwappingWowmax
+                        ? 'Swapping...'
+                        : isLoading
                         ? 'Swapping...'
                         : !isConnected
                             ? 'Connect Wallet'
