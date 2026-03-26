@@ -612,8 +612,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenIn && actualTokenOut) {
                     // WowMax takes human-readable amount, KyberSwap takes wei
                     const amountInWeiStr = parseUnits(amountIn, actualTokenIn.decimals).toString();
-                    const kyberTokenIn = tokenIn.isNative ? '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : actualTokenIn.address;
-                    const kyberTokenOut = tokenOut.isNative ? '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' : actualTokenOut.address;
+                    // Proxy always wraps native ETH → WETH before calling router,
+                    // so KyberSwap must receive WETH (not native ETH)
+                    const kyberTokenIn = actualTokenIn.address;
+                    const kyberTokenOut = actualTokenOut.address;
                     const [wmQuote, kyberQuote] = await Promise.allSettled([
                         getWowMaxQuote(actualTokenIn.address, actualTokenOut.address, amountIn),
                         getKyberQuote(kyberTokenIn, kyberTokenOut, amountInWeiStr),
