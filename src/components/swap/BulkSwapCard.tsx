@@ -8,6 +8,7 @@ import { useBulkSwap, BulkSwapLeg } from '@/hooks/useBulkSwap';
 import { useTokenBalance } from '@/hooks/useToken';
 import { useToast } from '@/providers/ToastProvider';
 import { formatUnits, parseUnits } from 'viem';
+import { TokenSelector } from '@/components/common/TokenSelector';
 
 // Pre-built basket presets
 const PRESETS = [
@@ -15,11 +16,6 @@ const PRESETS = [
     { name: 'Meme Pack', tokens: [BRETT, BOOMER, VVV] },
     { name: 'Full Mix', tokens: [USDC, WIND, SKI, VIRTUAL, BRETT] },
 ];
-
-// Available output tokens (exclude SEI/WSEI since that's typically the input)
-const AVAILABLE_OUTPUTS = DEFAULT_TOKEN_LIST.filter(
-    (t) => !t.isNative && t.symbol !== 'WETH',
-);
 
 export function BulkSwapCard() {
     const { isConnected, address } = useAccount();
@@ -29,7 +25,9 @@ export function BulkSwapCard() {
     const [tokenIn, setTokenIn] = useState<Token>(SEI);
     const [amountIn, setAmountIn] = useState('');
     const [legs, setLegs] = useState<BulkSwapLeg[]>([]);
-    const [showTokenPicker, setShowTokenPicker] = useState(false);
+    
+    const [isInputSelectorOpen, setIsInputSelectorOpen] = useState(false);
+    const [isOutputSelectorOpen, setIsOutputSelectorOpen] = useState(false);
 
     const { formatted: balanceIn } = useTokenBalance(tokenIn);
     const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,7 +57,7 @@ export function BulkSwapCard() {
             // Re-distribute equally
             const alloc = 1 / newLegs.length;
             setLegs(newLegs.map((l) => ({ ...l, allocation: alloc })));
-            setShowTokenPicker(false);
+            setIsOutputSelectorOpen(false);
         },
         [legs],
     );
@@ -134,11 +132,6 @@ export function BulkSwapCard() {
     const quotedCount = legs.filter((l) => l.status === 'quoted').length;
     const canExecute = isConnected && legs.length > 0 && quotedCount === legs.length && !isQuoting && !isExecuting;
 
-    // Input token options (ETH + ERC20s that aren't already in output legs)
-    const inputTokens = DEFAULT_TOKEN_LIST.filter(
-        (t) => t.isNative || t.symbol === 'USDC' || t.symbol === 'WETH',
-    );
-
     return (
         <div className="glass-card p-6 md:p-8 relative overflow-hidden" id="bulk-swap-card">
             {/* Background glow */}
@@ -207,11 +200,7 @@ export function BulkSwapCard() {
                         {/* Token selector dropdown */}
                         <div className="relative">
                             <button
-                                onClick={() => {
-                                    // Cycle through input tokens
-                                    const idx = inputTokens.findIndex((t) => t.address === tokenIn.address);
-                                    setTokenIn(inputTokens[(idx + 1) % inputTokens.length]);
-                                }}
+                                onClick={() => setIsInputSelectorOpen(true)}
                                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition font-medium"
                             >
                                 {tokenIn.logoURI && (
@@ -240,7 +229,7 @@ export function BulkSwapCard() {
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-xs text-gray-400">You receive</span>
                         <button
-                            onClick={() => setShowTokenPicker(!showTokenPicker)}
+                            onClick={() => setIsOutputSelectorOpen(true)}
                             className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition font-medium"
                         >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -249,40 +238,6 @@ export function BulkSwapCard() {
                             Add Token
                         </button>
                     </div>
-
-                    {/* Token picker dropdown */}
-                    <AnimatePresence>
-                        {showTokenPicker && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="overflow-hidden mb-3"
-                            >
-                                <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-white/5 border border-white/10">
-                                    {AVAILABLE_OUTPUTS.filter(
-                                        (t) => !legs.find((l) => l.token.address === t.address),
-                                    ).map((token) => (
-                                        <button
-                                            key={token.address}
-                                            onClick={() => addToken(token)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-medium hover:bg-white/10 hover:border-indigo-500/30 transition-all"
-                                        >
-                                            {token.logoURI && (
-                                                <img src={token.logoURI} alt={token.symbol} className="w-4 h-4 rounded-full" />
-                                            )}
-                                            {token.symbol}
-                                        </button>
-                                    ))}
-                                    {AVAILABLE_OUTPUTS.filter(
-                                        (t) => !legs.find((l) => l.token.address === t.address),
-                                    ).length === 0 && (
-                                        <span className="text-xs text-gray-500">All tokens added</span>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
 
                     {/* Leg rows */}
                     <div className="space-y-2">
@@ -400,6 +355,20 @@ export function BulkSwapCard() {
                     </div>
                 )}
             </div>
+
+            <TokenSelector
+                isOpen={isInputSelectorOpen}
+                onClose={() => setIsInputSelectorOpen(false)}
+                onSelect={setTokenIn}
+                selectedToken={tokenIn}
+            />
+
+            <TokenSelector
+                isOpen={isOutputSelectorOpen}
+                onClose={() => setIsOutputSelectorOpen(false)}
+                onSelect={(token) => addToken(token)}
+                excludeToken={tokenIn}
+            />
         </div>
     );
 }
