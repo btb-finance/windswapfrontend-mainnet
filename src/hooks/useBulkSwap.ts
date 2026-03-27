@@ -147,9 +147,10 @@ export function useBulkSwap() {
 
                         if (!swapData) throw new Error(`Failed to build swap data for ${leg.token.symbol}`);
 
-                        // minAmountOut with slippage (the contract also checks, but we set it here too)
+                        // minAmountOut with slippage (account for 1% proxy fee + user slippage tolerance)
                         const estimatedOutWei = parseUnits(leg.estimatedOut || '0', leg.token.decimals);
-                        const minOut = (estimatedOutWei * BigInt(10000 - slippageBps)) / BigInt(10000);
+                        // Deduct user slippage + 1% protocol fee (100 bps)
+                        const minOut = (estimatedOutWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
 
                         return {
                             tokenOut: actualTokenOut.address as Address,

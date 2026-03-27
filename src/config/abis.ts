@@ -2321,4 +2321,25 @@ export const AGGREGATOR_PROXY_ABI = [
         stateMutability: 'payable',
         type: 'function',
     },
+    {
+        inputs: [
+            {
+                name: 'orders',
+                type: 'tuple[]',
+                components: [
+                    { name: 'tokenIn', type: 'address' },
+                    { name: 'amountIn', type: 'uint256' },
+                    { name: 'minAmountOut', type: 'uint256' },
+                    { name: 'router', type: 'address' },
+                    { name: 'callData', type: 'bytes' },
+                ],
+            },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'recipient', type: 'address' },
+        ],
+        name: 'bulkSell',
+        outputs: [],
+        stateMutability: 'payable',
+        type: 'function',
+    },
 ] as const;

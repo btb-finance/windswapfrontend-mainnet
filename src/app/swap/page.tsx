@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SwapInterface } from '@/components/swap/SwapInterface';
 import { BulkSwapCard } from '@/components/swap/BulkSwapCard';
+import { BulkSellCard } from '@/components/swap/BulkSellCard';
 import { getTokenByAddress } from '@/utils/tokens';
 import { Token } from '@/config/tokens';
 import { getRpcForPoolData } from '@/utils/rpc';
@@ -41,8 +42,8 @@ function SwapWithParams() {
     const [initialTokenOut, setInitialTokenOut] = useState<Token | undefined>();
     const [ready, setReady] = useState(false);
     
-    // Toggle state: 'single' | 'bulk'
-    const [swapMode, setSwapMode] = useState<'single' | 'bulk'>('single');
+    // Toggle state: 'single' | 'bulk-buy' | 'bulk-sell'
+    const [swapMode, setSwapMode] = useState<'single' | 'bulk-buy' | 'bulk-sell'>('single');
 
     useEffect(() => {
         const tokenInAddress = searchParams.get('tokenIn');
@@ -92,20 +93,30 @@ function SwapWithParams() {
                         Single Swap
                     </button>
                     <button
-                        onClick={() => setSwapMode('bulk')}
+                        onClick={() => setSwapMode('bulk-buy')}
                         className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
-                            swapMode === 'bulk'
-                                ? 'bg-white/10 text-white shadow-sm'
+                            swapMode === 'bulk-buy'
+                                ? 'bg-white/10 text-indigo-400 shadow-sm'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                        Bulk Swap
+                        Bulk Buy
+                    </button>
+                    <button
+                        onClick={() => setSwapMode('bulk-sell')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                            swapMode === 'bulk-sell'
+                                ? 'bg-white/10 text-red-400 shadow-sm'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        Bulk Sell
                     </button>
                 </div>
             </div>
 
             {/* Content properly centered with matching max-widths */}
-            {swapMode === 'single' ? (
+            {swapMode === 'single' && (
                 <div className="max-w-md mx-auto">
                     <SwapInterface
                         initialTokenIn={initialTokenIn}
@@ -113,9 +124,15 @@ function SwapWithParams() {
                         onTokenPairChange={handleTokenChange}
                     />
                 </div>
-            ) : (
+            )}
+            {swapMode === 'bulk-buy' && (
                 <div className="w-full">
                     <BulkSwapCard />
+                </div>
+            )}
+            {swapMode === 'bulk-sell' && (
+                <div className="w-full">
+                    <BulkSellCard />
                 </div>
             )}
         </div>
