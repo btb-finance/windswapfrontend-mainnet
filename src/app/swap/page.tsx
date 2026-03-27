@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SwapInterface } from '@/components/swap/SwapInterface';
+import { BulkSwapCard } from '@/components/swap/BulkSwapCard';
 import { getTokenByAddress } from '@/utils/tokens';
 import { Token } from '@/config/tokens';
 import { getRpcForPoolData } from '@/utils/rpc';
@@ -39,6 +40,9 @@ function SwapWithParams() {
     const [initialTokenIn, setInitialTokenIn] = useState<Token | undefined>();
     const [initialTokenOut, setInitialTokenOut] = useState<Token | undefined>();
     const [ready, setReady] = useState(false);
+    
+    // Toggle state: 'single' | 'bulk'
+    const [swapMode, setSwapMode] = useState<'single' | 'bulk'>('single');
 
     useEffect(() => {
         const tokenInAddress = searchParams.get('tokenIn');
@@ -57,7 +61,7 @@ function SwapWithParams() {
             setInitialTokenOut(tOut);
             setReady(true);
         });
-    }, []); // only on mount — URL params are initial state
+    }, [searchParams]); // re-run if URL logic is used later
 
     const handleTokenChange = (tokenIn?: Token, tokenOut?: Token) => {
         const params = new URLSearchParams();
@@ -73,17 +77,54 @@ function SwapWithParams() {
     );
 
     return (
-        <SwapInterface
-            initialTokenIn={initialTokenIn}
-            initialTokenOut={initialTokenOut}
-            onTokenPairChange={handleTokenChange}
-        />
+        <div className="max-w-xl mx-auto">
+            {/* Mode Toggle */}
+            <div className="flex justify-center mb-6">
+                <div className="inline-flex rounded-xl bg-surface-dark border border-white/10 p-1">
+                    <button
+                        onClick={() => setSwapMode('single')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                            swapMode === 'single'
+                                ? 'bg-white/10 text-white shadow-sm'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        Single Swap
+                    </button>
+                    <button
+                        onClick={() => setSwapMode('bulk')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                            swapMode === 'bulk'
+                                ? 'bg-white/10 text-white shadow-sm'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                        Bulk Swap
+                    </button>
+                </div>
+            </div>
+
+            {/* Content properly centered with matching max-widths */}
+            {swapMode === 'single' ? (
+                <div className="max-w-md mx-auto">
+                    <SwapInterface
+                        initialTokenIn={initialTokenIn}
+                        initialTokenOut={initialTokenOut}
+                        onTokenPairChange={handleTokenChange}
+                    />
+                </div>
+            ) : (
+                <div className="w-full">
+                    <BulkSwapCard />
+                </div>
+            )}
+        </div>
     );
 }
 
 export default function SwapPage() {
     return (
-        <div className="container mx-auto px-3 sm:px-6 py-4">
+        <div className="container mx-auto px-3 sm:px-6 py-8">
             <Suspense fallback={
                 <div className="swap-card max-w-md mx-auto p-8 text-center">
                     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />

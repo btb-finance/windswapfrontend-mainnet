@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 import { LockVoteEarnSteps } from '@/components/common/StepIndicator';
+import { BulkSwapCard } from '@/components/swap/BulkSwapCard';
 import { useCLPositions, useV2Positions } from '@/hooks/usePositions';
 import { useVeWIND } from '@/hooks/useVeWIND';
 import { usePoolData } from '@/providers/PoolDataProvider';
@@ -153,6 +154,17 @@ export default function Home() {
               </div>
             </motion.div>
           )}
+        </motion.div>
+      </section>
+
+      {/* Bulk Swap Section */}
+      <section className="py-6 md:py-10 max-w-xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.5 }}
+        >
+          <BulkSwapCard />
         </motion.div>
       </section>
 
