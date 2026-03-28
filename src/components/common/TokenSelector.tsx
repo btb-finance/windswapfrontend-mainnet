@@ -17,6 +17,9 @@ interface TokenSelectorProps {
     onSelect: (token: Token) => void;
     selectedToken?: Token;
     excludeToken?: Token;
+    multiSelect?: boolean;
+    onMultiSelect?: (tokens: Token[]) => void;
+    excludeTokens?: Token[];
 }
 
 // Helper to check if string is a valid Ethereum address
@@ -116,7 +119,11 @@ export function TokenSelector({
     onSelect,
     selectedToken,
     excludeToken,
+    multiSelect = false,
+    onMultiSelect,
+    excludeTokens,
 }: TokenSelectorProps) {
+    const [multiSelected, setMultiSelected] = useState<Token[]>([]);
     const router = useRouter();
     const [search, setSearch] = useState('');
     const [filteredTokens, setFilteredTokens] = useState(DEFAULT_TOKEN_LIST);
@@ -353,6 +360,7 @@ export function TokenSelector({
         const filtered = baseList.filter((token) => {
             // Exclude the already selected token in the other input
             if (excludeToken && token.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
+            if (excludeTokens?.some(e => e.address.toLowerCase() === token.address.toLowerCase())) return false;
 
             // Filter by search
             if (search) {
@@ -377,16 +385,41 @@ export function TokenSelector({
     }, [search, excludeToken, fetchCustomToken, sortedTokens, activeTab, trendingTokens, liquidityTokens, cgTokens]);
 
     const handleSelect = (token: Token) => {
+        if (multiSelect) {
+            setMultiSelected(prev =>
+                prev.some(t => t.address === token.address)
+                    ? prev.filter(t => t.address !== token.address)
+                    : [...prev, token]
+            );
+            return;
+        }
         onSelect(token);
         onClose();
         setSearch('');
         setCustomToken(null);
     };
 
+    const handleConfirmMulti = () => {
+        if (onMultiSelect && multiSelected.length > 0) {
+            onMultiSelect(multiSelected);
+        }
+        setMultiSelected([]);
+        setSearch('');
+        setCustomToken(null);
+        onClose();
+    };
+
     const [mounted, setMounted] = useState(false);
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Reset multi-selection when modal opens
+    useEffect(() => {
+        if (isOpen && multiSelect) {
+            setMultiSelected([]);
+        }
+    }, [isOpen, multiSelect]);
 
     // Swipe to dismiss for mobile
     const { handlers: swipeHandlers, style: swipeStyle } = useSwipeToDismiss({
@@ -432,7 +465,9 @@ export function TokenSelector({
                         <div className="glass-card p-6 pt-4 flex flex-col flex-1 min-h-0">
                             {/* Header */}
                             <div className="flex items-center justify-between mb-4 shrink-0">
-                                <h2 className="text-xl font-semibold">Select Token</h2>
+                                <h2 className="text-xl font-semibold">
+                                    {multiSelect ? `Select Tokens${multiSelected.length > 0 ? ` (${multiSelected.length})` : ''}` : 'Select Token'}
+                                </h2>
                                 <button
                                     onClick={onClose}
                                     className="p-2 rounded-lg hover:bg-white/5 transition"
@@ -536,14 +571,19 @@ export function TokenSelector({
                                         {isValidAddress(search) ? 'Checking address...' : 'No tokens found'}
                                     </div>
                                 ) : (
-                                    filteredTokens.map((token) => (
+                                    filteredTokens.map((token) => {
+                                        const isChecked = multiSelect && multiSelected.some(t => t.address === token.address);
+                                        return (
                                         <button
                                             key={token.address}
                                             onClick={() => handleSelect(token)}
-                                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/5 ${selectedToken?.address === token.address
-                                                ? 'bg-primary/10 border border-primary/30'
-                                                : ''
-                                                }`}
+                                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/5 ${
+                                                isChecked
+                                                    ? 'bg-indigo-500/10 border border-indigo-500/30'
+                                                    : selectedToken?.address === token.address
+                                                        ? 'bg-primary/10 border border-primary/30'
+                                                        : ''
+                                            }`}
                                         >
                                             {/* Token Icon */}
                                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
@@ -593,8 +633,16 @@ export function TokenSelector({
                                                 );
                                             })()}
 
-                                            {/* Share/Info Icon */}
-                                            {!token.isNative && (
+                                            {/* Multi-select checkbox OR Share/Info Icon */}
+                                            {multiSelect ? (
+                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${isChecked ? 'bg-indigo-500 border-indigo-500' : 'border-white/30'}`}>
+                                                    {isChecked && (
+                                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                            ) : !token.isNative && (
                                                 <div
                                                     onClick={(e) => openTokenPage(e, token)}
                                                     className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-primary transition cursor-pointer"
@@ -606,15 +654,32 @@ export function TokenSelector({
                                                 </div>
                                             )}
                                         </button>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
 
-                            {/* Help Text */}
-                            <div className="mt-4 pt-4 border-t border-white/5 text-center shrink-0">
-                                <p className="text-sm text-gray-400">
-                                    Paste a token contract address to import any ERC-20 token
-                                </p>
+                            {/* Confirm button (multi-select) or Help Text */}
+                            <div className="mt-4 pt-4 border-t border-white/5 shrink-0">
+                                {multiSelect ? (
+                                    <button
+                                        onClick={handleConfirmMulti}
+                                        disabled={multiSelected.length === 0}
+                                        className={`w-full py-3 rounded-xl font-semibold transition-all ${
+                                            multiSelected.length > 0
+                                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 hover:scale-[1.01] active:scale-[0.99]'
+                                                : 'bg-white/5 text-gray-500 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        {multiSelected.length === 0
+                                            ? 'Select tokens above'
+                                            : `Add ${multiSelected.length} Token${multiSelected.length > 1 ? 's' : ''}`}
+                                    </button>
+                                ) : (
+                                    <p className="text-sm text-gray-400 text-center">
+                                        Paste a token contract address to import any ERC-20 token
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </motion.div>

@@ -368,6 +368,18 @@ export function BulkSwapCard() {
                 onClose={() => setIsOutputSelectorOpen(false)}
                 onSelect={(token) => addToken(token)}
                 excludeToken={tokenIn}
+                excludeTokens={legs.map(l => l.token)}
+                multiSelect
+                onMultiSelect={(tokens) => {
+                    setLegs((prev) => {
+                        const toAdd = tokens.filter(t => !prev.some(l => l.token.address === t.address));
+                        if (toAdd.length === 0) return prev;
+                        const newLegs = [...prev, ...toAdd.map(t => ({ token: t, allocation: 0, status: 'idle' as const }))];
+                        const alloc = 1 / newLegs.length;
+                        return newLegs.map(l => ({ ...l, allocation: alloc }));
+                    });
+                    setIsOutputSelectorOpen(false);
+                }}
             />
         </div>
     );

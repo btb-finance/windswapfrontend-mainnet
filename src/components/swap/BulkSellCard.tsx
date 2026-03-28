@@ -30,7 +30,6 @@ export function BulkSellCard() {
         (token: Token) => {
             if (legs.find((l) => l.token.address === token.address)) return;
             setLegs((prev) => [...prev, { token, amountIn: '', status: 'idle' }]);
-            setIsInputSelectorOpen(false);
         },
         [legs],
     );
@@ -310,6 +309,9 @@ export function BulkSellCard() {
                 onClose={() => setIsInputSelectorOpen(false)}
                 onSelect={addToken}
                 excludeToken={tokenOut}
+                excludeTokens={legs.map(l => l.token)}
+                multiSelect
+                onMultiSelect={(tokens) => tokens.forEach(addToken)}
             />
 
             <TokenSelector
