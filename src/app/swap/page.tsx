@@ -80,21 +80,21 @@ function SwapWithParams() {
     return (
         <div className="max-w-xl mx-auto">
             {/* Mode Toggle */}
-            <div className="flex justify-center mb-6">
-                <div className="inline-flex rounded-xl bg-surface-dark border border-white/10 p-1">
+            <div className="flex justify-center mb-6 px-1">
+                <div className="flex w-full max-w-sm rounded-xl bg-surface-dark border border-white/10 p-1 gap-1">
                     <button
                         onClick={() => setSwapMode('single')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                        className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                             swapMode === 'single'
                                 ? 'bg-white/10 text-white shadow-sm'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}
                     >
-                        Single Swap
+                        Swap
                     </button>
                     <button
                         onClick={() => setSwapMode('bulk-buy')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                        className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                             swapMode === 'bulk-buy'
                                 ? 'bg-white/10 text-indigo-400 shadow-sm'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -104,7 +104,7 @@ function SwapWithParams() {
                     </button>
                     <button
                         onClick={() => setSwapMode('bulk-sell')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                        className={`flex-1 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                             swapMode === 'bulk-sell'
                                 ? 'bg-white/10 text-red-400 shadow-sm'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'

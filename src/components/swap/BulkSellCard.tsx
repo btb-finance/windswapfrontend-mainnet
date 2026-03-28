@@ -153,84 +153,103 @@ export function BulkSellCard() {
                         </button>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         {legs.map((leg, i) => {
                             const balanceInfo = getBalance(leg.token.address);
+                            const numBal = parseFloat(balanceInfo?.formatted || '0');
+                            const hasAmount = leg.amountIn && parseFloat(leg.amountIn) > 0;
                             return (
                                 <div
                                     key={leg.token.address}
-                                    className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] group hover:border-white/10 transition"
+                                    className="rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/20 transition-all group overflow-hidden"
                                 >
-                                    <div className="flex items-center gap-3">
-                                        {/* Token icon + symbol */}
-                                        <div className="flex items-center gap-2 min-w-[70px]">
-                                            {leg.token.logoURI ? (
-                                                <img src={leg.token.logoURI} alt={leg.token.symbol} className="w-6 h-6 rounded-full" />
-                                            ) : (
-                                                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs">
-                                                    {leg.token.symbol[0]}
-                                                </div>
-                                            )}
-                                            <span className="font-medium text-sm">{leg.token.symbol}</span>
+                                    {/* Top row: token identity + remove */}
+                                    <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center shrink-0 overflow-hidden">
+                                                {leg.token.logoURI ? (
+                                                    <img src={leg.token.logoURI} alt={leg.token.symbol} className="w-8 h-8 rounded-full" />
+                                                ) : (
+                                                    <span className="text-sm font-bold text-red-300">{leg.token.symbol[0]}</span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-sm leading-none">{leg.token.symbol}</p>
+                                                {numBal > 0 && (
+                                                    <p className="text-[11px] text-gray-500 mt-0.5">
+                                                        Bal: {numBal > 1000 ? numBal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : numBal.toFixed(4)}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
+                                        <button
+                                            onClick={() => removeToken(i)}
+                                            className="w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition opacity-0 group-hover:opacity-100"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
 
-                                        {/* Amount input */}
-                                        <div className="flex-1">
+                                    {/* Bottom row: amount input + output estimate */}
+                                    <div className="px-4 pb-3 space-y-2">
+                                        <div className="flex items-center gap-2 bg-black/20 rounded-lg px-3 py-2">
                                             <input
                                                 type="text"
                                                 inputMode="decimal"
                                                 placeholder="0.0"
                                                 value={leg.amountIn}
                                                 onChange={(e) => updateAmount(i, e.target.value)}
-                                                className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-gray-600 border-b border-transparent focus:border-red-500/30 transition pb-1"
+                                                className="flex-1 bg-transparent text-xl font-semibold outline-none placeholder:text-gray-600 min-w-0 w-0"
                                             />
-                                            {balanceInfo && (
-                                                <div className="flex justify-between items-center mt-1">
-                                                    <span className="text-[10px] text-gray-500">
-                                                        Bal: {parseFloat(balanceInfo.formatted).toFixed(4)}
-                                                    </span>
-                                                    <button 
-                                                        onClick={() => setMaxBalance(i, leg.token)}
-                                                        className="text-[10px] text-red-400 hover:text-red-300 uppercase tracking-wide"
-                                                    >
-                                                        Max
-                                                    </button>
-                                                </div>
+                                            {numBal > 0 && (
+                                                <button
+                                                    onClick={() => setMaxBalance(i, leg.token)}
+                                                    className="text-[11px] font-medium px-2.5 py-1 rounded-md bg-red-500/15 text-red-400 hover:bg-red-500/25 transition shrink-0"
+                                                >
+                                                    MAX
+                                                </button>
                                             )}
                                         </div>
 
-                                        {/* Estimated output line */}
-                                        <div className="min-w-[70px] text-right flex flex-col items-end">
-                                            {leg.status === 'quoting' || isQuoting ? (
-                                                <div className="w-3 h-3 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                                            ) : leg.status === 'quoted' && leg.estimatedOut ? (
-                                                <span className="text-sm font-medium text-green-400">
-                                                    +{parseFloat(leg.estimatedOut).toFixed(4)}
+                                        {/* Estimated output — full width below input */}
+                                        {(leg.status === 'quoting' || (isQuoting && hasAmount)) ? (
+                                            <div className="flex items-center gap-1.5 px-1">
+                                                <div className="w-3 h-3 border-2 border-orange-400/40 border-t-orange-400 rounded-full animate-spin" />
+                                                <span className="text-xs text-gray-500">Getting quote...</span>
+                                            </div>
+                                        ) : leg.status === 'quoted' && leg.estimatedOut ? (
+                                            <div className="flex items-center justify-between px-1">
+                                                <svg className="w-3 h-3 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                                </svg>
+                                                <span className="text-sm font-semibold text-green-400">
+                                                    +{parseFloat(leg.estimatedOut).toFixed(4)} <span className="text-xs text-gray-400 font-normal">{tokenOut.symbol}</span>
                                                 </span>
-                                            ) : leg.status === 'failed' ? (
-                                                <span className="text-xs text-red-500">Failed</span>
-                                            ) : (
-                                                <span className="text-sm text-gray-600">—</span>
-                                            )}
-                                        </div>
-
-                                        {/* Remove button */}
-                                        <button
-                                            onClick={() => removeToken(i)}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10 shrink-0"
-                                        >
-                                            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
+                                            </div>
+                                        ) : leg.status === 'failed' ? (
+                                            <div className="flex items-center gap-1 px-1">
+                                                <svg className="w-3.5 h-3.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <span className="text-xs text-red-400">No route found</span>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
                             );
                         })}
                         {legs.length === 0 && (
-                            <div className="text-center py-6 text-gray-500 text-sm">
-                                Click 'Add Token' to select what you want to sell
-                            </div>
+                            <button
+                                onClick={() => setIsInputSelectorOpen(true)}
+                                className="w-full py-8 rounded-xl border border-dashed border-white/10 hover:border-red-500/30 hover:bg-red-500/5 transition-all flex flex-col items-center gap-2 text-gray-500 hover:text-red-400"
+                            >
+                                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                                </svg>
+                                <span className="text-sm font-medium">Select tokens to sell</span>
+                            </button>
                         )}
                     </div>
                 </div>
@@ -246,26 +265,32 @@ export function BulkSellCard() {
 
                 {/* Output Section (What you get) */}
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 mt-4">
-                    <span className="text-xs text-gray-400 block mb-2">You receive (approx total)</span>
-                    <div className="flex items-center gap-3">
-                        <div className="flex-1 text-2xl font-semibold text-green-400">
-                            {totalEstimatedOut > 0 ? totalEstimatedOut.toFixed(4) : '0.000'}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <span className="text-xs text-gray-400">You receive</span>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className={`text-2xl font-bold ${totalEstimatedOut > 0 ? 'text-green-400' : 'text-gray-600'}`}>
+                                    {totalEstimatedOut > 0
+                                        ? (totalEstimatedOut > 1000
+                                            ? totalEstimatedOut.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                            : totalEstimatedOut.toFixed(4))
+                                        : '0.00'}
+                                </span>
+                                <span className="text-sm text-gray-400 font-medium">{tokenOut.symbol}</span>
+                            </div>
                         </div>
-                        {/* Token selector dropdown */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setIsOutputSelectorOpen(true)}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition font-medium"
-                            >
-                                {tokenOut.logoURI && (
-                                    <img src={tokenOut.logoURI} alt={tokenOut.symbol} className="w-5 h-5 rounded-full" />
-                                )}
-                                {tokenOut.symbol}
-                                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => setIsOutputSelectorOpen(true)}
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 hover:border-white/25 transition font-medium"
+                        >
+                            {tokenOut.logoURI && (
+                                <img src={tokenOut.logoURI} alt={tokenOut.symbol} className="w-5 h-5 rounded-full" />
+                            )}
+                            <span>{tokenOut.symbol}</span>
+                            <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
 

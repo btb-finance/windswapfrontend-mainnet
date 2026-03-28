@@ -244,58 +244,61 @@ export function BulkSwapCard() {
                         {legs.map((leg, i) => (
                             <div
                                 key={leg.token.address}
-                                className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.03] border border-white/[0.06] group hover:border-white/10 transition"
+                                className="rounded-xl bg-white/[0.04] border border-white/[0.08] group hover:border-white/15 transition-all overflow-hidden"
                             >
-                                {/* Token icon + symbol */}
-                                <div className="flex items-center gap-2 min-w-[90px]">
-                                    {leg.token.logoURI && (
-                                        <img src={leg.token.logoURI} alt={leg.token.symbol} className="w-6 h-6 rounded-full" />
-                                    )}
-                                    <span className="font-medium text-sm">{leg.token.symbol}</span>
-                                </div>
-
-                                {/* Allocation slider */}
-                                <div className="flex-1 flex items-center gap-2">
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={100}
-                                        step={1}
-                                        value={Math.round(leg.allocation * 100)}
-                                        onChange={(e) => updateAllocation(i, parseInt(e.target.value) / 100)}
-                                        className="flex-1 h-1.5 rounded-full accent-indigo-500 cursor-pointer"
-                                    />
-                                    <span className="text-xs text-gray-400 w-10 text-right font-mono">
-                                        {Math.round(leg.allocation * 100)}%
-                                    </span>
-                                </div>
-
-                                {/* Estimated output */}
-                                <div className="min-w-[80px] text-right">
-                                    {leg.status === 'quoting' || isQuoting ? (
-                                        <div className="flex items-center justify-end gap-1">
-                                            <div className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                {/* Top: token + remove */}
+                                <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-full bg-indigo-500/20 flex items-center justify-center overflow-hidden shrink-0">
+                                            {leg.token.logoURI
+                                                ? <img src={leg.token.logoURI} alt={leg.token.symbol} className="w-7 h-7 rounded-full" />
+                                                : <span className="text-xs font-bold text-indigo-300">{leg.token.symbol[0]}</span>
+                                            }
                                         </div>
-                                    ) : leg.status === 'quoted' && leg.estimatedOut ? (
-                                        <span className="text-sm font-medium text-green-400">
-                                            {parseFloat(leg.estimatedOut).toFixed(4)}
-                                        </span>
-                                    ) : leg.status === 'failed' ? (
-                                        <span className="text-xs text-red-400">No route</span>
-                                    ) : (
-                                        <span className="text-sm text-gray-500">—</span>
-                                    )}
+                                        <span className="font-semibold text-sm">{leg.token.symbol}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => removeToken(i)}
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition opacity-0 group-hover:opacity-100"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
                                 </div>
 
-                                {/* Remove button */}
-                                <button
-                                    onClick={() => removeToken(i)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
-                                >
-                                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                {/* Bottom: slider + allocation % + estimated out */}
+                                <div className="px-3 pb-3 space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="range"
+                                            min={0}
+                                            max={100}
+                                            step={1}
+                                            value={Math.round(leg.allocation * 100)}
+                                            onChange={(e) => updateAllocation(i, parseInt(e.target.value) / 100)}
+                                            className="flex-1 h-1.5 rounded-full accent-indigo-500 cursor-pointer min-w-0"
+                                        />
+                                        <span className="text-xs text-gray-300 font-mono w-9 text-right shrink-0">
+                                            {Math.round(leg.allocation * 100)}%
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center justify-end min-h-[18px]">
+                                        {leg.status === 'quoting' || isQuoting ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+                                                <span className="text-xs text-gray-500">quoting</span>
+                                            </div>
+                                        ) : leg.status === 'quoted' && leg.estimatedOut ? (
+                                            <span className="text-sm font-semibold text-green-400">
+                                                ≈ {parseFloat(leg.estimatedOut).toFixed(4)} <span className="text-xs text-gray-400 font-normal">{leg.token.symbol}</span>
+                                            </span>
+                                        ) : leg.status === 'failed' ? (
+                                            <span className="text-xs text-red-400">No route</span>
+                                        ) : null}
+                                    </div>
+                                </div>
                             </div>
                         ))}
                     </div>
