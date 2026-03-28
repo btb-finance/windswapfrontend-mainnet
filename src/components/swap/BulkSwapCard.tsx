@@ -3,19 +3,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
-import { Token, SEI, USDC, WIND, BRETT, SKI, VIRTUAL, BOOMER, VVV, DEFAULT_TOKEN_LIST } from '@/config/tokens';
+import { Token, SEI, USDC, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useBulkSwap, BulkSwapLeg } from '@/hooks/useBulkSwap';
 import { useTokenBalance } from '@/hooks/useToken';
 import { useToast } from '@/providers/ToastProvider';
 import { formatUnits, parseUnits } from 'viem';
 import { TokenSelector } from '@/components/common/TokenSelector';
 
-// Pre-built basket presets
-const PRESETS = [
-    { name: 'Blue Chips', tokens: [USDC, WIND] },
-    { name: 'Meme Pack', tokens: [BRETT, BOOMER, VVV] },
-    { name: 'Full Mix', tokens: [USDC, WIND, SKI, VIRTUAL, BRETT] },
-];
 
 export function BulkSwapCard() {
     const { isConnected, address } = useAccount();
@@ -31,23 +25,6 @@ export function BulkSwapCard() {
 
     const { formatted: balanceIn } = useTokenBalance(tokenIn);
     const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Load a preset
-    const loadPreset = useCallback((tokens: Token[]) => {
-        const alloc = 1 / tokens.length;
-        setLegs(
-            tokens.map((t) => ({
-                token: t,
-                allocation: alloc,
-                status: 'idle' as const,
-            })),
-        );
-    }, []);
-
-    // Default preset on mount
-    useEffect(() => {
-        loadPreset(PRESETS[0].tokens);
-    }, [loadPreset]);
 
     // Add a token
     const addToken = useCallback(
@@ -116,10 +93,12 @@ export function BulkSwapCard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [amountIn, tokenIn, legs.length, legs.map((l) => l.token.address + l.allocation).join(',')]);
 
-    // Handle execute
+    // Handle execute — skip failed legs automatically
     const handleExecute = async () => {
         if (!isConnected || !amountIn || legs.length === 0) return;
-        const result = await executeBulkSwap(tokenIn, amountIn, legs);
+        const executableLegs = legs.filter((l) => l.status !== 'failed');
+        if (executableLegs.length === 0) return;
+        const result = await executeBulkSwap(tokenIn, amountIn, executableLegs);
         if (result) {
             success('Bulk swap submitted!');
             setAmountIn('');
@@ -129,8 +108,10 @@ export function BulkSwapCard() {
         }
     };
 
+    const failedCount = legs.filter((l) => l.status === 'failed').length;
     const quotedCount = legs.filter((l) => l.status === 'quoted').length;
-    const canExecute = isConnected && legs.length > 0 && quotedCount === legs.length && !isQuoting && !isExecuting;
+    const executableLegsCount = legs.length - failedCount;
+    const canExecute = isConnected && executableLegsCount > 0 && quotedCount === executableLegsCount && !isQuoting && !isExecuting;
 
     return (
         <div className="glass-card p-6 md:p-8 relative overflow-hidden" id="bulk-swap-card">
@@ -158,18 +139,6 @@ export function BulkSwapCard() {
                     </div>
                 </div>
 
-                {/* Preset Buttons */}
-                <div className="flex flex-wrap gap-2 mb-5">
-                    {PRESETS.map((preset) => (
-                        <button
-                            key={preset.name}
-                            onClick={() => loadPreset(preset.tokens)}
-                            className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-medium text-gray-300 hover:bg-white/10 hover:border-white/20 transition-all active:scale-95"
-                        >
-                            {preset.name}
-                        </button>
-                    ))}
-                </div>
 
                 {/* Input Section */}
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
@@ -295,7 +264,9 @@ export function BulkSwapCard() {
                                                 ≈ {parseFloat(leg.estimatedOut).toFixed(4)} <span className="text-xs text-gray-400 font-normal">{leg.token.symbol}</span>
                                             </span>
                                         ) : leg.status === 'failed' ? (
-                                            <span className="text-xs text-red-400">No route</span>
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-500/15 text-gray-500 border border-gray-500/20">
+                                                No route · skipped
+                                            </span>
                                         ) : null}
                                     </div>
                                 </div>
@@ -348,7 +319,9 @@ export function BulkSwapCard() {
                                     ? 'Select Tokens'
                                     : quotedCount === 0
                                         ? 'Enter Amount'
-                                        : `Swap into ${quotedCount} Token${quotedCount > 1 ? 's' : ''}`}
+                                        : failedCount > 0
+                                            ? `Swap into ${quotedCount} Token${quotedCount > 1 ? 's' : ''} (${failedCount} skipped)`
+                                            : `Swap into ${quotedCount} Token${quotedCount > 1 ? 's' : ''}`}
                 </button>
 
                 {/* Error display */}

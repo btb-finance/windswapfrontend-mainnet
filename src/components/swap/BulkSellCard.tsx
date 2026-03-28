@@ -97,8 +97,8 @@ export function BulkSellCard() {
             return;
         }
 
-        // 2. Execute Bulk Sell
-        const result = await executeBulkSell(legs, tokenOut);
+        // 2. Execute Bulk Sell — skip failed legs
+        const result = await executeBulkSell(legs.filter(l => l.status !== 'failed'), tokenOut);
         if (result) {
             success('Bulk sell submitted!');
             setLegs([]);
@@ -109,8 +109,10 @@ export function BulkSellCard() {
     };
 
     const activeLegs = legs.filter(l => l.amountIn && parseFloat(l.amountIn) > 0);
+    const failedActiveLegs = activeLegs.filter(l => l.status === 'failed');
     const quotedCount = activeLegs.filter((l) => l.status === 'quoted').length;
-    const canExecute = isConnected && activeLegs.length > 0 && quotedCount === activeLegs.length && !isQuoting && !isProcessing;
+    const executableLegsCount = activeLegs.length - failedActiveLegs.length;
+    const canExecute = isConnected && executableLegsCount > 0 && quotedCount === executableLegsCount && !isQuoting && !isProcessing;
 
     const totalEstimatedOut = activeLegs.reduce((sum, leg) => {
         return sum + (leg.estimatedOut ? parseFloat(leg.estimatedOut) : 0);
@@ -229,11 +231,10 @@ export function BulkSellCard() {
                                                 </span>
                                             </div>
                                         ) : leg.status === 'failed' ? (
-                                            <div className="flex items-center gap-1 px-1">
-                                                <svg className="w-3.5 h-3.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                <span className="text-xs text-red-400">No route found</span>
+                                            <div className="px-1">
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-500/15 text-gray-500 border border-gray-500/20">
+                                                    No route · skipped
+                                                </span>
                                             </div>
                                         ) : null}
                                     </div>
@@ -319,7 +320,9 @@ export function BulkSellCard() {
                                     ? 'Enter Amounts to Sell'
                                     : quotedCount === 0
                                         ? 'No Routes Found'
-                                        : `Sell ${activeLegs.length} Token${activeLegs.length > 1 ? 's' : ''}`}
+                                        : failedActiveLegs.length > 0
+                                            ? `Sell ${executableLegsCount} Token${executableLegsCount > 1 ? 's' : ''} (${failedActiveLegs.length} skipped)`
+                                            : `Sell ${activeLegs.length} Token${activeLegs.length > 1 ? 's' : ''}`}
                 </button>
 
                 {error && (
