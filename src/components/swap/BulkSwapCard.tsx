@@ -3,28 +3,88 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
+import { useSearchParams } from 'next/navigation';
 import { Token, SEI, USDC, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useBulkSwap, BulkSwapLeg } from '@/hooks/useBulkSwap';
 import { useTokenBalance } from '@/hooks/useToken';
 import { useToast } from '@/providers/ToastProvider';
 import { formatUnits, parseUnits } from 'viem';
 import { TokenSelector } from '@/components/common/TokenSelector';
+import { getRpcForPoolData } from '@/utils/rpc';
+import { getTokenMetadataFromCache, setTokenMetadataCache } from '@/utils/cache';
+
+const isValidAddress = (v: string) => /^0x[a-fA-F0-9]{40}$/.test(v);
+
+async function resolveToken(address: string): Promise<Token | null> {
+    const lower = address.toLowerCase();
+    const known = DEFAULT_TOKEN_LIST.find(t => t.address.toLowerCase() === lower);
+    if (known) return known;
+    try {
+        const cached = getTokenMetadataFromCache(address);
+        if (cached) return { address: address as `0x${string}`, ...cached };
+        const decode = (hex: string) => {
+            if (!hex || hex === '0x' || hex.length < 130) return '';
+            const len = parseInt(hex.slice(66, 130), 16);
+            return Buffer.from(hex.slice(130, 130 + len * 2), 'hex').toString('utf8').replace(/\0/g, '').trim();
+        };
+        const rpc = getRpcForPoolData();
+        const call = (data: string, id: number) => fetch(rpc, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: address, data }, 'latest'], id }),
+        }).then(r => r.json());
+        const [sym, name, dec] = await Promise.all([call('0x95d89b41', 1), call('0x06fdde03', 2), call('0x313ce567', 3)]);
+        const symbol = decode(sym.result);
+        if (!symbol) return null;
+        const decimals = dec.result ? parseInt(dec.result, 16) : 18;
+        const nameStr = decode(name.result) || symbol;
+        setTokenMetadataCache(address, { symbol, name: nameStr, decimals });
+        return { address: address as `0x${string}`, symbol, name: nameStr, decimals };
+    } catch { return null; }
+}
 
 
 export function BulkSwapCard() {
     const { isConnected, address } = useAccount();
     const { success, error: showError } = useToast();
     const { quoteAll, executeBulkSwap, isQuoting, isExecuting, error } = useBulkSwap();
+    const searchParams = useSearchParams();
 
     const [tokenIn, setTokenIn] = useState<Token>(SEI);
     const [amountIn, setAmountIn] = useState('');
     const [legs, setLegs] = useState<BulkSwapLeg[]>([]);
-    
+    const [shareCopied, setShareCopied] = useState(false);
+    const [isShareSelectorOpen, setIsShareSelectorOpen] = useState(false);
+
     const [isInputSelectorOpen, setIsInputSelectorOpen] = useState(false);
     const [isOutputSelectorOpen, setIsOutputSelectorOpen] = useState(false);
 
     const { formatted: balanceIn } = useTokenBalance(tokenIn);
     const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Load tokens from URL param on mount (?tokens=addr1,addr2,...)
+    useEffect(() => {
+        const param = searchParams.get('tokens');
+        if (!param) return;
+        const addresses = param.split(',').filter(isValidAddress);
+        if (addresses.length === 0) return;
+        Promise.all(addresses.map(resolveToken)).then(results => {
+            const resolved = results.filter((t): t is Token => t !== null);
+            if (resolved.length === 0) return;
+            const alloc = 1 / resolved.length;
+            setLegs(resolved.map(token => ({ token, allocation: alloc, status: 'idle' as const })));
+        });
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Copy shareable URL for selected tokens
+    const handleShareTokens = useCallback((tokens: Token[]) => {
+        if (tokens.length === 0) return;
+        const addrs = tokens.map(t => t.address).join(',');
+        const url = `${window.location.origin}/swap?mode=bulk-buy&tokens=${addrs}`;
+        navigator.clipboard.writeText(url).then(() => {
+            setShareCopied(true);
+            setTimeout(() => setShareCopied(false), 2000);
+        }).catch(() => {});
+    }, []);
 
     // Add a token
     const addToken = useCallback(
@@ -133,10 +193,27 @@ export function BulkSwapCard() {
                             Split one token into multiple in a single transaction
                         </p>
                     </div>
-                    <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-xs font-medium text-indigo-300">
-                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />
-                        1 TX
-                    </div>
+                    <button
+                        onClick={() => setIsShareSelectorOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-500/15 border border-sky-500/30 text-xs font-medium text-sky-300 hover:bg-sky-500/25 transition-all active:scale-95 shrink-0"
+                        title="Create a shareable basket link"
+                    >
+                        {shareCopied ? (
+                            <>
+                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Link copied!
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
+                                </svg>
+                                Create basket to share
+                            </>
+                        )}
+                    </button>
                 </div>
 
 
@@ -356,6 +433,16 @@ export function BulkSwapCard() {
                     });
                     setIsOutputSelectorOpen(false);
                 }}
+            />
+
+            {/* Share basket — pick any tokens → copy link */}
+            <TokenSelector
+                isOpen={isShareSelectorOpen}
+                onClose={() => setIsShareSelectorOpen(false)}
+                onSelect={(token) => { handleShareTokens([token]); setIsShareSelectorOpen(false); }}
+                excludeToken={tokenIn}
+                multiSelect
+                onMultiSelect={(tokens) => { handleShareTokens(tokens); setIsShareSelectorOpen(false); }}
             />
         </div>
     );

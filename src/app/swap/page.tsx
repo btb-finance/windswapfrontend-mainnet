@@ -43,7 +43,9 @@ function SwapWithParams() {
     const [ready, setReady] = useState(false);
     
     // Toggle state: 'single' | 'bulk-buy' | 'bulk-sell'
-    const [swapMode, setSwapMode] = useState<'single' | 'bulk-buy' | 'bulk-sell'>('single');
+    const modeParam = searchParams.get('mode');
+    const initialMode = modeParam === 'bulk-buy' ? 'bulk-buy' : modeParam === 'bulk-sell' ? 'bulk-sell' : 'single';
+    const [swapMode, setSwapMode] = useState<'single' | 'bulk-buy' | 'bulk-sell'>(initialMode);
 
     useEffect(() => {
         const tokenInAddress = searchParams.get('tokenIn');
