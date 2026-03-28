@@ -163,14 +163,14 @@ export function BulkSwapCard() {
                                 const v = e.target.value.replace(/[^0-9.]/g, '');
                                 if (v.split('.').length <= 2) setAmountIn(v);
                             }}
-                            className="flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-600"
+                            className="flex-1 min-w-0 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-600"
                             id="bulk-swap-amount-input"
                         />
                         {/* Token selector dropdown */}
                         <div className="relative">
                             <button
                                 onClick={() => setIsInputSelectorOpen(true)}
-                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition font-medium"
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 border border-white/15 hover:bg-white/15 transition font-medium shrink-0"
                             >
                                 {tokenIn.logoURI && (
                                     <img src={tokenIn.logoURI} alt={tokenIn.symbol} className="w-5 h-5 rounded-full" />
