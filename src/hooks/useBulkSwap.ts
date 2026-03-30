@@ -1,9 +1,9 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, useReadContract } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
+import { parseUnits, formatUnits, Address } from 'viem';
 import { V2_CONTRACTS, COMMON } from '@/config/contracts';
 import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
 import { Token, WSEI } from '@/config/tokens';
@@ -23,6 +23,7 @@ export interface BulkSwapLeg {
 
 export function useBulkSwap() {
     const { address } = useAccount();
+    const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
     const [isQuoting, setIsQuoting] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
@@ -171,16 +172,25 @@ export function useBulkSwap() {
                 // Approve if ERC20
                 if (!isNativeIn) {
                     // Check current allowance
-                    // We'll do inline approval if needed
-                    const approveHash = await writeContractAsync({
+                    const allowance = await publicClient!.readContract({
                         address: actualTokenIn.address as Address,
                         abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [proxyAddress, maxUint256],
-                    });
-                    // Wait a moment for approval to propagate
-                    if (approveHash) {
-                        await new Promise((r) => setTimeout(r, 2000));
+                        functionName: 'allowance',
+                        args: [address, proxyAddress],
+                    }) as bigint;
+
+                    // Only approve if current allowance is less than needed amount
+                    if (allowance < totalWei) {
+                        const approveHash = await writeContractAsync({
+                            address: actualTokenIn.address as Address,
+                            abi: ERC20_ABI,
+                            functionName: 'approve',
+                            args: [proxyAddress, totalWei],
+                        });
+                        // Wait a moment for approval to propagate
+                        if (approveHash) {
+                            await new Promise((r) => setTimeout(r, 2000));
+                        }
                     }
                 }
 
