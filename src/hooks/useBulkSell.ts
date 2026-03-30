@@ -113,7 +113,7 @@ export function useBulkSell() {
                             address: leg.token.address as Address,
                             abi: ERC20_ABI,
                             functionName: 'approve',
-                            args: [proxyAddress, maxUint256],
+                            args: [proxyAddress, legAmountWei],
                         });
                         
                         if (hash) {
