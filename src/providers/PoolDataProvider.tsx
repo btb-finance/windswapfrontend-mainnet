@@ -423,7 +423,9 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
         };
 
         fetchEarnedFromRpc();
-        const interval = setInterval(fetchEarnedFromRpc, FIVE_MINUTES);
+        const interval = setInterval(() => {
+            if (document.visibilityState !== 'hidden') fetchEarnedFromRpc();
+        }, FIVE_MINUTES);
         return () => {
             cancelled = true;
             clearInterval(interval);
@@ -531,7 +533,9 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
         };
 
         fetchPermanentVotingPowerFromRpc();
-        const interval = setInterval(fetchPermanentVotingPowerFromRpc, FIVE_MINUTES);
+        const interval = setInterval(() => {
+            if (document.visibilityState !== 'hidden') fetchPermanentVotingPowerFromRpc();
+        }, FIVE_MINUTES);
         return () => {
             cancelled = true;
             clearInterval(interval);
@@ -900,11 +904,19 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
         fetchAllData();
     }, [fetchAllData]);
 
-    // Auto-refresh every 10 minutes (only if page is still open)
+    // Auto-refresh every 10 minutes, paused when tab is hidden
     useEffect(() => {
         const TEN_MINUTES = 10 * 60 * 1000;
-        const interval = setInterval(fetchAllData, TEN_MINUTES);
-        return () => clearInterval(interval);
+        const interval = setInterval(() => {
+            if (document.visibilityState !== 'hidden') fetchAllData();
+        }, TEN_MINUTES);
+        // Refetch when tab becomes visible again after being hidden
+        const onVisible = () => { if (document.visibilityState === 'visible') fetchAllData(); };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisible);
+        };
     }, [fetchAllData]);
 
     const getTokenInfo = useCallback((address: string) => {

@@ -149,7 +149,7 @@ export default function VotePage() {
     // Note: VotingRewardBalance in subgraph tracks CLAIMED rewards, not pending ones
     // We must call earned(token, tokenId) on fee/bribe reward contracts to get pending
     const fetchVotingRewards = useCallback(async () => {
-        if (positions.length === 0) return;
+        if (!positionsTokenIdsKey) return;
         if (!address) return;
         if (gauges.length === 0) return;
 
@@ -166,7 +166,7 @@ export default function VotePage() {
         try {
             // Step 1: Get ALL votes (including inactive/past epochs) for each veNFT
             // Rewards accumulate across ALL epochs where user voted, not just current active votes
-            const tokenIds = positions.map(p => p.tokenId.toString());
+            const tokenIds = positionsTokenIdsKey.split('|');
             const votesQuery = `query VeVotesForRewards($tokenIds: [ID!]) {
                 veVotes(where: { veNFT_in: $tokenIds }, first: 1000) {
                     veNFT { id }
@@ -323,7 +323,8 @@ export default function VotePage() {
             rewardsFetchRef.current.inFlight = false;
             setIsLoadingVotingRewards(false);
         }
-    }, [positions, address, positionsTokenIdsKey, gauges, allEpochBribes]);
+    // positions replaced by positionsTokenIdsKey (stable string) to avoid callback churn
+    }, [positionsTokenIdsKey, address, gauges, allEpochBribes]);
 
 
     const fetchVeNftVoteStatus = useCallback(async () => {

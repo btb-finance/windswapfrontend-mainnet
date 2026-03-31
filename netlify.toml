@@ -12,6 +12,13 @@
     Access-Control-Allow-Methods = "GET"
 
 [[headers]]
+  for = "/.well-known/base-app-manifest.json"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET"
+    Content-Type = "application/json"
+
+[[headers]]
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
