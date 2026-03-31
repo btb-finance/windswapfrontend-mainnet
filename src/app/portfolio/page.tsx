@@ -19,7 +19,6 @@ import { getRpcForPoolData } from '@/utils/rpc';
 import { useToast } from '@/providers/ToastProvider';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
-import MigrationBanner from '@/components/common/MigrationBanner';
 
 async function fetchGaugeAddressByPool(poolId: string): Promise<string | null> {
     try {
@@ -1514,9 +1513,6 @@ export default function PortfolioPage() {
                     </div>
                 )}
             </motion.div>
-
-            {/* Migration Banner for old contract positions */}
-            <MigrationBanner />
 
             {/* Tabs - Compact */}
             <div className="flex gap-1 mb-4 overflow-x-auto pb-1 -mx-1 px-1">

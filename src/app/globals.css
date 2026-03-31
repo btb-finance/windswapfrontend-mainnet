@@ -110,25 +110,25 @@ body {
 /* Glass Effect */
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
 }
 
 .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(20, 20, 30, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   border-radius: 20px;
   box-shadow: var(--shadow-lg);
 }
 
 .glass-header {
-  background: rgba(10, 10, 15, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -260,9 +260,9 @@ body {
 
 /* Swap Card */
 .swap-card {
-  background: linear-gradient(180deg, rgba(20, 20, 30, 0.9) 0%, rgba(15, 15, 22, 0.95) 100%);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  background: linear-gradient(180deg, rgba(20, 20, 30, 0.96) 0%, rgba(15, 15, 22, 0.98) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   border-radius: 20px;
   padding: 1rem;
@@ -392,23 +392,25 @@ select:focus {
 .bg-orb {
   position: fixed;
   border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.2;
+  filter: blur(80px);
+  opacity: 0.15;
   pointer-events: none;
   z-index: -1;
-  animation: orb-drift 20s ease-in-out infinite;
+  /* Use will-change to promote to GPU layer and avoid main-thread repaints */
+  will-change: transform;
+  animation: orb-drift 25s ease-in-out infinite;
 }
 
 @keyframes orb-drift {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -20px) scale(1.05); }
-  66% { transform: translate(-20px, 15px) scale(0.95); }
+  33% { transform: translate(20px, -15px) scale(1.03); }
+  66% { transform: translate(-15px, 10px) scale(0.97); }
 }
 
 .bg-orb-primary {
   background: radial-gradient(circle, #6366f1, #8b5cf6);
-  width: 600px;
-  height: 600px;
+  width: 500px;
+  height: 500px;
   top: -200px;
   right: -150px;
   animation-duration: 25s;
@@ -416,12 +418,19 @@ select:focus {
 
 .bg-orb-secondary {
   background: radial-gradient(circle, #8b5cf6, #06b6d4);
-  width: 500px;
-  height: 500px;
+  width: 400px;
+  height: 400px;
   bottom: -150px;
   left: -150px;
   animation-duration: 30s;
   animation-direction: reverse;
+}
+
+/* Disable orbs on slow/metered connections */
+@media (prefers-reduced-data: reduce) {
+  .bg-orb {
+    display: none;
+  }
 }
 
 /* Stats Card */
@@ -1050,24 +1059,26 @@ select:focus {
 
 /* Reduce expensive blur effects on mobile for GPU performance */
 @media (max-width: 767px) {
-  .glass {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+  /* Remove backdrop-filter entirely on mobile — uses solid bg instead */
+  .glass,
+  .glass-card,
+  .glass-header,
+  .swap-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
-  .glass-card {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+  .glass-card,
+  .glass {
+    background: rgba(18, 18, 26, 0.97);
   }
 
   .glass-header {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(10, 10, 15, 0.98);
   }
 
   .swap-card {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(15, 15, 22, 0.99);
   }
 
   /* Hide GPU-heavy animated background orbs on mobile */

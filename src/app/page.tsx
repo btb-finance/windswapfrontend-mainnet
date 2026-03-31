@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
 import { LockVoteEarnSteps } from '@/components/common/StepIndicator';
@@ -78,11 +77,7 @@ export default function Home() {
     <div className="container mx-auto px-4 md:px-6">
       {/* Hero Section */}
       <section className="py-8 md:py-16 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+        <div className="animate-fade-in">
           <div className="flex gap-3 justify-center mb-6 flex-wrap">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/30 text-sm font-medium">
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
@@ -117,12 +112,7 @@ export default function Home() {
 
           {/* veWIND Holder Congratulations Banner */}
           {isConnected && totalVeNFTs > 0 && (
-            <motion.div
-              className="mt-8 mx-auto max-w-2xl"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-            >
+            <div className="mt-8 mx-auto max-w-2xl animate-fade-in">
               <div className="p-4 md:p-6 rounded-2xl bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-teal-500/20 border border-green-500/40 shadow-lg shadow-green-500/10">
                 <div className="flex items-center gap-3 md:gap-4">
                   <div className="flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
@@ -152,30 +142,19 @@ export default function Home() {
                   </Link>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
       </section>
 
       {/* Bulk Swap Section */}
       <section className="py-6 md:py-10 max-w-xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.5 }}
-        >
-          <BulkSwapCard />
-        </motion.div>
+        <BulkSwapCard />
       </section>
 
       {/* Live Stats Section */}
       <section className="py-6 md:py-8">
-        <motion.div
-          className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
           <div className="stat-card text-center">
             <p className="text-xs md:text-sm text-gray-400 mb-1">Total Pools</p>
             <p className="text-xl md:text-3xl font-bold text-indigo-400">{poolCount > 0 ? poolCount.toLocaleString() : '--'}</p>
@@ -192,17 +171,12 @@ export default function Home() {
             <p className="text-xs md:text-sm text-gray-400 mb-1">Network</p>
             <p className="text-xl md:text-3xl font-bold text-amber-400">Ethereum</p>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* How It Works */}
       <section className="py-8 md:py-12">
-        <motion.div
-          className="glass-card p-4 md:p-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        <div className="glass-card p-4 md:p-8">
           <div className="text-center mb-6 md:mb-8">
             <h2 className="text-xl md:text-3xl font-bold mb-2 md:mb-3">
               How <span className="text-green-400">ve(3,3)</span> Works
@@ -258,57 +232,41 @@ export default function Home() {
               <strong className="text-primary">The Flywheel:</strong> Good pools earn more → LPs join → Better trades
             </span>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Features Section */}
       <section className="py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
+        <div>
           <h2 className="text-3xl font-bold text-center mb-4">
             Everything You Need
           </h2>
           <p className="text-gray-400 text-center max-w-xl mx-auto mb-10">
             Trade, earn, and participate in Wind Swap governance — all in one place.
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 + index * 0.1 }}
-            >
-              <Link href={feature.href}>
-                <div className="feature-card h-full cursor-pointer group">
-                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed">{feature.description}</p>
-                  <div className="mt-4 text-primary text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                    Get Started <span>→</span>
-                  </div>
+          {features.map((feature) => (
+            <Link key={feature.title} href={feature.href}>
+              <div className="feature-card h-full cursor-pointer group">
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  {feature.icon}
                 </div>
-              </Link>
-            </motion.div>
+                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{feature.description}</p>
+                <div className="mt-4 text-primary text-sm font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                  Get Started <span>→</span>
+                </div>
+              </div>
+            </Link>
           ))}
         </div>
       </section>
 
       {/* V2 vs V3 Comparison */}
       <section className="py-12">
-        <motion.div
-          className="glass-card p-8 overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
+        <div className="glass-card p-8 overflow-hidden">
           <h2 className="text-2xl font-bold mb-2 text-center">Why Concentrated Liquidity?</h2>
           <p className="text-gray-400 text-center mb-8">V3 pools are up to 4000x more efficient than traditional AMMs</p>
 
@@ -371,19 +329,14 @@ export default function Home() {
               </ul>
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* Quick Actions for connected users */}
       {isConnected && (
         <>
           <section className="py-12">
-            <motion.div
-              className="glass-card p-8"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.7 }}
-            >
+            <div className="glass-card p-8">
               <h2 className="text-2xl font-bold mb-6">Quick Actions</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Link href="/swap">
@@ -402,17 +355,12 @@ export default function Home() {
                   </button>
                 </Link>
               </div>
-            </motion.div>
+            </div>
           </section>
 
           {/* Portfolio Summary */}
           <section className="py-8">
-            <motion.div
-              className="glass-card p-8"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.75 }}
-            >
+            <div className="glass-card p-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold mb-1">Your Portfolio</h2>
@@ -468,19 +416,14 @@ export default function Home() {
                   </button>
                 </Link>
               </div>
-            </motion.div>
+            </div>
           </section>
         </>
       )}
 
       {/* WIND Token Section */}
       <section className="py-12">
-        <motion.div
-          className="glass-card p-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-        >
+        <div className="glass-card p-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg shadow-primary/30">
@@ -506,7 +449,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
     </div>
   );

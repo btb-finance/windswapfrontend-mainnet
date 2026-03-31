@@ -15,3 +15,20 @@
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+
+# Long-term cache for immutable Next.js static assets (_next/static)
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Cache public images for 7 days
+[[headers]]
+  for = "/logo/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/logo.png"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
