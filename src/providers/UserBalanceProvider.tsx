@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { formatUnits, Address, encodeFunctionData, decodeFunctionResult, getAddress } from 'viem';
 import { useAccount } from 'wagmi';
 import { DEFAULT_TOKEN_LIST, Token, WSEI } from '@/config/tokens';
@@ -310,17 +310,26 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
         }).catch(() => {});
     }, []);
 
+    // Keep a ref to allTokens so fetchBalances doesn't need it as a dep
+    // (allTokens only changes once on mount when extended list loads)
+    const allTokensRef = useRef<Token[]>(allTokens);
+    useEffect(() => { allTokensRef.current = allTokens; }, [allTokens]);
+
     const fetchBalances = useCallback(async () => {
         if (!address || !isConnected) {
             setBalances(new Map());
-            setSortedTokens(allTokens);
+            setSortedTokens(allTokensRef.current);
             return;
         }
+
+        // Skip fetch if tab is hidden — resume when user comes back
+        if (document.visibilityState === 'hidden') return;
 
         setIsLoading(true);
         try {
             const rpc = getRpcForUserData();
-            const erc20Tokens = allTokens.filter(t => !t.isNative);
+            const currentTokens = allTokensRef.current;
+            const erc20Tokens = currentTokens.filter(t => !t.isNative);
 
             // Step 1: get native + ERC20 balances in parallel
             const [nativeHex, erc20Balances] = await Promise.all([
@@ -332,7 +341,7 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
 
             // Step 2: collect addresses with non-zero balance for price fetch
             const tokensWithBalance: string[] = [];
-            const nativeToken = allTokens.find(t => t.isNative);
+            const nativeToken = currentTokens.find(t => t.isNative);
             if (nativeToken && nativeBalance > 0n) tokensWithBalance.push(WSEI.address);
             for (const token of erc20Tokens) {
                 const bal = erc20Balances.get(token.address.toLowerCase()) ?? 0n;
@@ -374,7 +383,7 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
             setBalances(newBalances);
 
             // Sort: tokens with balance first (by USD value desc), then zero-balance tokens
-            const sorted = [...allTokens].sort((a, b) => {
+            const sorted = [...currentTokens].sort((a, b) => {
                 const aRow = newBalances.get(a.address.toLowerCase());
                 const bRow = newBalances.get(b.address.toLowerCase());
                 const aUsd = aRow?.usdValue;
@@ -395,14 +404,27 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
             console.error('[UserBalanceProvider] Error fetching balances:', err);
         }
         setIsLoading(false);
-    }, [address, isConnected, allTokens]);
+    // allTokens removed from deps — accessed via ref to avoid callback churn
+    }, [address, isConnected]);
 
     useEffect(() => { fetchBalances(); }, [fetchBalances]);
 
     useEffect(() => {
         if (!isConnected) return;
-        const interval = setInterval(fetchBalances, 15000);
-        return () => clearInterval(interval);
+
+        // Poll every 60s (not 15s) — balances don't change that fast when idle
+        const interval = setInterval(fetchBalances, 60_000);
+
+        // Pause polling when tab is hidden, resume and fetch immediately when visible again
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') fetchBalances();
+        };
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        };
     }, [isConnected, fetchBalances]);
 
     const getBalance = useCallback((tokenAddress: string) => {

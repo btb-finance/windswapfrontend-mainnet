@@ -8,6 +8,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { MainContent } from "@/components/layout/MainContent";
 import { PWAInstallPrompt } from "@/components/common/PWAInstallPrompt";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { NavigationProgress } from "@/components/common/NavigationProgress";
 
 
 const geistSans = Geist({
@@ -21,9 +22,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wind Swap | DEX on Ethereum",
-  description: "The premier AMM and ve-tokenomics DEX on Ethereum Network. Swap, provide liquidity, and earn rewards with WIND.",
-  keywords: ["DEX", "Sei", "AMM", "DeFi", "Wind Swap", "WIND", "ve-tokenomics", "concentrated liquidity"],
+  title: "Wind Swap | DEX on Base",
+  description: "The premier AMM and ve(3,3) DEX on Base. Swap tokens, provide concentrated liquidity, lock WIND to vote and earn real yield every week.",
+  keywords: ["DEX", "Base", "AMM", "DeFi", "Wind Swap", "WIND", "ve(3,3)", "concentrated liquidity", "ve-tokenomics"],
   metadataBase: new URL("https://windswap.org"),
   manifest: "/manifest.json",
   appleWebApp: {
@@ -38,15 +39,15 @@ export const metadata: Metadata = {
     apple: '/logo.png',
   },
   openGraph: {
-    title: 'Wind Swap | DEX on Ethereum',
-    description: 'The premier AMM and ve-tokenomics DEX on Ethereum Network. Swap, provide liquidity, and earn rewards.',
+    title: 'Wind Swap | DEX on Base',
+    description: 'Swap, provide liquidity, and earn real yield on Base with ve(3,3) tokenomics.',
     type: 'website',
     images: ['/logo.png'],
   },
   twitter: {
     card: 'summary',
-    title: 'Wind Swap | DEX on Ethereum',
-    description: 'The premier AMM and ve-tokenomics DEX on Ethereum Network.',
+    title: 'Wind Swap | DEX on Base',
+    description: 'Swap, provide liquidity, and earn real yield on Base with ve(3,3) tokenomics.',
     images: ['/logo.png'],
   },
 };
@@ -97,6 +98,9 @@ export default function RootLayout({
           }}
         />
         <ClientProviders>
+          {/* Navigation progress bar — shows instantly when user taps a link */}
+          <NavigationProgress />
+
           {/* Background Effects */}
           <div className="bg-orb bg-orb-primary" />
           <div className="bg-orb bg-orb-secondary" />

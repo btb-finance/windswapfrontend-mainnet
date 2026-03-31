@@ -187,8 +187,10 @@ export function useSubgraph(): UseSubgraphResult {
     useEffect(() => {
         fetchData();
 
-        // Refresh every 5 minutes
-        const interval = setInterval(fetchData, 5 * 60 * 1000);
+        // Refresh every 5 minutes, skip when tab is hidden
+        const interval = setInterval(() => {
+            if (document.visibilityState !== 'hidden') fetchData();
+        }, 5 * 60 * 1000);
         return () => clearInterval(interval);
     }, [fetchData]);
 
