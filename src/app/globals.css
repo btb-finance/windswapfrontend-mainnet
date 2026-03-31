@@ -193,7 +193,9 @@ body {
   border-radius: 8px;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all 0.2s ease;
+  /* No transition on transform so :active fires instantly */
+  transition: color 0.15s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .nav-link:hover {
@@ -201,8 +203,39 @@ body {
   background: var(--glass-bg);
 }
 
+.nav-link:active {
+  color: var(--text-primary);
+  background: rgba(245, 158, 11, 0.2);
+  transform: scale(0.94);
+}
+
 .nav-link-active {
   color: var(--text-primary);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+/* Mobile bottom nav tap feedback — CSS :active fires instantly, no JS needed */
+.mobile-nav-item {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-nav-item:active .mobile-nav-icon {
+  color: var(--primary);
+  transform: scale(0.85);
+}
+
+.mobile-nav-item:active .mobile-nav-label {
+  color: var(--primary);
+}
+
+.mobile-nav-item:active .mobile-nav-bg {
+  opacity: 1;
+}
+
+.mobile-nav-main:active .mobile-nav-main-circle {
+  transform: scale(0.9);
 }
 
 /* Input Fields */

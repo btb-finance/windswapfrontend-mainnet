@@ -327,7 +327,7 @@ export default function VotePage() {
 
 
     const fetchVeNftVoteStatus = useCallback(async () => {
-        if (positions.length === 0) {
+        if (!positionsTokenIdsKey) {
             setVeNftHasVotes({});
             return;
         }
@@ -342,7 +342,7 @@ export default function VotePage() {
         voteStatusFetchRef.current.inFlight = true;
 
         try {
-            const tokenIds = positions.map(p => p.tokenId.toString());
+            const tokenIds = key.split('|');
             const query = `query VeVoteStatus($tokenIds: [ID!]) {
                 veVotes(where: { veNFT_in: $tokenIds, isActive: true }, orderBy: epoch, orderDirection: desc, first: 1000) {
                     epoch
@@ -360,7 +360,7 @@ export default function VotePage() {
 
             const rows: Array<any> = json.data?.veVotes || [];
             const next: Record<string, boolean> = {};
-            for (const p of positions) next[p.tokenId.toString()] = false;
+            for (const tid of tokenIds) next[tid] = false;
 
             // Mark true if there is at least one active vote row for the veNFT.
             for (const r of rows) {
@@ -378,7 +378,7 @@ export default function VotePage() {
         } finally {
             voteStatusFetchRef.current.inFlight = false;
         }
-    }, [positions, positionsTokenIdsKey]);
+    }, [positionsTokenIdsKey]);
 
     // Fetch voting rewards when positions or gauges change
     useEffect(() => {

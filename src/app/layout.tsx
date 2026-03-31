@@ -8,6 +8,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { MainContent } from "@/components/layout/MainContent";
 import { PWAInstallPrompt } from "@/components/common/PWAInstallPrompt";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { NavigationProgress } from "@/components/common/NavigationProgress";
 
 
 const geistSans = Geist({
@@ -97,6 +98,9 @@ export default function RootLayout({
           }}
         />
         <ClientProviders>
+          {/* Navigation progress bar — shows instantly when user taps a link */}
+          <NavigationProgress />
+
           {/* Background Effects */}
           <div className="bg-orb bg-orb-primary" />
           <div className="bg-orb bg-orb-secondary" />
