@@ -1740,8 +1740,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 )}
                                             </motion.button>
                                         );
-                                    })()
-                                )}
+                                    })()}
+
                             </div>
                         </motion.div>
                     </motion.div>
