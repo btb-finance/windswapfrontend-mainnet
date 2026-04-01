@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { useSearchParams } from 'next/navigation';
-import { Token, ETH, USDC, DEFAULT_TOKEN_LIST } from '@/config/tokens';
+import { Token, ETH, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useBulkSwap, BulkSwapLeg } from '@/hooks/useBulkSwap';
 import { useTokenBalance } from '@/hooks/useToken';
 import { useToast } from '@/providers/ToastProvider';
-import { formatUnits, parseUnits } from 'viem';
 import { TokenSelector } from '@/components/common/TokenSelector';
 import { getRpcForPoolData } from '@/utils/rpc';
 import { getTokenMetadataFromCache, setTokenMetadataCache } from '@/utils/cache';

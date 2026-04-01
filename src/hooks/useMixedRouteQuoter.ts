@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { parseUnits, formatUnits } from 'viem';
 import { Token, WETH, USDC, WIND } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
-import { getRpcForQuotes } from '@/utils/rpc';
+import { batchRpcCall } from '@/utils/rpc';
 
 // Common intermediate tokens for routing
 const INTERMEDIATE_TOKENS = [WETH, USDC, WIND];
@@ -85,33 +85,23 @@ export function useMixedRouteQuoter() {
     const batchQuote = useCallback(async (requests: BatchQuoteRequest[]): Promise<(RouteQuote | null)[]> => {
         if (requests.length === 0) return [];
 
-        const batchBody = requests.map((req, i) => ({
-            jsonrpc: '2.0',
+        const batchCalls = requests.map((req) => ({
             method: 'eth_call',
             params: [{ to: CL_CONTRACTS.MixedRouteQuoterV1, data: encodeQuoteData(req.path, req.amountIn) }, 'latest'],
-            id: i + 1
         }));
 
         try {
-            const response = await fetch(getRpcForQuotes(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(batchBody)
-            });
-
-            const results = await response.json();
+            const results = await batchRpcCall(batchCalls);
 
             return requests.map((req, i) => {
-                const result = Array.isArray(results)
-                    ? (results as Array<{ id: number; result: string }>).find((r) => r.id === i + 1)
-                    : (results as { id: number; result: string });
+                const rawResult = results[i] as string | null | undefined;
 
-                if (!result?.result || result.result === '0x' || result.result.length < 66) {
+                if (!rawResult || rawResult === '0x' || rawResult.length < 66) {
                     return null;
                 }
 
                 try {
-                    const hex = result.result.slice(2);
+                    const hex = rawResult.slice(2);
                     const amountOut = BigInt('0x' + hex.slice(0, 64));
 
                     if (amountOut <= BigInt(0)) return null;

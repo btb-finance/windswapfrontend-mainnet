@@ -5,7 +5,7 @@ import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { parseUnits, formatUnits, Address } from 'viem';
-import { V2_CONTRACTS, COMMON } from '@/config/contracts';
+import { V2_CONTRACTS } from '@/config/contracts';
 import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
 import { Token, WETH } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';

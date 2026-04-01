@@ -1,5 +1,5 @@
 'use client';
-import { getRpcForQuotes } from '@/utils/rpc';
+import { ethCall } from '@/utils/rpc';
 
 import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
@@ -49,22 +49,7 @@ export function useSwapV3() {
                 : [tokenOut, tokenIn];
 
             // Call CLFactory.getPool
-            const response = await fetch(getRpcForQuotes(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'eth_call',
-                    params: [{
-                        to: CL_CONTRACTS.CLFactory,
-                        data: encodeGetPoolCall(token0, token1, tickSpacing)
-                    }, 'latest'],
-                    id: 1
-                })
-            });
-
-            const result = await response.json();
-            const poolAddress = result.result;
+            const poolAddress = await ethCall(CL_CONTRACTS.CLFactory, encodeGetPoolCall(token0, token1, tickSpacing));
 
             // If pool address is not zero, pool exists
             return poolAddress && poolAddress !== '0x' + '0'.repeat(64);
@@ -114,27 +99,13 @@ export function useSwapV3() {
                         }],
                     });
 
-                    const response = await fetch(getRpcForQuotes(), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0',
-                            method: 'eth_call',
-                            params: [{
-                                to: CL_CONTRACTS.QuoterV2,
-                                data
-                            }, 'latest'],
-                            id: 1
-                        })
-                    });
+                    const callResult = await ethCall(CL_CONTRACTS.QuoterV2, data);
 
-                    const result = await response.json();
-
-                    if (result.result && result.result !== '0x') {
+                    if (callResult && callResult !== '0x') {
                         const decoded = decodeFunctionResult({
                             abi: QUOTER_V2_ABI,
                             functionName: 'quoteExactInputSingle',
-                            data: result.result,
+                            data: callResult as `0x${string}`,
                         }) as [bigint, bigint, number, bigint];
 
                         const amountOutWei = decoded[0];
@@ -200,27 +171,13 @@ export function useSwapV3() {
                         }],
                     });
 
-                    const response = await fetch(getRpcForQuotes(), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0',
-                            method: 'eth_call',
-                            params: [{
-                                to: CL_CONTRACTS.QuoterV2,
-                                data
-                            }, 'latest'],
-                            id: 1
-                        })
-                    });
+                    const callResult = await ethCall(CL_CONTRACTS.QuoterV2, data);
 
-                    const result = await response.json();
-
-                    if (result.result && result.result !== '0x') {
+                    if (callResult && callResult !== '0x') {
                         const decoded = decodeFunctionResult({
                             abi: QUOTER_V2_ABI,
                             functionName: 'quoteExactOutputSingle',
-                            data: result.result,
+                            data: callResult as `0x${string}`,
                         }) as [bigint, bigint, number, bigint];
 
                         const amountInWei = decoded[0];
@@ -339,7 +296,6 @@ export function useSwapV3() {
         amountIn: string,
         amountOutMin: string,
         tickSpacing: number, // Required - from quote
-        slippage: number = 0.5,
         tradeType: 'exactIn' | 'exactOut' = 'exactIn'
     ) => {
         if (!address) {
@@ -474,8 +430,7 @@ export function useSwapV3() {
         amountIn: string,
         amountOutMin: string,
         tickSpacing1Override?: number,
-        tickSpacing2Override?: number,
-        slippage: number = 0.5
+        tickSpacing2Override?: number
     ) => {
         if (!address) {
             setError('Wallet not connected');
@@ -620,7 +575,6 @@ export function useSwapV3() {
             tickSpacing2?: number;
             intermediate?: Token;
         }[],
-        slippage: number = 0.5
     ) => {
         if (!address || legs.length === 0) return null;
 
@@ -746,43 +700,3 @@ function encodeGetPoolCall(token0: string, token1: string, tickSpacing: number):
     return `0x${selector}${token0Padded}${token1Padded}${tickHex}`;
 }
 
-// Helper: Encode QuoterV2.quoteExactInputSingle call
-function encodeQuoterCall(
-    tokenIn: string,
-    tokenOut: string,
-    amountIn: bigint,
-    tickSpacing: number
-): string {
-    // Function selector for quoteExactInputSingle((address,address,uint256,int24,uint160)) - verified via cast sig
-    const selector = '9e7defe6';
-
-    // Encode tuple: (tokenIn, tokenOut, amountIn, tickSpacing, sqrtPriceLimitX96)
-    const tokenInPadded = tokenIn.slice(2).padStart(64, '0');
-    const tokenOutPadded = tokenOut.slice(2).padStart(64, '0');
-    const amountInHex = amountIn.toString(16).padStart(64, '0');
-
-    // Handle signed int24
-    let tickHex: string;
-    if (tickSpacing >= 0) {
-        tickHex = tickSpacing.toString(16).padStart(64, '0');
-    } else {
-        const uint256Value = BigInt(2) ** BigInt(256) + BigInt(tickSpacing);
-        tickHex = uint256Value.toString(16);
-    }
-
-    const sqrtPriceLimitHex = '0'.padStart(64, '0');
-
-    // Struct tuple encoding - just concatenate the fields directly after selector
-    return `0x${selector}${tokenInPadded}${tokenOutPadded}${amountInHex}${tickHex}${sqrtPriceLimitHex}`;
-}
-
-// Helper: Decode QuoterV2 result
-function decodeQuoterResult(data: string): { amountOut: bigint; sqrtPriceX96After: bigint; gasEstimate: bigint } {
-    const hex = data.slice(2);
-
-    const amountOut = BigInt('0x' + hex.slice(0, 64));
-    const sqrtPriceX96After = BigInt('0x' + hex.slice(64, 128));
-    const gasEstimate = BigInt('0x' + hex.slice(192, 256));
-
-    return { amountOut, sqrtPriceX96After, gasEstimate };
-}

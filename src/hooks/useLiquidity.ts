@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
+import { useAsyncState } from '@/hooks/useAsyncState';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
-import { V2_CONTRACTS, COMMON } from '@/config/contracts';
+import { parseUnits, Address, maxUint256 } from 'viem';
+import { V2_CONTRACTS } from '@/config/contracts';
 import { ROUTER_ABI, ERC20_ABI, POOL_FACTORY_ABI } from '@/config/abis';
 import { Token } from '@/config/tokens';
 import { getDeadline } from '@/utils/format';
@@ -12,8 +13,7 @@ import { extractErrorMessage } from '@/utils/errors';
 
 export function useLiquidity() {
     const { address, isConnected } = useAccount();
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { isLoading, setIsLoading, error, setError } = useAsyncState();
 
     const { writeContractAsync } = useWriteContract();
 

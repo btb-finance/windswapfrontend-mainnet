@@ -19,9 +19,6 @@ export const ETH: Token = {
     isNative: true,
 };
 
-// Legacy aliases — kept for code compatibility
-export const SEI = ETH;
-
 // Wrapped ETH (Base canonical WETH)
 export const WETH: Token = {
     address: '0x4200000000000000000000000000000000000006',
@@ -31,9 +28,6 @@ export const WETH: Token = {
     logoURI: '/logo/eth.svg',
 };
 
-// Legacy alias — kept for code compatibility
-export const WSEI = WETH;
-
 // WIND Protocol Token
 export const WIND: Token = {
     address: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888',
@@ -42,9 +36,6 @@ export const WIND: Token = {
     decimals: 18,
     logoURI: '/logo.png',
 };
-
-// Legacy alias — kept for code compatibility
-export const YAKA = WIND;
 
 // Stablecoins
 export const USDC: Token = {
@@ -60,9 +51,6 @@ export const USDT: Token = { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb
 export const DAI: Token = { address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 };
 export const WBTC: Token = { address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c', symbol: 'cbBTC', name: 'Coinbase Wrapped BTC', decimals: 8 };
 export const LINK: Token = { address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196', symbol: 'LINK', name: 'ChainLink Token', decimals: 18 };
-export const USDT0 = USDT;
-export const USDCN = USDC;
-export const cbBTC = WBTC;
 export const LORE: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LORE', name: 'LORE', decimals: 18 };
 export const USDVE: Token = { address: '0xbFCD661Be34C99920036F176876746b9f5B68c26', symbol: 'USDVE', name: 'USDVE', decimals: 18, logoURI: '/logo/USDVE.png' };
 export const SKI: Token = { address: '0x768BE13e1680b5ebE0024C42c896E3dB59ec0149', symbol: 'SKI', name: 'SKI', decimals: 18, logoURI: '/logo/ski.png' };
@@ -88,20 +76,14 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
 // Token addresses for quick lookup
 export const TOKEN_ADDRESSES = {
     ETH: ETH.address,
-    SEI: ETH.address,  // legacy alias
     WETH: WETH.address,
-    WSEI: WETH.address, // legacy alias
     WIND: WIND.address,
-    YAKA: WIND.address, // legacy alias
     USDC: USDC.address,
     USDT: USDT.address,
-    USDT0: USDT.address,
-    USDCN: USDC.address,
     DAI: DAI.address,
     WBTC: WBTC.address,
     LINK: LINK.address,
     LORE: LORE.address,
-    cbBTC: cbBTC.address,
     USDVE: USDVE.address,
     SKI: SKI.address,
     VIRTUAL: VIRTUAL.address,

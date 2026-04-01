@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { haptic } from '@/hooks/useHaptic';
 import { CheckIcon, ErrorIcon, WarningIcon, InfoIcon } from '@/components/common/Icons';

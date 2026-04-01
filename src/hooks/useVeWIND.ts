@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useAccount } from 'wagmi';
+import { useAsyncState } from '@/hooks/useAsyncState';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { parseUnits, Address } from 'viem';
@@ -33,8 +34,7 @@ export interface VeWINDPosition {
 
 export function useVeWIND() {
     const { address } = useAccount();
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { isLoading, setIsLoading, error, setError } = useAsyncState();
 
     // Use prefetched veNFT data from global provider instead of fetching locally
     const { veNFTs, veNFTsLoading, refetchVeNFTs } = usePoolData();

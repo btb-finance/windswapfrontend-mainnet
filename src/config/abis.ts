@@ -334,51 +334,6 @@ export const ROUTER_ABI = [
     },
 ] as const;
 
-// CL SwapRouter ABI (Slipstream)
-export const CL_SWAP_ROUTER_ABI = [
-    {
-        inputs: [
-            {
-                components: [
-                    { name: 'tokenIn', type: 'address' },
-                    { name: 'tokenOut', type: 'address' },
-                    { name: 'tickSpacing', type: 'int24' },
-                    { name: 'recipient', type: 'address' },
-                    { name: 'deadline', type: 'uint256' },
-                    { name: 'amountIn', type: 'uint256' },
-                    { name: 'amountOutMinimum', type: 'uint256' },
-                    { name: 'sqrtPriceLimitX96', type: 'uint160' },
-                ],
-                name: 'params',
-                type: 'tuple',
-            },
-        ],
-        name: 'exactInputSingle',
-        outputs: [{ name: 'amountOut', type: 'uint256' }],
-        stateMutability: 'payable',
-        type: 'function',
-    },
-    {
-        inputs: [
-            {
-                components: [
-                    { name: 'path', type: 'bytes' },
-                    { name: 'recipient', type: 'address' },
-                    { name: 'deadline', type: 'uint256' },
-                    { name: 'amountIn', type: 'uint256' },
-                    { name: 'amountOutMinimum', type: 'uint256' },
-                ],
-                name: 'params',
-                type: 'tuple',
-            },
-        ],
-        name: 'exactInput',
-        outputs: [{ name: 'amountOut', type: 'uint256' }],
-        stateMutability: 'payable',
-        type: 'function',
-    },
-] as const;
-
 // QuoterV2 ABI for getting swap quotes
 export const QUOTER_V2_ABI = [
     {

@@ -1,14 +1,14 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData, decodeFunctionResult } from 'viem';
-import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
+import { V2_CONTRACTS, COMMON } from '@/config/contracts';
 import { ROUTER_ABI, ERC20_ABI } from '@/config/abis';
 import { Token, WETH } from '@/config/tokens';
-import { getRpcForQuotes } from '@/utils/rpc';
-import { swrCache, dedupeRequest, getQuoteCacheKey } from '@/utils/cache';
+import { ethCall } from '@/utils/rpc';
+import { swrCache, getQuoteCacheKey } from '@/utils/cache';
 import { getDeadline } from '@/utils/format';
 import { extractErrorMessage } from '@/utils/errors';
 
@@ -70,24 +70,13 @@ export function useSwap() {
                             args: [amountInWei, route],
                         });
 
-                        const response = await fetch(getRpcForQuotes(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0',
-                                method: 'eth_call',
-                                params: [{ to: V2_CONTRACTS.Router, data }, 'latest'],
-                                id: 1
-                            })
-                        });
+                        const callResult = await ethCall(V2_CONTRACTS.Router, data);
 
-                        const result = await response.json();
-
-                        if (result.result && result.result !== '0x') {
+                        if (callResult && callResult !== '0x') {
                             const decoded = decodeFunctionResult({
                                 abi: ROUTER_ABI,
                                 functionName: 'getAmountsOut',
-                                data: result.result,
+                                data: callResult,
                             }) as bigint[];
 
                             const amountOutWei = decoded[decoded.length - 1];
@@ -153,24 +142,13 @@ export function useSwap() {
                             args: [amountOutWei, route],
                         });
 
-                        const response = await fetch(getRpcForQuotes(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0',
-                                method: 'eth_call',
-                                params: [{ to: V2_CONTRACTS.Router, data }, 'latest'],
-                                id: 1
-                            })
-                        });
+                        const callResult = await ethCall(V2_CONTRACTS.Router, data);
 
-                        const result = await response.json();
-
-                        if (result.result && result.result !== '0x') {
+                        if (callResult && callResult !== '0x') {
                             const decoded = decodeFunctionResult({
                                 abi: ROUTER_ABI,
                                 functionName: 'getAmountsIn',
-                                data: result.result,
+                                data: callResult,
                             }) as bigint[];
 
                             const amountInWei = decoded[0];

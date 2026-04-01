@@ -6,7 +6,7 @@ import { useWriteContract } from '@/hooks/useWriteContract';
 import { Address, parseUnits } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { usePoolData, GaugeInfo, RewardToken } from '@/providers/PoolDataProvider';
-import { VOTER_EXTENDED_ABI, VOTER_ABI, BRIBE_VOTING_REWARD_ABI, ERC20_ABI } from '@/config/abis';
+import { VOTER_ABI, BRIBE_VOTING_REWARD_ABI, ERC20_ABI } from '@/config/abis';
 import { fetchSubgraph } from '@/config/subgraph';
 import { extractErrorMessage } from '@/utils/errors';
 

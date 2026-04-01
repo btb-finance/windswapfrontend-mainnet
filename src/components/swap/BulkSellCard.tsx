@@ -1,16 +1,15 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
-import { Token, USDC, WETH } from '@/config/tokens';
+import { Token, USDC } from '@/config/tokens';
 import { useBulkSell, BulkSellLeg } from '@/hooks/useBulkSell';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { TokenSelector } from '@/components/common/TokenSelector';
 
 export function BulkSellCard() {
-    const { isConnected, address } = useAccount();
+    const { isConnected } = useAccount();
     const { success, error: showError } = useToast();
     const { getBalance } = useUserBalances();
     const { quoteAll, executeBulkSell, isQuoting, error } = useBulkSell();
