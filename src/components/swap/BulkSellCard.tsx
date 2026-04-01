@@ -13,7 +13,7 @@ export function BulkSellCard() {
     const { isConnected, address } = useAccount();
     const { success, error: showError } = useToast();
     const { getBalance } = useUserBalances();
-    const { quoteAll, approveAll, executeBulkSell, isQuoting, error } = useBulkSell();
+    const { quoteAll, executeBulkSell, isQuoting, error } = useBulkSell();
 
     const [tokenOut, setTokenOut] = useState<Token>(USDC);
     const [legs, setLegs] = useState<BulkSellLeg[]>([]);
@@ -89,15 +89,7 @@ export function BulkSellCard() {
         if (!isConnected || legs.length === 0) return;
         setIsProcessing(true);
 
-        // 1. Approve all native inputs (if needed)
-        const approved = await approveAll(legs);
-        if (!approved) {
-            setIsProcessing(false);
-            if (error) showError(error);
-            return;
-        }
-
-        // 2. Execute Bulk Sell — skip failed legs
+        // Approve + bulkSell (EIP-5792 batch or sequential fallback)
         const result = await executeBulkSell(legs.filter(l => l.status !== 'failed'), tokenOut);
         if (result) {
             success('Bulk sell submitted!');
@@ -144,15 +136,25 @@ export function BulkSellCard() {
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-4">
                     <div className="flex items-center justify-between mb-3">
                         <span className="text-xs text-gray-400">You pay (Sell)</span>
-                        <button
-                            onClick={() => setIsInputSelectorOpen(true)}
-                            className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition font-medium"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            Add Token to Sell
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {legs.length > 0 && (
+                                <button
+                                    onClick={() => legs.forEach((leg, i) => setMaxBalance(i, leg.token))}
+                                    className="text-xs font-medium px-2 py-0.5 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25 transition"
+                                >
+                                    Max All
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setIsInputSelectorOpen(true)}
+                                className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition font-medium"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Add Token to Sell
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
