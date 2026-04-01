@@ -1,8 +1,7 @@
 // Base Chain Configuration
 import { defineChain } from 'viem';
 
-// Keep "sei" export name for code compatibility with Sei frontend
-export const sei = defineChain({
+export const sei = defineChain({ // exported as "sei" for legacy code compatibility
     id: 8453,
     name: 'Base',
     nativeCurrency: {
@@ -34,5 +33,5 @@ export const sei = defineChain({
 export const base = sei;
 export const ethereum = sei;
 
-export const WSEI_ADDRESS = '0x4200000000000000000000000000000000000006';
 export const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
+export const WSEI_ADDRESS = WETH_ADDRESS; // legacy alias

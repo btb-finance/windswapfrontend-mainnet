@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { formatUnits, Address, encodeFunctionData, decodeFunctionResult, getAddress } from 'viem';
 import { useAccount } from 'wagmi';
-import { DEFAULT_TOKEN_LIST, Token, WSEI } from '@/config/tokens';
+import { DEFAULT_TOKEN_LIST, Token, WETH } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { getRpcForUserData, rpcCall } from '@/utils/rpc';
 
@@ -342,7 +342,7 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
             // Step 2: collect addresses with non-zero balance for price fetch
             const tokensWithBalance: string[] = [];
             const nativeToken = currentTokens.find(t => t.isNative);
-            if (nativeToken && nativeBalance > 0n) tokensWithBalance.push(WSEI.address);
+            if (nativeToken && nativeBalance > 0n) tokensWithBalance.push(WETH.address);
             for (const token of erc20Tokens) {
                 const bal = erc20Balances.get(token.address.toLowerCase()) ?? 0n;
                 if (bal > 0n) tokensWithBalance.push(token.address);
@@ -350,7 +350,7 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
 
             // Step 3: fetch prices only for tokens user holds
             const priceUsdMap = await fetchTokenPricesUsd(tokensWithBalance);
-            const wseiUsd = priceUsdMap.get(WSEI.address.toLowerCase()) || 0;
+            const wseiUsd = priceUsdMap.get(WETH.address.toLowerCase()) || 0;
             const newBalances = new Map<string, TokenBalance>();
 
             // Native token

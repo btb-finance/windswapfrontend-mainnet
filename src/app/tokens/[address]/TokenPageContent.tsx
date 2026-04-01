@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useTokenPage, TokenPool } from '@/hooks/useTokenPage';
-import { Token, SEI } from '@/config/tokens';
+import { Token, ETH } from '@/config/tokens';
 import { getTokenByAddress } from '@/utils/tokens';
 import { formatTVL } from '@/utils/format';
 import { SwapIcon, VoteIcon, LinkIcon, CheckIcon, SparklesIcon } from '@/components/common/Icons';
@@ -26,7 +26,7 @@ interface PoolConfig {
 
 const findTokenForUI = (addr: string): Token | undefined => {
     const token = getTokenByAddress(addr);
-    if (token?.symbol === 'WETH') return SEI;
+    if (token?.symbol === 'WETH') return ETH;
     return token || undefined;
 };
 

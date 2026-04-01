@@ -10,7 +10,7 @@ export interface Token {
 }
 
 // Native ETH
-export const SEI: Token = {
+export const ETH: Token = {
     address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
     symbol: 'ETH',
     name: 'Ethereum',
@@ -19,10 +19,11 @@ export const SEI: Token = {
     isNative: true,
 };
 
-export const ETH = SEI;
+// Legacy aliases — kept for code compatibility
+export const SEI = ETH;
 
 // Wrapped ETH (Base canonical WETH)
-export const WSEI: Token = {
+export const WETH: Token = {
     address: '0x4200000000000000000000000000000000000006',
     symbol: 'WETH',
     name: 'Wrapped Ether',
@@ -30,7 +31,8 @@ export const WSEI: Token = {
     logoURI: '/logo/eth.svg',
 };
 
-export const WETH = WSEI;
+// Legacy alias — kept for code compatibility
+export const WSEI = WETH;
 
 // WIND Protocol Token
 export const WIND: Token = {
@@ -41,6 +43,7 @@ export const WIND: Token = {
     logoURI: '/logo.png',
 };
 
+// Legacy alias — kept for code compatibility
 export const YAKA = WIND;
 
 // Stablecoins
@@ -70,8 +73,8 @@ export const VVV: Token = { address: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf
 
 // Default token list - only core tokens
 export const DEFAULT_TOKEN_LIST: Token[] = [
-    SEI,
-    WSEI,
+    ETH,
+    WETH,
     WIND,
     USDC,
     USDVE,
@@ -84,12 +87,12 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
 
 // Token addresses for quick lookup
 export const TOKEN_ADDRESSES = {
-    SEI: SEI.address,
-    ETH: SEI.address,
-    WSEI: WSEI.address,
-    WETH: WSEI.address,
+    ETH: ETH.address,
+    SEI: ETH.address,  // legacy alias
+    WETH: WETH.address,
+    WSEI: WETH.address, // legacy alias
     WIND: WIND.address,
-    YAKA: WIND.address,
+    YAKA: WIND.address, // legacy alias
     USDC: USDC.address,
     USDT: USDT.address,
     USDT0: USDT.address,

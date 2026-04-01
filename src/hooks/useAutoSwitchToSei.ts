@@ -8,7 +8,7 @@ import { sei } from '@/config/chains';
 /**
  * Hook to auto-switch to Base network when on non-special pages.
  */
-export function useAutoSwitchToSei() {
+export function useAutoSwitchToBase() {
     const { chainId, isConnected } = useAccount();
     const { switchChain } = useSwitchChain();
     const pathname = usePathname();

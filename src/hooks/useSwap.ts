@@ -6,7 +6,7 @@ import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
 import { ROUTER_ABI, ERC20_ABI } from '@/config/abis';
-import { Token, WSEI } from '@/config/tokens';
+import { Token, WETH } from '@/config/tokens';
 import { getRpcForQuotes } from '@/utils/rpc';
 import { swrCache, dedupeRequest, getQuoteCacheKey } from '@/utils/cache';
 
@@ -35,8 +35,8 @@ export function useSwap() {
             try {
                 if (!amountIn || parseFloat(amountIn) === 0) return null;
 
-                const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-                const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+                const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+                const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
                 
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
@@ -118,8 +118,8 @@ export function useSwap() {
             try {
                 if (!amountOut || parseFloat(amountOut) === 0) return null;
 
-                const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-                const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+                const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+                const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
@@ -248,17 +248,17 @@ export function useSwap() {
                     },
                 ];
 
-                // Check if tokenIn is native SEI
+                // Check if tokenIn is native ETH
                 const isNativeIn = tokenIn.isNative;
                 const isNativeOut = tokenOut.isNative;
 
                 let hash: `0x${string}`;
 
                 if (isNativeIn) {
-                    // Swap SEI for Token
+                    // Swap ETH for Token
                     const wethRoute: Route[] = [
                         {
-                            from: COMMON.WSEI as Address,
+                            from: COMMON.WETH as Address,
                             to: tokenOut.address as Address,
                             stable,
                             factory: V2_CONTRACTS.PoolFactory as Address,
@@ -283,11 +283,11 @@ export function useSwap() {
                         });
                     }
                 } else if (isNativeOut) {
-                    // Swap Token for SEI
+                    // Swap Token for ETH
                     const wethRoute: Route[] = [
                         {
                             from: tokenIn.address as Address,
-                            to: COMMON.WSEI as Address,
+                            to: COMMON.WETH as Address,
                             stable,
                             factory: V2_CONTRACTS.PoolFactory as Address,
                         },

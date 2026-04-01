@@ -67,7 +67,7 @@ export function useVeWIND() {
 
             // Try batch: approve + createLock in 1 tx
             const approveCall = encodeContractCall(
-                V2_CONTRACTS.YAKA as Address,
+                V2_CONTRACTS.WIND as Address,
                 ERC20_ABI as any,
                 'approve',
                 [V2_CONTRACTS.VotingEscrow as Address, amountWei]
@@ -86,7 +86,7 @@ export function useVeWIND() {
             } else {
                 // Sequential fallback
                 await writeContractAsync({
-                    address: V2_CONTRACTS.YAKA as Address,
+                    address: V2_CONTRACTS.WIND as Address,
                     abi: ERC20_ABI,
                     functionName: 'approve',
                     args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
@@ -125,7 +125,7 @@ export function useVeWIND() {
 
             // Try batch: approve + increaseAmount in 1 tx
             const approveCall = encodeContractCall(
-                V2_CONTRACTS.YAKA as Address,
+                V2_CONTRACTS.WIND as Address,
                 ERC20_ABI as any,
                 'approve',
                 [V2_CONTRACTS.VotingEscrow as Address, amountWei]
@@ -144,7 +144,7 @@ export function useVeWIND() {
             } else {
                 // Sequential fallback
                 await writeContractAsync({
-                    address: V2_CONTRACTS.YAKA as Address,
+                    address: V2_CONTRACTS.WIND as Address,
                     abi: ERC20_ABI,
                     functionName: 'approve',
                     args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],

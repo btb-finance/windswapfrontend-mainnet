@@ -13,7 +13,7 @@ const AddLiquidityModal = dynamic(
     () => import('@/components/pools/AddLiquidityModal').then(mod => mod.AddLiquidityModal),
     { ssr: false }
 );
-import { Token, SEI } from '@/config/tokens';
+import { Token, ETH } from '@/config/tokens';
 import { getTokenByAddress } from '@/utils/tokens';
 import { calculatePoolAPR, formatAPR } from '@/utils/aprCalculator';
 
@@ -45,12 +45,12 @@ const TOP_POOL_ADDRESSES: Record<string, boolean> = Object.fromEntries(
 
 const TOP_POOL_PRIORITY: Record<string, number> = {};
 
-// Helper to find token by address - use SEI for WSEI in UI
+// Helper to find token by address - use ETH for WETH in UI
 // Falls back to building a Token from pool data for unlisted tokens
 const findTokenForUI = (addr: string, poolToken?: { address: string; symbol: string; decimals: number; logoURI?: string }): Token | undefined => {
     const token = getTokenByAddress(addr);
-    // Show SEI for WSEI in UI for better UX
-    if (token?.symbol === 'WSEI') return SEI;
+    // Show ETH for WETH in UI for better UX
+    if (token?.symbol === 'WETH' || token?.symbol === 'WSEI') return ETH;
     if (token) return token;
     // For unlisted tokens, build a Token from pool subgraph data
     if (poolToken) {

@@ -1,7 +1,7 @@
 // Centralized token lookup utilities
-// Provides O(1) lookups and consistent handling of WSEI/SEI edge cases
+// Provides O(1) lookups and consistent handling of WETH/SEI edge cases
 
-import { Token, DEFAULT_TOKEN_LIST, SEI, WSEI } from '@/config/tokens';
+import { Token, DEFAULT_TOKEN_LIST, ETH, WETH } from '@/config/tokens';
 import { shortenAddress } from '@/utils/format';
 
 // Pre-built lookup map for O(1) lookups instead of O(n) array find
@@ -11,15 +11,15 @@ const TOKEN_MAP = new Map<string, Token>(
 
 /**
  * Get token by address with O(1) lookup
- * Handles WSEI/SEI edge cases consistently
+ * Handles WETH/SEI edge cases consistently
  */
 export function getTokenByAddress(address: string): Token | null {
     if (!address) return null;
     const lowerAddr = address.toLowerCase();
 
-    // Ensure WSEI and SEI are always found even if excluded from DEFAULT_TOKEN_LIST
-    if (lowerAddr === WSEI.address.toLowerCase()) return WSEI;
-    if (lowerAddr === SEI.address.toLowerCase()) return SEI;
+    // Ensure WETH and SEI are always found even if excluded from DEFAULT_TOKEN_LIST
+    if (lowerAddr === WETH.address.toLowerCase()) return WETH;
+    if (lowerAddr === ETH.address.toLowerCase()) return ETH;
 
     return TOKEN_MAP.get(lowerAddr) || null;
 }

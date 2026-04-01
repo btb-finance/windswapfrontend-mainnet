@@ -5,7 +5,7 @@ import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
-import { Token, WSEI } from '@/config/tokens';
+import { Token, WETH } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { SWAP_ROUTER_ABI, ERC20_ABI, QUOTER_V2_ABI } from '@/config/abis';
 import { swrCache, getQuoteCacheKey } from '@/utils/cache';
@@ -80,8 +80,8 @@ export function useSwapV3() {
     ): Promise<SwapQuoteV3 | null> => {
         if (!amountIn || parseFloat(amountIn) <= 0) return null;
 
-        const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+        const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+        const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
         // Generate cache key
         const cacheKey = getQuoteCacheKey(
@@ -166,8 +166,8 @@ export function useSwapV3() {
     ): Promise<SwapQuoteV3 | null> => {
         if (!amountOut || parseFloat(amountOut) <= 0) return null;
 
-        const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+        const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+        const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
         // Generate cache key
         const cacheKey = getQuoteCacheKey(
@@ -349,8 +349,8 @@ export function useSwapV3() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
             // For exactIn: amountIn is exact, amountOutMin is minimum output
             // For exactOut: amountOutMin param is exact output, amountIn param is maximum input
@@ -365,7 +365,7 @@ export function useSwapV3() {
             let hash: `0x${string}`;
 
             if (tokenOut.isNative) {
-                // Swapping to native SEI - need to unwrap WSEI
+                // Swapping to native SEI - need to unwrap WETH
                 // Use multicall: swap to router, then unwrap and send to user
                 let swapData;
 
@@ -377,7 +377,7 @@ export function useSwapV3() {
                             tokenIn: actualTokenIn.address as Address,
                             tokenOut: actualTokenOut.address as Address,
                             tickSpacing,
-                            recipient: CL_CONTRACTS.SwapRouter as Address, // Send WSEI to router first
+                            recipient: CL_CONTRACTS.SwapRouter as Address, // Send WETH to router first
                             deadline,
                             amountOut: amountOutWei,
                             amountInMaximum: amountInWei,
@@ -392,7 +392,7 @@ export function useSwapV3() {
                             tokenIn: actualTokenIn.address as Address,
                             tokenOut: actualTokenOut.address as Address,
                             tickSpacing,
-                            recipient: CL_CONTRACTS.SwapRouter as Address, // Send WSEI to router first
+                            recipient: CL_CONTRACTS.SwapRouter as Address, // Send WETH to router first
                             deadline,
                             amountIn: amountInWei,
                             amountOutMinimum: amountOutWei,
@@ -484,9 +484,9 @@ export function useSwapV3() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-            const actualIntermediate = intermediate.isNative ? WSEI : intermediate;
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+            const actualIntermediate = intermediate.isNative ? WETH : intermediate;
+            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
             const amountInWei = parseUnits(amountIn, actualTokenIn.decimals);
 
@@ -551,14 +551,14 @@ export function useSwapV3() {
             let hash: `0x${string}`;
 
             if (tokenOut.isNative) {
-                // Swapping to native SEI - need to unwrap WSEI
+                // Swapping to native SEI - need to unwrap WETH
                 // Use multicall: swap to router, then unwrap and send to user
                 const swapData = encodeFunctionData({
                     abi: SWAP_ROUTER_ABI,
                     functionName: 'exactInput',
                     args: [{
                         path: path as `0x${string}`,
-                        recipient: CL_CONTRACTS.SwapRouter as Address, // Send WSEI to router first
+                        recipient: CL_CONTRACTS.SwapRouter as Address, // Send WETH to router first
                         deadline,
                         amountIn: amountInWei,
                         amountOutMinimum,
@@ -626,8 +626,8 @@ export function useSwapV3() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
             const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
 
             const swapCalls: `0x${string}`[] = [];
@@ -657,7 +657,7 @@ export function useSwapV3() {
                         }],
                     }));
                 } else if (leg.routeType === 'multi-hop' && leg.intermediate) {
-                    const actualIntermediate = leg.intermediate.isNative ? WSEI : leg.intermediate;
+                    const actualIntermediate = leg.intermediate.isNative ? WETH : leg.intermediate;
                     const encodeTS = (ts: number) => {
                         return ts >= 0 ? ts.toString(16).padStart(6, '0') : ((1 << 24) + ts).toString(16);
                     };

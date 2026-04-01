@@ -7,7 +7,7 @@
 export const V2_CONTRACTS = {
     // Protocol Token (WIND)
     WIND: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888',
-    YAKA: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888', // Legacy alias
+    YAKA: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888', // legacy alias for WIND
 
     // Core Voting Escrow
     VotingEscrow: '0x88889C4Be508cA88eba6ad802340C0563891D426',
@@ -97,8 +97,8 @@ export const CL_CONTRACTS = {
 // ============================================
 export const COMMON = {
     // Wrapped ETH (canonical WETH on Base)
-    WSEI: '0x4200000000000000000000000000000000000006',
     WETH: '0x4200000000000000000000000000000000000006',
+    WSEI: '0x4200000000000000000000000000000000000006', // legacy alias for WETH
 
     ZERO_ADDRESS: '0x0000000000000000000000000000000000000000',
 } as const;
@@ -110,7 +110,7 @@ export const COMMON = {
 export const NOTABLE_POOLS = {} as const;
 export const NOTABLE_GAUGES = {} as const;
 
-// Stub for LORE mining (Sei-only)
+// LORE mining contracts (stubs — not deployed on Base)
 export const LORE_MINING_CONTRACTS = {
     LOREmining: '0x0000000000000000000000000000000000000000',
     BondingCurve: '0x0000000000000000000000000000000000000000',

@@ -6,7 +6,7 @@ import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address } from 'viem';
 import { V2_CONTRACTS, COMMON } from '@/config/contracts';
 import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
-import { Token, WSEI } from '@/config/tokens';
+import { Token, WETH } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
 
 export interface BulkSwapLeg {
@@ -43,7 +43,7 @@ export function useBulkSwap() {
             setIsQuoting(true);
             setError(null);
 
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
             const totalWei = parseUnits(amountIn, tokenIn.decimals);
 
             // Calculate exact wei per leg to avoid rounding dust missing/exceeding totalWei
@@ -64,7 +64,7 @@ export function useBulkSwap() {
                             return { ...leg, status: 'failed', estimatedOut: '0' };
                         }
 
-                        const actualTokenOut = leg.token.isNative ? WSEI : leg.token;
+                        const actualTokenOut = leg.token.isNative ? WETH : leg.token;
                         const quote = await getKyberQuote(
                             actualTokenIn.address,
                             actualTokenOut.address,
@@ -118,7 +118,7 @@ export function useBulkSwap() {
             setError(null);
 
             try {
-                const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+                const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
                 const totalWei = parseUnits(amountIn, tokenIn.decimals);
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
@@ -136,7 +136,7 @@ export function useBulkSwap() {
                 const orders = await Promise.all(
                     legs.map(async (leg, index) => {
                         const legAmountWei = legAmountsWei[index];
-                        const actualTokenOut = leg.token.isNative ? WSEI : leg.token;
+                        const actualTokenOut = leg.token.isNative ? WETH : leg.token;
 
                         // Build calldata — sender & recipient = proxy contract
                         const swapData = await getKyberSwapData(

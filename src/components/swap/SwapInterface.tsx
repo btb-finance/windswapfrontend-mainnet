@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData } from 'viem';
-import { Token, SEI, USDC, WSEI, LORE } from '@/config/tokens';
+import { Token, ETH, USDC, WETH, LORE } from '@/config/tokens';
 import { LoreBondingCurveSwap } from './LoreBondingCurveSwap';
 import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
 import { ROUTER_ABI, ERC20_ABI, SWAP_ROUTER_ABI, WETH_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
@@ -74,7 +74,7 @@ function isLoreToken(t?: Token): boolean {
 
 // Public entry point — owns tokenIn/tokenOut routing state, no other hooks
 export function SwapInterface({ initialTokenIn, initialTokenOut, onTokenPairChange }: SwapInterfaceProps) {
-    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
+    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || ETH);
     const [tokenOut, setTokenOut] = useState<Token | undefined>(initialTokenOut || USDC);
 
     const handleTokenInChange = useCallback((t: Token) => {
@@ -105,7 +105,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { success, error: showError } = useToast();
 
     // Token state — local copy; changes bubble up via callbacks so parent can re-route to bonding curve
-    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
+    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || ETH);
     const [tokenOut, setTokenOut] = useState<Token | undefined>(initialTokenOut || USDC);
 
     const handleSetTokenIn = useCallback((t: Token) => {
@@ -158,9 +158,9 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const isLoading = isLoadingV2 || isLoadingV3 || isBatching || isSwappingWowmax;
     const hookError = errorV2 || errorV3;
 
-    // Get actual token addresses (use WSEI for native SEI)
-    const actualTokenIn = tokenIn?.isNative ? WSEI : tokenIn;
-    const actualTokenOut = tokenOut?.isNative ? WSEI : tokenOut;
+    // Get actual token addresses (use WETH for native SEI)
+    const actualTokenIn = tokenIn?.isNative ? WETH : tokenIn;
+    const actualTokenOut = tokenOut?.isNative ? WETH : tokenOut;
 
     // Calculate amountInWei for allowance check
     const amountInWei = actualTokenIn && amountIn && parseFloat(amountIn) > 0
@@ -271,8 +271,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             if (bestRoute.type === 'v2') {
                 // V2 swap
                 const route = [{
-                    from: (tokenIn?.isNative ? COMMON.WSEI : actualTokenIn.address) as Address,
-                    to: (tokenOut?.isNative ? COMMON.WSEI : actualTokenOut.address) as Address,
+                    from: (tokenIn?.isNative ? COMMON.WETH : actualTokenIn.address) as Address,
+                    to: (tokenOut?.isNative ? COMMON.WETH : actualTokenOut.address) as Address,
                     stable: bestRoute.stable || false,
                     factory: V2_CONTRACTS.PoolFactory as Address,
                 }];
@@ -471,10 +471,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             try {
                 const routes: BestRoute[] = [];
 
-                // === Check for direct wrap/unwrap (WSEI <-> SEI) ===
+                // === Check for direct wrap/unwrap (WETH <-> SEI) ===
                 // Use address comparison for reliability (isNative may not always be preserved)
-                const seiAddress = SEI.address.toLowerCase();
-                const wseiAddress = WSEI.address.toLowerCase();
+                const seiAddress = ETH.address.toLowerCase();
+                const wseiAddress = WETH.address.toLowerCase();
                 const tokenInAddr = tokenIn.address.toLowerCase();
                 const tokenOutAddr = tokenOut.address.toLowerCase();
 
@@ -766,18 +766,18 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 let hash: `0x${string}`;
 
                 if (bestRoute.isWrap) {
-                    // Wrap: SEI -> WSEI (deposit)
+                    // Wrap: SEI -> WETH (deposit)
                     hash = await writeContractAsync({
-                        address: WSEI.address as Address,
+                        address: WETH.address as Address,
                         abi: WETH_ABI,
                         functionName: 'deposit',
                         args: [],
                         value: amountWei,
                     });
                 } else {
-                    // Unwrap: WSEI -> SEI (withdraw)
+                    // Unwrap: WETH -> SEI (withdraw)
                     hash = await writeContractAsync({
-                        address: WSEI.address as Address,
+                        address: WETH.address as Address,
                         abi: WETH_ABI,
                         functionName: 'withdraw',
                         args: [amountWei],

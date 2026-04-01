@@ -6,7 +6,7 @@ import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { formatUnits, parseUnits, Address } from 'viem';
-import { Token, DEFAULT_TOKEN_LIST, SEI, WSEI, USDC, USDT0 } from '@/config/tokens';
+import { Token, DEFAULT_TOKEN_LIST, ETH, WETH, USDC, USDT0 } from '@/config/tokens';
 import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
 import { TokenSelector } from '@/components/common/TokenSelector';
 import { useLiquidity } from '@/hooks/useLiquidity';
@@ -90,7 +90,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const [poolType, setPoolType] = useState<PoolType>(initialPool?.poolType || 'v2');
 
     // Token state
-    const [tokenA, setTokenA] = useState<Token | undefined>(initialPool?.token0 || SEI);
+    const [tokenA, setTokenA] = useState<Token | undefined>(initialPool?.token0 || ETH);
     const [tokenB, setTokenB] = useState<Token | undefined>(initialPool?.token1 || USDC);
     const [amountA, setAmountA] = useState('');
     const [amountB, setAmountB] = useState('');
@@ -151,8 +151,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const getPoolGauge = useCallback(() => {
         if (!tokenA || !tokenB || poolType !== 'cl') return null;
 
-        const actualTokenA = tokenA.isNative ? WSEI : tokenA;
-        const actualTokenB = tokenB.isNative ? WSEI : tokenB;
+        const actualTokenA = tokenA.isNative ? WETH : tokenA;
+        const actualTokenB = tokenB.isNative ? WETH : tokenB;
 
         // Find matching gauge by tokens and tick spacing
         const gauge = GAUGE_LIST.find(g => {
@@ -225,8 +225,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                 return;
             }
 
-            const actualTokenA = tokenA.isNative ? WSEI : tokenA;
-            const actualTokenB = tokenB.isNative ? WSEI : tokenB;
+            const actualTokenA = tokenA.isNative ? WETH : tokenA;
+            const actualTokenB = tokenB.isNative ? WETH : tokenB;
 
             const [token0, token1] = actualTokenA.address.toLowerCase() < actualTokenB.address.toLowerCase()
                 ? [actualTokenA, actualTokenB]
@@ -333,8 +333,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const isSingleSided = isRangeAboveCurrent || isRangeBelowCurrent;
 
     // Determine which token is token0 and token1 (for correct single-sided logic)
-    const actualTokenA = tokenA?.isNative ? WSEI : tokenA;
-    const actualTokenB = tokenB?.isNative ? WSEI : tokenB;
+    const actualTokenA = tokenA?.isNative ? WETH : tokenA;
+    const actualTokenB = tokenB?.isNative ? WETH : tokenB;
     const isAToken0 = actualTokenA && actualTokenB ?
         actualTokenA.address.toLowerCase() < actualTokenB.address.toLowerCase() : true;
 
@@ -562,8 +562,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
         setTxError(null);
 
         try {
-            const actualTokenA = tokenA.isNative ? WSEI : tokenA;
-            const actualTokenB = tokenB.isNative ? WSEI : tokenB;
+            const actualTokenA = tokenA.isNative ? WETH : tokenA;
+            const actualTokenB = tokenB.isNative ? WETH : tokenB;
 
             const isAFirst = actualTokenA.address.toLowerCase() < actualTokenB.address.toLowerCase();
             const token0 = isAFirst ? actualTokenA : actualTokenB;
@@ -693,10 +693,10 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
             };
 
             // Determine which tokens need approval
-            const token0IsNative = (tokenA.isNative && token0.address.toLowerCase() === WSEI.address.toLowerCase()) ||
-                (tokenB.isNative && token0.address.toLowerCase() === WSEI.address.toLowerCase());
-            const token1IsNative = (tokenA.isNative && token1.address.toLowerCase() === WSEI.address.toLowerCase()) ||
-                (tokenB.isNative && token1.address.toLowerCase() === WSEI.address.toLowerCase());
+            const token0IsNative = (tokenA.isNative && token0.address.toLowerCase() === WETH.address.toLowerCase()) ||
+                (tokenB.isNative && token0.address.toLowerCase() === WETH.address.toLowerCase());
+            const token1IsNative = (tokenA.isNative && token1.address.toLowerCase() === WETH.address.toLowerCase()) ||
+                (tokenB.isNative && token1.address.toLowerCase() === WETH.address.toLowerCase());
 
             const needsToken0Approval = !token0IsNative && !(await checkAllowance(token0.address, amount0Wei));
             const needsToken1Approval = !token1IsNative && !(await checkAllowance(token1.address, amount1Wei));
@@ -704,9 +704,9 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
             // Calculate native value - simple check for native tokens
             let nativeValue = BigInt(0);
             if (tokenA.isNative || tokenB.isNative) {
-                if (token0.address.toLowerCase() === WSEI.address.toLowerCase()) {
+                if (token0.address.toLowerCase() === WETH.address.toLowerCase()) {
                     nativeValue = amount0Wei;
-                } else if (token1.address.toLowerCase() === WSEI.address.toLowerCase()) {
+                } else if (token1.address.toLowerCase() === WETH.address.toLowerCase()) {
                     nativeValue = amount1Wei;
                 }
             }
@@ -1561,8 +1561,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                             {/* Single-Sided LP Presets */}
                                             {currentPrice && tokenA && tokenB && (() => {
                                                 // Determine sorted token order for correct labeling
-                                                const actualTokenA = tokenA.isNative ? WSEI : tokenA;
-                                                const actualTokenB = tokenB.isNative ? WSEI : tokenB;
+                                                const actualTokenA = tokenA.isNative ? WETH : tokenA;
+                                                const actualTokenB = tokenB.isNative ? WETH : tokenB;
                                                 const isAToken0 = actualTokenA.address.toLowerCase() < actualTokenB.address.toLowerCase();
                                                 // CORRECT Uniswap V3 CL Math:
                                                 // When range is ABOVE current: deposit token0 (lower sorted address)
@@ -2136,8 +2136,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                             e.preventDefault();
                                             if (!tokenA || !tokenB || !currentPrice) return;
 
-                                            const actualTokenA = tokenA.isNative ? WSEI : tokenA;
-                                            const actualTokenB = tokenB.isNative ? WSEI : tokenB;
+                                            const actualTokenA = tokenA.isNative ? WETH : tokenA;
+                                            const actualTokenB = tokenB.isNative ? WETH : tokenB;
                                             const isAToken0 = actualTokenA.address.toLowerCase() < actualTokenB.address.toLowerCase();
 
                                             const poolPrice = isAToken0 ? currentPrice : 1 / currentPrice;

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
-import { Token, SEI, LORE } from '@/config/tokens';
+import { Token, ETH, LORE } from '@/config/tokens';
 import { sei } from '@/config/chains';
 import { useTokenBalance } from '@/hooks/useToken';
 import { TokenInput } from './TokenInput';
@@ -68,7 +68,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
     const [loreAmount, setLoreAmount] = useState('');
     const [drivingField, setDrivingField] = useState<'sei' | 'lore'>('sei');
 
-    const { raw: rawSeiBalance, formatted: formattedSeiBalance } = useTokenBalance(SEI);
+    const { raw: rawEthBalance, formatted: formattedEthBalance } = useTokenBalance(ETH);
     const { raw: rawLoreBalance, formatted: formattedLoreBalance } = useTokenBalance(LORE);
 
     // Market info — drives both the buy quote and display stats
@@ -219,13 +219,13 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             : (loreWei !== undefined && loreWei > BigInt(0))
     );
 
-    const tokenIn  = isBuying ? SEI  : LORE;
-    const tokenOut = isBuying ? LORE : SEI;
+    const tokenIn  = isBuying ? ETH  : LORE;
+    const tokenOut = isBuying ? LORE : ETH;
     const amountIn  = isBuying ? seiAmount  : loreAmount;
     const amountOut = isBuying ? loreAmount : seiAmount;
-    const balanceIn    = isBuying ? formattedSeiBalance  : formattedLoreBalance;
-    const rawBalanceIn = isBuying ? rawSeiBalance        : rawLoreBalance;
-    const balanceOut   = isBuying ? formattedLoreBalance : formattedSeiBalance;
+    const balanceIn    = isBuying ? formattedEthBalance  : formattedLoreBalance;
+    const rawBalanceIn = isBuying ? rawEthBalance        : rawLoreBalance;
+    const balanceOut   = isBuying ? formattedLoreBalance : formattedEthBalance;
 
     return (
         <div className="swap-card max-w-md mx-auto">
@@ -307,22 +307,22 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
                             <span className="text-gray-400">
                                 {isBuying && seiWei ? 'Execution price' : 'Current price'}
                             </span>
-                            <span>1 LORE = {priceFormatted} SEI</span>
+                            <span>1 LORE = {priceFormatted} ETH</span>
                         </div>
                     )}
                     {feeAmount && parseFloat(feeAmount) > 0 && (
                         <div className="flex justify-between">
                             <span className="text-gray-400">Fee ({feePercent}%)</span>
                             <span className="text-foreground/70">
-                                {parseFloat(feeAmount).toFixed(6)} {isBuying ? 'SEI' : 'SEI'}
+                                {parseFloat(feeAmount).toFixed(6)} {isBuying ? 'ETH' : 'ETH'}
                             </span>
                         </div>
                     )}
                     {marketInfo && (
                         <>
                             <div className="flex justify-between">
-                                <span className="text-gray-400">SEI Backing</span>
-                                <span>{Number(formatEther(marketInfo[2])).toLocaleString(undefined, { maximumFractionDigits: 2 })} SEI</span>
+                                <span className="text-gray-400">ETH Backing</span>
+                                <span>{Number(formatEther(marketInfo[2])).toLocaleString(undefined, { maximumFractionDigits: 2 })} ETH</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-gray-400">Circulating Supply</span>

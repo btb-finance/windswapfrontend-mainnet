@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
-import { Token, USDC, WSEI } from '@/config/tokens';
+import { Token, USDC, WETH } from '@/config/tokens';
 import { useBulkSell, BulkSellLeg } from '@/hooks/useBulkSell';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { useToast } from '@/providers/ToastProvider';

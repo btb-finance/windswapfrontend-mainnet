@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { useSearchParams } from 'next/navigation';
-import { Token, SEI, USDC, DEFAULT_TOKEN_LIST } from '@/config/tokens';
+import { Token, ETH, USDC, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useBulkSwap, BulkSwapLeg } from '@/hooks/useBulkSwap';
 import { useTokenBalance } from '@/hooks/useToken';
 import { useToast } from '@/providers/ToastProvider';
@@ -49,7 +49,7 @@ export function BulkSwapCard() {
     const { quoteAll, executeBulkSwap, isQuoting, isExecuting, error } = useBulkSwap();
     const searchParams = useSearchParams();
 
-    const [tokenIn, setTokenIn] = useState<Token>(SEI);
+    const [tokenIn, setTokenIn] = useState<Token>(ETH);
     const [amountIn, setAmountIn] = useState('');
     const [legs, setLegs] = useState<BulkSwapLeg[]>([]);
     const [shareCopied, setShareCopied] = useState(false);

@@ -758,7 +758,7 @@ export const SWAP_ROUTER_ABI = [
         stateMutability: 'payable',
         type: 'function',
     },
-    // Unwrap WSEI to native SEI
+    // Unwrap WETH to native ETH
     {
         inputs: [
             { name: 'amountMinimum', type: 'uint256' },
@@ -1813,7 +1813,7 @@ export const STABLECOIN_ZAP_ABI = [
 ] as const;
 
 // ============================================
-// LOREBondingCurve ABI (Sei Mainnet)
+// LOREBondingCurve ABI (Base)
 // ============================================
 export const LORE_BONDING_CURVE_ABI = [
     {
@@ -1923,7 +1923,7 @@ export const LORE_BONDING_CURVE_ABI = [
 ] as const;
 
 // ============================================
-// LOREmining ABI (Sei Mainnet)
+// LOREmining ABI (Base)
 // ============================================
 export const LORE_MINING_ABI = [
     // View functions

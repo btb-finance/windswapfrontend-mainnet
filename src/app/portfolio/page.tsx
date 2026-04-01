@@ -9,7 +9,8 @@ import { Address, formatUnits, createPublicClient, http, encodeFunctionData } fr
 import { base } from 'viem/chains';
 import Link from 'next/link';
 import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
-import { WSEI, Token } from '@/config/tokens';
+import { WETH, Token } from '@/config/tokens';
+const WSEI = WETH; // local alias for WETH address comparisons
 import { getTokenLogo as getTokenLogoUtil, getTokenDisplayInfo } from '@/utils/tokens';
 import { formatPrice } from '@/utils/format';
 import { useCLPositions, useV2Positions } from '@/hooks/usePositions';
@@ -440,7 +441,7 @@ export default function PortfolioPage() {
 
                 console.log('Balance responses:', bal0Response, bal1Response);
 
-                // For WSEI, fetch native SEI balance instead
+                // For WETH, fetch native ETH balance instead
                 if (isToken0WSEI) {
                     const nativeBal = await fetch(getRpcForPoolData(), {
                         method: 'POST',
@@ -2842,7 +2843,7 @@ export default function PortfolioPage() {
                                     <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs text-gray-400">
-                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? 'SEI' : getTokenInfo(selectedPosition.token0).symbol}
+                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token0).symbol}
                                             </label>
                                             <span className="text-[10px] text-gray-400">
                                                 Bal: {balance0}
@@ -2888,7 +2889,7 @@ export default function PortfolioPage() {
                                     <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs text-gray-400">
-                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'SEI' : getTokenInfo(selectedPosition.token1).symbol} (auto)
+                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token1).symbol} (auto)
                                             </label>
                                             <span className="text-[10px] text-gray-400">
                                                 Bal: {balance1}

@@ -28,7 +28,7 @@ export default function GettingStartedGuide() {
             <div className="bg-gray-800 rounded-lg p-5 space-y-3">
               <ActionItem
                 title="Buy on DEX"
-                description="Purchase WIND from Wind Swap or other DEXs on Sei Network"
+                description="Purchase WIND from Wind Swap or other DEXs on Base"
               />
               <ActionItem
                 title="Earn from Liquidity"

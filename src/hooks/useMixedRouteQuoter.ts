@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from 'react';
 import { parseUnits, formatUnits } from 'viem';
-import { Token, WSEI, USDC, WIND } from '@/config/tokens';
+import { Token, WETH, USDC, WIND } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { getRpcForQuotes } from '@/utils/rpc';
 
 // Common intermediate tokens for routing
-const INTERMEDIATE_TOKENS = [WSEI, USDC, WIND];
+const INTERMEDIATE_TOKENS = [WETH, USDC, WIND];
 
 // CL tick spacings from CLFactory contract
 const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
@@ -142,8 +142,8 @@ export function useMixedRouteQuoter() {
         tokenOut: Token,
         amountInWei: bigint,
     ): BatchQuoteRequest[] => {
-        const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+        const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+        const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
         const requests: BatchQuoteRequest[] = [];
 
         // Direct routes
@@ -160,7 +160,7 @@ export function useMixedRouteQuoter() {
 
         // Multi-hop routes
         for (const intermediate of INTERMEDIATE_TOKENS) {
-            const actualIntermediate = intermediate.isNative ? WSEI : intermediate;
+            const actualIntermediate = intermediate.isNative ? WETH : intermediate;
             if (actualIntermediate.address.toLowerCase() === actualTokenIn.address.toLowerCase() ||
                 actualIntermediate.address.toLowerCase() === actualTokenOut.address.toLowerCase()) continue;
 
@@ -205,7 +205,7 @@ export function useMixedRouteQuoter() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
             const fullAmountWei = parseUnits(amountIn, actualTokenIn.decimals);
 
             // === BATCH 1: All routes at full amount ===
@@ -384,8 +384,8 @@ export function useMixedRouteQuoter() {
         tokenOut: Token,
     ): Promise<number | null> => {
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
             // If one side IS USDC, we only need one quote
             const isTokenInUSDC = actualTokenIn.address.toLowerCase() === USDC.address.toLowerCase();

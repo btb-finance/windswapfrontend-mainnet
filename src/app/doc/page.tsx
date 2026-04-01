@@ -55,7 +55,7 @@ export default function DocPage() {
           <Section id="overview" title="Protocol Overview">
             <ContentBlock>
               <p className="text-gray-300 mb-4">
-                Wind Swap is a decentralized exchange (DEX) protocol on Sei Network, featuring two distinct AMM implementations:
+                Wind Swap is a decentralized exchange (DEX) protocol on Base, featuring two distinct AMM implementations:
               </p>
               <div className="grid md:grid-cols-2 gap-6 mb-6">
                 <FeatureCard

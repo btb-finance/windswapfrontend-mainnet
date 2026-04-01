@@ -6,7 +6,7 @@ import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
-import { Token, WSEI } from '@/config/tokens';
+import { Token, WETH } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
 
 export interface BulkSellLeg {
@@ -41,7 +41,7 @@ export function useBulkSell() {
             setIsQuoting(true);
             setError(null);
 
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
 
             const results = await Promise.all(
                 legs.map(async (leg): Promise<BulkSellLeg> => {
@@ -50,7 +50,7 @@ export function useBulkSell() {
                             return { ...leg, status: 'idle', estimatedOut: undefined, routeSummary: undefined };
                         }
 
-                        const actualTokenIn = leg.token.isNative ? WSEI : leg.token;
+                        const actualTokenIn = leg.token.isNative ? WETH : leg.token;
                         const legAmountWei = parseUnits(leg.amountIn, leg.token.decimals);
 
                         const quote = await getKyberQuote(
