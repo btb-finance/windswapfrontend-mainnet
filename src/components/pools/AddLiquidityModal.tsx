@@ -3,29 +3,26 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
-import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { formatUnits, parseUnits, Address } from 'viem';
-import { Token, DEFAULT_TOKEN_LIST, ETH, WETH, USDC } from '@/config/tokens';
+import { Token, ETH, WETH, USDC } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { TokenSelector } from '@/components/common/TokenSelector';
 import { useLiquidity } from '@/hooks/useLiquidity';
-import { useTokenBalance, useTokenAllowance, truncateToDecimals, bigIntPercentage } from '@/hooks/useToken';
-import { NFT_POSITION_MANAGER_ABI, ERC20_ABI } from '@/config/abis';
-import { getRpcForPoolData, getRpcForUserData } from '@/utils/rpc';
+import { useTokenBalance, bigIntPercentage } from '@/hooks/useToken';
+import { NFT_POSITION_MANAGER_ABI } from '@/config/abis';
+import { getRpcForPoolData } from '@/utils/rpc';
 import { usePoolData } from '@/providers/PoolDataProvider';
 import { calculatePoolAPR, formatAPR } from '@/utils/aprCalculator';
 import { GAUGE_LIST } from '@/config/gauges';
-import { isStablecoinPair, tickToStablecoinPrice } from '@/config/stablecoinTicks';
+import { isStablecoinPair } from '@/config/stablecoinTicks';
 import { useToast } from '@/providers/ToastProvider';
-import { haptic } from '@/hooks/useHaptic';
 import {
     calculateOptimalAmounts,
     getRequiredTokens,
     priceToTick,
     tickToPrice,
     MAX_TICK,
-    MIN_TICK
 } from '@/utils/liquidityMath';
 import { useTickLensData } from '@/hooks/useTickLensData';
 import { getDeadline } from '@/utils/format';
@@ -116,9 +113,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const { addLiquidity, isLoading, error } = useLiquidity();
     const { raw: rawBalanceA, rawBigInt: rawBigIntA, formatted: balanceA } = useTokenBalance(tokenA);
     const { raw: rawBalanceB, rawBigInt: rawBigIntB, formatted: balanceB } = useTokenBalance(tokenB);
-    const { writeContractAsync } = useWriteContract();
     const { batchOrSequential, encodeContractCall, buildApproveCallIfNeeded } = useBatchTransactions();
-    const { poolRewards, windPrice, seiPrice, allPools } = usePoolData();
+    const { poolRewards, windPrice, allPools } = usePoolData();
     const toast = useToast();
 
     // Find gauge for current pool configuration
@@ -304,7 +300,6 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     // For single-sided LP, determine which side
     const isRangeAboveCurrent = currentPrice !== null && pLower > 0 && currentPrice <= pLower;
     const isRangeBelowCurrent = currentPrice !== null && pUpper > 0 && pUpper !== Infinity && currentPrice >= pUpper;
-    const isSingleSided = isRangeAboveCurrent || isRangeBelowCurrent;
 
     // Determine which token is token0 and token1 (for correct single-sided logic)
     const actualTokenA = tokenA?.isNative ? WETH : tokenA;
