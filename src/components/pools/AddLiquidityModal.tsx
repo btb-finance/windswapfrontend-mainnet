@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { formatUnits, parseUnits, Address } from 'viem';
@@ -847,14 +846,11 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
 
     return (
         <>
-            <AnimatePresence>
+            <>
                 {isOpen && (
-                    <motion.div
+                    <div
                         key="modal-backdrop"
-                        className={mobileStyles.overlay}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                        className={`${mobileStyles.overlay} animate-fade-in`}
                     >
                         {/* Backdrop */}
                         <div
@@ -863,13 +859,9 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                         />
 
                         {/* Modal - Bottom sheet on mobile, centered on desktop */}
-                        <motion.div
+                        <div
                             key="modal-content"
-                            className={mobileStyles.modal}
-                            initial={{ opacity: 0, y: 100 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 100 }}
-                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className={`${mobileStyles.modal} animate-slide-up`}
                         >
                             {/* Sticky Header */}
                             <div className={mobileStyles.header}>
@@ -1693,28 +1685,26 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                         // If invalid, show the auto-fix button instead of disabling
                                         if (invalidSingleSidedRange) {
                                             return (
-                                                <motion.button
+                                                <button
                                                     onClick={handleAutoFixRange}
                                                     className="w-full py-4 rounded-2xl font-bold text-lg transition-all shadow-xl bg-orange-500/20 text-orange-400 border border-orange-500/50 hover:bg-orange-500/30 active:scale-[0.98]"
-                                                    whileTap={{ scale: 0.98 }}
                                                 >
                                                     <div className="flex flex-col items-center">
                                                         <span>Auto-Fix Single-Sided Range</span>
                                                         <span className="text-xs font-normal opacity-80 mt-0.5">Shifts range to nearest valid tick</span>
                                                     </div>
-                                                </motion.button>
+                                                </button>
                                             );
                                         }
 
                                         return (
-                                            <motion.button
+                                            <button
                                                 onClick={poolType === 'cl' ? handleAddCLLiquidity : handleAddLiquidity}
                                                 disabled={!canAdd || isLoading || isCLInProgress}
                                                 className={`w-full py-4 rounded-2xl font-bold text-lg transition-all shadow-xl ${canAdd && !isLoading && !isCLInProgress
                                                     ? 'bg-gradient-to-r from-primary via-purple-500 to-secondary text-white shadow-primary/30 hover:shadow-2xl hover:shadow-primary/40 active:scale-[0.98]'
                                                     : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                                                     }`}
-                                                whileTap={canAdd ? { scale: 0.98 } : {}}
                                             >
                                                 {isLoading || isCLInProgress ? (
                                                     <span className="flex items-center justify-center gap-3">
@@ -1733,15 +1723,15 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 ) : (
                                                     <>Add Liquidity</>
                                                 )}
-                                            </motion.button>
+                                            </button>
                                         );
                                     })()}
 
                             </div>
-                        </motion.div>
-                    </motion.div>
+                        </div>
+                    </div>
                 )}
-            </AnimatePresence>
+            </>
 
             {/* Token Selector */}
             <TokenSelector

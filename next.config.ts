@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   compress: true,
   experimental: {
     optimizePackageImports: [
-      'framer-motion',
       'viem',
       'wagmi',
       '@rainbow-me/rainbowkit',

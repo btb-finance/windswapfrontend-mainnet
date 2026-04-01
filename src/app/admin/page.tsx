@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { Address } from 'viem';
@@ -390,18 +389,14 @@ export default function AdminPage() {
     return (
         <div className="container mx-auto px-6 py-8">
             {/* Header */}
-            <motion.div
-                className="text-center mb-12"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div className="text-center mb-12 animate-fade-up">
                 <h1 className="text-4xl font-bold mb-4">
                     <span className="gradient-text">Admin Dashboard</span>
                 </h1>
                 <p className="text-gray-400 max-w-2xl mx-auto">
                     Protocol administration for WIND Finance. Whitelist tokens, create gauges, and manage factories.
                 </p>
-            </motion.div>
+            </div>
 
             {/* Connection Check */}
             {!isConnected ? (
@@ -475,7 +470,7 @@ export default function AdminPage() {
 
                     {/* Tokens Tab */}
                     {activeTab === 'tokens' && (
-                        <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <div className="space-y-6 animate-fade-in">
                             {/* Whitelist Token */}
                             <div className="glass-card p-6">
                                 <h3 className="text-lg font-semibold mb-4">Whitelist Token</h3>
@@ -574,12 +569,12 @@ export default function AdminPage() {
                                     </button>
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
                     )}
 
                     {/* Gauges Tab */}
                     {activeTab === 'gauges' && (
-                        <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <div className="space-y-6 animate-fade-in">
                             {/* Factory Approval Status */}
                             <div className="glass-card p-4">
                                 <h3 className="font-semibold mb-3">Factory Approval Status</h3>
@@ -716,12 +711,12 @@ export default function AdminPage() {
                                     </button>
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
                     )}
 
                     {/* Factories Tab */}
                     {activeTab === 'factories' && (
-                        <motion.div className="glass-card p-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <div className="glass-card p-6 animate-fade-in">
                             <h3 className="text-lg font-semibold mb-4">Approve Factory Set</h3>
                             <p className="text-gray-400 text-sm mb-4">
                                 Approve a set of factories (pool, voting rewards, gauge) for creating new pools with gauges.
@@ -846,12 +841,12 @@ export default function AdminPage() {
                                     </button>
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
                     )}
 
                     {/* Config Tab */}
                     {activeTab === 'config' && (
-                        <motion.div className="space-y-6" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        <div className="space-y-6 animate-fade-in">
                             {/* Epoch/Emissions Info */}
                             <div className="glass-card p-6">
                                 <h3 className="text-lg font-semibold mb-4">📅 Weekly Epoch Info</h3>
@@ -1111,7 +1106,7 @@ export default function AdminPage() {
                                     </div>
                                 </div>
                             </div>
-                        </motion.div>
+                        </div>
                     )}
                 </div>
             )}

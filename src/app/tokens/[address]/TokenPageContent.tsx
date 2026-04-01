@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useTokenPage, TokenPool } from '@/hooks/useTokenPage';
 import { Token, ETH } from '@/config/tokens';
@@ -134,11 +133,7 @@ export function TokenPageContent() {
     return (
         <div className="container mx-auto px-3 sm:px-6 py-4">
             {/* Token Header */}
-            <motion.div
-                className="glass-card p-4 sm:p-6 mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div className="glass-card p-4 sm:p-6 mb-4 animate-fade-up">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                         {token.logoURI ? (
@@ -185,15 +180,10 @@ export function TokenPageContent() {
                         </span>
                     </div>
                 )}
-            </motion.div>
+            </div>
 
             {/* Action Buttons */}
-            <motion.div
-                className="grid grid-cols-4 gap-2 sm:gap-4 mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-            >
+            <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-4 animate-fade-up" style={{ animationDelay: '0.1s' }}>
                 <button
                     onClick={handleTrade}
                     className="glass-card p-3 sm:p-6 text-center hover:bg-white/10 transition group"
@@ -243,15 +233,10 @@ export function TokenPageContent() {
                         {linkCopied ? 'Link copied' : 'Copy link'}
                     </div>
                 </button>
-            </motion.div>
+            </div>
 
             {/* Pools List */}
-            <motion.div
-                className="glass-card overflow-hidden"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-            >
+            <div className="glass-card overflow-hidden animate-fade-up" style={{ animationDelay: '0.2s' }}>
                 <div className="p-4 border-b border-white/5">
                     <h2 className="font-semibold">
                         Pools with {token.symbol} ({pools.length})
@@ -327,18 +312,13 @@ export function TokenPageContent() {
                         ))}
                     </div>
                 )}
-            </motion.div>
+            </div>
 
-            <motion.div
-                className="mt-6 text-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-            >
+            <div className="mt-6 text-center animate-fade-in" style={{ animationDelay: '0.3s' }}>
                 <Link href="/swap" className="text-sm text-gray-400 hover:text-white transition">
                     Back to Swap
                 </Link>
-            </motion.div>
+            </div>
 
             <AddLiquidityModal
                 isOpen={modalOpen}

@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
@@ -1168,11 +1167,7 @@ export default function PortfolioPage() {
     return (
         <div className="container mx-auto px-3 sm:px-6 py-4">
             {/* Header - Compact inline */}
-            <motion.div
-                className="flex items-center justify-between gap-3 mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div className="flex items-center justify-between gap-3 mb-4 animate-fade-up">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold">
                         <span className="gradient-text">Portfolio</span>
@@ -1189,7 +1184,7 @@ export default function PortfolioPage() {
                         </div>
                     </div>
                 )}
-            </motion.div>
+            </div>
 
             {/* Tabs - Compact */}
             <div className="flex gap-1 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
@@ -1209,7 +1204,7 @@ export default function PortfolioPage() {
 
             {/* Pull to Refresh Indicator */}
             <div className="md:hidden flex justify-center items-center h-0 overflow-visible relative z-10">
-                <motion.div
+                <div
                     className="absolute -top-6"
                     style={{
                         opacity: isPulling ? Math.min(pullProgress * 2, 1) : 0,
@@ -1221,7 +1216,7 @@ export default function PortfolioPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </div>
-                </motion.div>
+                </div>
             </div>
 
             {/* Scrollable Content with Pull-to-Refresh */}
@@ -1236,7 +1231,7 @@ export default function PortfolioPage() {
             >
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Portfolio Value Hero */}
                         <div className="glass-card p-5">
                             <div className="text-xs text-gray-400 mb-1">Total Portfolio Value</div>
@@ -1445,13 +1440,13 @@ export default function PortfolioPage() {
                                 </div>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
 
                 {/* Positions Tab */}
                 {activeTab === 'positions' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Search and Sort Controls */}
                         <div className="flex items-center gap-2">
                             <div className="relative flex-1">
@@ -2000,12 +1995,12 @@ export default function PortfolioPage() {
                                 )}
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Staked Tab */}
                 {activeTab === 'staked' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Total Rewards Banner */}
                         {stakedPositions.length > 0 && totalPendingRewards > BigInt(0) && (
                             <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
@@ -2291,12 +2286,12 @@ export default function PortfolioPage() {
                                 })}
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Locks Tab */}
                 {activeTab === 'locks' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Summary */}
                         {veNFTs.length > 0 && (
                             <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
@@ -2377,12 +2372,12 @@ export default function PortfolioPage() {
                                 </Link>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Rewards Tab */}
                 {activeTab === 'rewards' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Rewards Hero */}
                         <div className="flex items-center justify-between p-5 rounded-2xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
                             <div>
@@ -2458,18 +2453,13 @@ export default function PortfolioPage() {
                                 })}
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Increase Liquidity Modal - Compact Mobile Style */}
                 {showIncreaseLiquidityModal && selectedPosition && (
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-                        <motion.div
-                            className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto"
-                            initial={{ y: '100%', opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        >
+                        <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto animate-slide-up">
                             {/* Header */}
                             <div className="sticky top-0 bg-[#0d0d14] z-10 px-4 py-3 border-b border-white/10">
                                 <div className="flex items-center justify-between">
@@ -2618,7 +2608,7 @@ export default function PortfolioPage() {
                                     )}
                                 </button>
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
                 )}
             </div>

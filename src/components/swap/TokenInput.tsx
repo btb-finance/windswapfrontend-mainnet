@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, memo, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import { Token } from '@/config/tokens';
 import { TokenSelector } from '@/components/common/TokenSelector';
 
@@ -92,11 +91,9 @@ function TokenInputComponent({
                         aria-label={`Enter ${label.toLowerCase()} amount`}
                     />
 
-                    <motion.button
+                    <button
                         onClick={handleOpenSelector}
-                        className="token-select"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className="token-select transition-transform hover:scale-[1.02] active:scale-[0.98]"
                         aria-label="Select token"
                     >
                         {token ? (
@@ -133,7 +130,7 @@ function TokenInputComponent({
                                 d="M19 9l-7 7-7-7"
                             />
                         </svg>
-                    </motion.button>
+                    </button>
                 </div>
 
                 {usdValue && (

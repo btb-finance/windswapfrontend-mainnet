@@ -2,7 +2,6 @@
 
 import { useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { motion } from 'framer-motion';
 import { usePoolData } from '@/providers/PoolDataProvider';
 import { NOTABLE_POOLS } from '@/config/contracts';
 import { EmptyState } from '@/components/common/InfoCard';
@@ -232,11 +231,7 @@ export default function PoolsPage() {
     return (
         <div className="container mx-auto px-3 sm:px-6">
             {/* Row 1: Title + New Pool button */}
-            <motion.div
-                className="flex items-center justify-between mb-3 sm:mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div className="flex items-center justify-between mb-3 sm:mb-4 animate-fade-up">
                 <h1 className="text-xl sm:text-3xl font-bold">
                     <span className="gradient-text">Pools</span>
                     <span className="text-sm sm:text-base font-normal text-gray-400 ml-2">
@@ -249,7 +244,7 @@ export default function PoolsPage() {
                 >
                     + New Pool
                 </button>
-            </motion.div>
+            </div>
 
             {/* Row 2: Filters + Search */}
             <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6">

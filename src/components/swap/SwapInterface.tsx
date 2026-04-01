@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address } from 'viem';
@@ -1047,17 +1046,15 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
             {/* Swap Direction Button */}
             <div className="relative h-0 flex items-center justify-center z-10">
-                <motion.button
+                <button
                     onClick={handleSwapTokens}
-                    className="swap-arrow-btn"
+                    className="swap-arrow-btn transition-transform hover:scale-110 active:scale-90"
                     aria-label="Swap tokens direction"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                     </svg>
-                </motion.button>
+                </button>
             </div>
 
             {/* Token Out */}
