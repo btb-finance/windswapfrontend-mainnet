@@ -4,39 +4,27 @@ import { useCallback } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { useAsyncState } from '@/hooks/useAsyncState';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, Address, maxUint256 } from 'viem';
+import { parseUnits, Address } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
-import { ROUTER_ABI, ERC20_ABI, POOL_FACTORY_ABI } from '@/config/abis';
+import { ROUTER_ABI, POOL_FACTORY_ABI } from '@/config/abis';
 import { Token } from '@/config/tokens';
 import { getDeadline } from '@/utils/format';
 import { extractErrorMessage } from '@/utils/errors';
+import { useTokenApproval } from '@/hooks/useTokenApproval';
 
 export function useLiquidity() {
     const { address, isConnected } = useAccount();
     const { isLoading, setIsLoading, error, setError } = useAsyncState();
 
     const { writeContractAsync } = useWriteContract();
+    const { approveMax } = useTokenApproval();
 
     // Approve token for router
     const approveToken = useCallback(
         async (token: Token, spender: Address): Promise<boolean> => {
-            if (!address) return false;
-
-            try {
-                const hash = await writeContractAsync({
-                    address: token.address as Address,
-                    abi: ERC20_ABI,
-                    functionName: 'approve',
-                    args: [spender, maxUint256],
-                });
-
-                return !!hash;
-            } catch (err) {
-                console.error('Approve error:', err);
-                return false;
-            }
+            return approveMax(token, spender);
         },
-        [address, writeContractAsync]
+        [approveMax]
     );
 
     // Add liquidity (token/token)
