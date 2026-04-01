@@ -6,12 +6,12 @@ import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { formatUnits, parseUnits, Address } from 'viem';
-import { Token, DEFAULT_TOKEN_LIST, ETH, WETH, USDC, USDT0 } from '@/config/tokens';
-import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
+import { Token, DEFAULT_TOKEN_LIST, ETH, WETH, USDC } from '@/config/tokens';
+import { CL_CONTRACTS } from '@/config/contracts';
 import { TokenSelector } from '@/components/common/TokenSelector';
 import { useLiquidity } from '@/hooks/useLiquidity';
 import { useTokenBalance, useTokenAllowance, truncateToDecimals, bigIntPercentage } from '@/hooks/useToken';
-import { NFT_POSITION_MANAGER_ABI, ERC20_ABI, STABLECOIN_ZAP_ABI } from '@/config/abis';
+import { NFT_POSITION_MANAGER_ABI, ERC20_ABI } from '@/config/abis';
 import { getRpcForPoolData, getRpcForUserData } from '@/utils/rpc';
 import { usePoolData } from '@/providers/PoolDataProvider';
 import { calculatePoolAPR, formatAPR } from '@/utils/aprCalculator';
@@ -60,9 +60,6 @@ function formatSmartPrice(price: number): string {
 
 type PoolType = 'v2' | 'cl';
 type TxStep = 'idle' | 'approving0' | 'approving1' | 'minting' | 'approving_nft' | 'staking' | 'done' | 'error';
-type ActiveTab = 'regular' | 'zap';
-
-const STABLECOIN_ZAP_ADDRESS = V2_CONTRACTS.StablecoinZap as Address;
 
 interface PoolConfig {
     token0?: Token;
@@ -115,13 +112,6 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     // Auto-stake state
     const [autoStake, setAutoStake] = useState(true); // Default to enabled
 
-    // Zap tab state (for stablecoin pairs)
-    const [activeTab, setActiveTab] = useState<ActiveTab>('regular');
-    const [zapAmount, setZapAmount] = useState('');
-    const [selectedZapToken, setSelectedZapToken] = useState<'USDC' | 'USDT0'>('USDC');
-    const [isApproving, setIsApproving] = useState(false);
-    const [isZapping, setIsZapping] = useState(false);
-
     // Hooks
     const { addLiquidity, isLoading, error } = useLiquidity();
     const { raw: rawBalanceA, rawBigInt: rawBigIntA, formatted: balanceA } = useTokenBalance(tokenA);
@@ -130,24 +120,6 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const { batchOrSequential, encodeContractCall, buildApproveCallIfNeeded } = useBatchTransactions();
     const { poolRewards, windPrice, seiPrice, allPools } = usePoolData();
     const toast = useToast();
-
-    // Zap token and balance
-    const zapToken = selectedZapToken === 'USDC' ? USDC : USDT0;
-    const { raw: rawZapBalance, rawBigInt: zapBalanceBigInt, formatted: zapBalance, refetch: refetchZapBalance } = useTokenBalance(zapToken);
-    const { allowance: zapAllowance, refetch: refetchZapAllowance } = useTokenAllowance(zapToken, STABLECOIN_ZAP_ADDRESS);
-
-    // Parse zap amount and check conditions
-    const parsedZapAmount = zapAmount ? parseUnits(zapAmount, zapToken.decimals) : BigInt(0);
-    const needsZapApproval = zapAllowance !== undefined && parsedZapAmount > zapAllowance;
-    const hasInsufficientZapBalance = zapBalanceBigInt !== undefined && parsedZapAmount > zapBalanceBigInt;
-
-    // Check if current pool is USDC/USDT0 stablecoin pool eligible for zap
-    const isStablecoinZapPool = (() => {
-        if (!tokenA || !tokenB) return false;
-        const symbols = [tokenA.symbol?.toUpperCase(), tokenB.symbol?.toUpperCase()];
-        return (symbols.includes('USDC') && symbols.includes('USDT0')) ||
-            (symbols.includes('USDC') && symbols.includes('USDT'));
-    })();
 
     // Find gauge for current pool configuration
     const getPoolGauge = useCallback(() => {
@@ -862,75 +834,6 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
         }
     };
 
-    // Handle zap approval
-    const handleZapApprove = async () => {
-        if (!address) return;
-
-        setIsApproving(true);
-        haptic('medium');
-
-        try {
-            await writeContractAsync({
-                address: zapToken.address as Address,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [STABLECOIN_ZAP_ADDRESS, parsedZapAmount],
-            });
-
-            toast.info('Approval submitted...');
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            await refetchZapAllowance();
-
-            toast.success(`${selectedZapToken} approved!`);
-            haptic('success');
-        } catch (err: unknown) {
-            console.error('Approval failed:', err);
-            toast.error(extractErrorMessage(err, 'Approval failed'));
-            haptic('error');
-        } finally {
-            setIsApproving(false);
-        }
-    };
-
-    // Handle zap execution with batch support
-    const handleZap = async () => {
-        if (!address || parsedZapAmount === BigInt(0)) return;
-
-        setIsZapping(true);
-        haptic('medium');
-
-        try {
-            const zapCall = encodeContractCall(
-                STABLECOIN_ZAP_ADDRESS,
-                STABLECOIN_ZAP_ABI,
-                'zap',
-                [
-                    zapToken.address as Address,
-                    parsedZapAmount,
-                    BigInt(50), // 0.5% slippage
-                    BigInt(0),  // min liquidity
-                ]
-            );
-
-            const approveCall = await buildApproveCallIfNeeded(zapToken.address as Address, STABLECOIN_ZAP_ADDRESS, parsedZapAmount);
-            await batchOrSequential([approveCall, zapCall].filter((c): c is NonNullable<typeof c> => c !== null));
-            toast.success('Zap complete! LP position created.');
-            haptic('success');
-
-            setZapAmount('');
-            refetchZapBalance();
-            onClose();
-        } catch (err: unknown) {
-            console.error('Zap failed:', err);
-            toast.error(extractErrorMessage(err, 'Zap failed'));
-            haptic('error');
-        } finally {
-            setIsZapping(false);
-        }
-    };
-
-    const isZapLoading = isApproving || isZapping;
-
     // Check if we're in the middle of a CL transaction
     const isCLInProgress = txProgress !== 'idle' && txProgress !== 'done' && txProgress !== 'error';
 
@@ -946,10 +849,6 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
 
     // Check if pool config is pre-defined (clicking Add LP on existing pool)
     const isPoolPreConfigured = !!(initialPool?.token0 && initialPool?.token1);
-
-    // Only show zap tab when on a stablecoin pool
-    const showZapTab = isPoolPreConfigured && isStablecoinZapPool;
-    const isZapActive = showZapTab && activeTab === 'zap';
 
     return (
         <>
@@ -1065,115 +964,6 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                     </div>
                                 )}
 
-                                {/* Tab Selector for Stablecoin Pools */}
-                                {showZapTab && (
-                                    <div className="flex gap-2 p-1 bg-white/5 rounded-xl">
-                                        <button
-                                            onClick={() => setActiveTab('regular')}
-                                            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${activeTab === 'regular'
-                                                ? 'bg-gradient-to-r from-primary/30 to-secondary/30 text-white border border-primary/40'
-                                                : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                                }`}
-                                        >
-                                            📊 Regular LP
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('zap')}
-                                            className={`flex-1 py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${activeTab === 'zap'
-                                                ? 'bg-gradient-to-r from-indigo-500/30 to-purple-500/30 text-white border border-indigo-400/40'
-                                                : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                                }`}
-                                        >
-                                            ⚡ Zap (1 Token)
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Zap Content - Only shown when zap tab is active */}
-                                {isZapActive && (
-                                    <div className="space-y-4">
-                                        {/* Zap Explanation */}
-                                        <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-lg">⚡</span>
-                                                <span className="font-medium text-sm text-indigo-300">One-Click LP</span>
-                                            </div>
-                                            <p className="text-xs text-gray-400">
-                                                Deposit a single stablecoin - we&apos;ll swap 50% and create your LP position automatically.
-                                            </p>
-                                        </div>
-
-                                        {/* Token Selection */}
-                                        <div>
-                                            <label className="text-sm text-gray-400 mb-2 block font-medium">Select Token</label>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => setSelectedZapToken('USDC')}
-                                                    className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${selectedZapToken === 'USDC'
-                                                        ? 'bg-indigo-500 text-white'
-                                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                                        }`}
-                                                >
-                                                    {USDC.logoURI && <img src={USDC.logoURI} alt="" className="w-5 h-5 rounded-full" />}
-                                                    USDC
-                                                </button>
-                                                <button
-                                                    onClick={() => setSelectedZapToken('USDT0')}
-                                                    className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${selectedZapToken === 'USDT0'
-                                                        ? 'bg-indigo-500 text-white'
-                                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                                        }`}
-                                                >
-                                                    {USDT0.logoURI && <img src={USDT0.logoURI} alt="" className="w-5 h-5 rounded-full" />}
-                                                    USDT0
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Amount Input */}
-                                        <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="text-sm text-gray-400">Amount</span>
-                                                <span className="text-sm text-gray-400">
-                                                    Balance: {zapBalance ? parseFloat(zapBalance).toFixed(2) : '0.00'} {selectedZapToken}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="number"
-                                                    value={zapAmount}
-                                                    onChange={(e) => setZapAmount(e.target.value)}
-                                                    placeholder="0.00"
-                                                    className="flex-1 bg-transparent text-2xl font-bold text-white outline-none"
-                                                    disabled={isZapLoading}
-                                                />
-                                                <button
-                                                    onClick={() => rawZapBalance && setZapAmount(rawZapBalance)}
-                                                    className="px-3 py-1.5 text-xs font-medium bg-indigo-500/20 text-indigo-400 rounded-lg hover:bg-indigo-500/30 transition-colors"
-                                                    disabled={isZapLoading}
-                                                >
-                                                    MAX
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Zap Info */}
-                                        <div className="bg-white/5 rounded-lg p-3 space-y-1 border border-white/10">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-400">Tick Range</span>
-                                                <span className="text-white">±0.5% (Tight)</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-400">Slippage</span>
-                                                <span className="text-white">0.5%</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-400">Action</span>
-                                                <span className="text-indigo-400">Swap 50% + Add LP</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
 
                                 {/* Pool Type Selection - only show when creating new pool */}
                                 {!isPoolPreConfigured && (
@@ -1270,7 +1060,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                 )}
 
                                 {/* CL Price Range */}
-                                {poolType === 'cl' && !isZapActive && (
+                                {poolType === 'cl' && (
                                     <div className="space-y-3">
                                         {/* New Pool - Initial Price Input (only if no pool exists) */}
                                         {!poolExists && (
@@ -1645,9 +1435,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                     </div>
                                 )}
 
-                                {/* Token Inputs - Hide when zap is active */}
-                                {!isZapActive && (
-                                    <div className="space-y-0.5">
+                                {/* Token Inputs */}
+                                {<div className="space-y-0.5">
                                         {/* Token A */}
                                         <div className={`p-3 rounded-lg border ${depositTokenAForOneSided ? 'bg-green-500/5 border-green-500/30' : depositTokenBForOneSided ? 'bg-white/5 border-white/10' : 'bg-white/5 border-white/10'}`}>
                                             <div className="flex items-center justify-between mb-2">
@@ -1785,11 +1574,10 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                )}
+                                    </div>}
 
                                 {/* Auto-Stake Toggle - only show for pools with gauges */}
-                                {hasGauge && poolType === 'cl' && !isZapActive && (
+                                {hasGauge && poolType === 'cl' && (
                                     <div className="p-3 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30">
                                         <label className="flex items-center justify-between cursor-pointer">
                                             <div className="flex items-center gap-2">
@@ -1846,56 +1634,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
 
                             {/* Sticky Footer with Action Button */}
                             <div className={mobileStyles.footer}>
-                                {isZapActive ? (
-                                    /* Zap Footer Buttons */
-                                    !isConnected ? (
-                                        <button
-                                            className="w-full py-4 rounded-2xl font-bold text-lg bg-gray-700 text-gray-400 cursor-not-allowed"
-                                            disabled
-                                        >
-                                            🔗 Connect Wallet
-                                        </button>
-                                    ) : hasInsufficientZapBalance ? (
-                                        <button
-                                            className="w-full py-4 rounded-2xl font-bold text-lg bg-red-500/20 text-red-400 cursor-not-allowed"
-                                            disabled
-                                        >
-                                            Insufficient Balance
-                                        </button>
-                                    ) : needsZapApproval ? (
-                                        <motion.button
-                                            onClick={handleZapApprove}
-                                            disabled={isZapLoading || parsedZapAmount === BigInt(0)}
-                                            className="w-full py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-xl"
-                                            whileTap={{ scale: 0.98 }}
-                                        >
-                                            {isApproving ? (
-                                                <span className="flex items-center justify-center gap-2">
-                                                    <span className="animate-spin">⏳</span> Approving...
-                                                </span>
-                                            ) : (
-                                                `Approve ${selectedZapToken}`
-                                            )}
-                                        </motion.button>
-                                    ) : (
-                                        <motion.button
-                                            onClick={handleZap}
-                                            disabled={isZapLoading || parsedZapAmount === BigInt(0)}
-                                            className="w-full py-4 rounded-2xl font-bold text-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-xl"
-                                            whileTap={{ scale: 0.98 }}
-                                        >
-                                            {isZapping ? (
-                                                <span className="flex items-center justify-center gap-2">
-                                                    <span className="animate-spin">⚡</span> Zapping...
-                                                </span>
-                                            ) : (
-                                                '⚡ Zap into LP'
-                                            )}
-                                        </motion.button>
-                                    )
-                                ) : (
-                                    /* Regular LP Footer Button */
-                                    (() => {
+                                {(() => {
                                         // Validation & UX: Check if user is trying to provide only 1 token when range overlaps current price
                                         let invalidSingleSidedRange = false;
                                         let isTryingSingleSidedA = false;
@@ -1914,7 +1653,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                             isTryingSingleSidedA = aAmt > 0 && bAmt === 0;
                                             isTryingSingleSidedB = bAmt > 0 && aAmt === 0;
 
-                                            if (isOverlapping && (isTryingSingleSidedA || isTryingSingleSidedB) && !isZapActive) {
+                                            if (isOverlapping && (isTryingSingleSidedA || isTryingSingleSidedB)) {
                                                 invalidSingleSidedRange = true;
                                             }
                                         }

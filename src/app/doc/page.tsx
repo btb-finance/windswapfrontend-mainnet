@@ -211,7 +211,7 @@ export default function DocPage() {
                 <EmissionPhase
                   title="Tail Emission Phase"
                   description="Dynamic emissions based on circulating supply"
-                  details="Starting at 0.3% of supply, adjustable by governance weekly via EpochGovernor votes"
+                  details="Starting at 0.3% of supply, adjustable weekly via on-chain votes"
                   color="purple"
                 />
               </div>
@@ -270,9 +270,7 @@ export default function DocPage() {
               </p>
               <ul className="space-y-2 text-gray-300">
                 <li>• <strong>Multi-hop Swaps:</strong> Route through multiple pools for best prices</li>
-                <li>• <strong>Zapping:</strong> Add/remove liquidity with single token (auto-converts 50/50)</li>
                 <li>• <strong>Fee-on-Transfer Support:</strong> Compatible with tokens that have transfer fees</li>
-                <li>• <strong>Zap & Stake:</strong> Add liquidity and automatically stake in gauge</li>
               </ul>
             </ContentBlock>
           </Section>
@@ -867,51 +865,6 @@ export default function DocPage() {
             </ContentBlock>
           </Section>
 
-          {/* Governance */}
-          <Section id="governance" title="Governance">
-            <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">Dual Governance System</h3>
-              <p className="text-gray-300 mb-4">
-                Wind Swap implements two governance mechanisms for different purposes:
-              </p>
-
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
-                <GovernanceCard
-                  title="Protocol Governor"
-                  description="Standard governance protocol"
-                  features={[
-                    'Propose protocol changes',
-                    'Vote with veNFT voting power',
-                    'Veto mechanism for protection',
-                    'Timestamp-based voting',
-                  ]}
-                />
-                <GovernanceCard
-                  title="Epoch Governor"
-                  description="Weekly emission adjustments"
-                  features={[
-                    'Adjust tail emission rate',
-                    'Vote each epoch (week)',
-                    'Simple majority wins',
-                    'Three options: Increase/Hold/Decrease',
-                  ]}
-                />
-              </div>
-
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-purple-400">Voting Power</h3>
-              <p className="text-gray-300 mb-4">
-                Governance voting power is derived from your veNFT balance at the time of vote. The longer your lock 
-                and more WIND you have locked, the more influence you have over protocol decisions.
-              </p>
-
-              <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
-                <p className="text-purple-200">
-                  <strong>Delegation:</strong> Permanent locks can delegate voting power to other addresses. 
-                  This allows for sophisticated voting strategies while maintaining lock benefits.
-                </p>
-              </div>
-            </ContentBlock>
-          </Section>
         </div>
 
         {/* Footer */}
@@ -1144,19 +1097,6 @@ function ContractTable({ contracts }: { contracts: Array<{ name: string; address
   );
 }
 
-function GovernanceCard({ title, description, features }: { title: string; description: string; features: string[] }) {
-  return (
-    <div className="bg-gray-700 rounded-lg p-6">
-      <h4 className="font-bold text-xl mb-2 text-blue-400">{title}</h4>
-      <p className="text-gray-400 mb-4">{description}</p>
-      <ul className="space-y-2">
-        {features.map((f, i) => (
-          <li key={i} className="text-sm text-gray-300">• {f}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 function FlowCard({ step, title, description, details, color }: { step: number; title: string; description: string; details: string; color: string }) {
   const colorClasses = {

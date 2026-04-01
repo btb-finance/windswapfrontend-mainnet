@@ -51,15 +51,8 @@ export const V2_CONTRACTS = {
     // Forwarder
     Forwarder: '0x888823B4514D65c035f4528255d0e514C2A57b98',
 
-    // StablecoinZap (stub)
-    StablecoinZap: '0x0000000000000000000000000000000000000000',
-
     // Aggregator Proxy — routes via WowMax/KyberSwap with 1% fee
     AggregatorProxy: '0x88882237C70b9C96a7749cA309187Eb9c9462094',
-
-    // Governance (stubs)
-    ProtocolGovernor: '0x0000000000000000000000000000000000000000',
-    EpochGovernor: '0x0000000000000000000000000000000000000000',
 } as const;
 
 // ============================================
