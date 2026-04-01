@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { haptic } from '@/hooks/useHaptic';
 import { CheckIcon, ErrorIcon, WarningIcon, InfoIcon } from '@/components/common/Icons';
 import { UI } from '@/config/constants';
@@ -88,42 +87,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
             {/* Toast Container - fixed at top for mobile */}
             <div className="fixed top-16 left-0 right-0 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none">
-                <AnimatePresence mode="popLayout">
-                    {toasts.map((toast) => {
-                        const progress = ((Date.now() - toast.createdAt) / (toast.duration || UI.TOAST_DURATION)) * 100;
-                        return (
-                            <motion.div
-                                key={toast.id}
-                                initial={{ opacity: 0, y: -50, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-                                className={`pointer-events-auto max-w-sm w-full px-4 py-3 rounded-xl border backdrop-blur-xl shadow-lg ${toastStyles[toast.type]}`}
-                                onClick={() => removeToast(toast.id)}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <ToastIcon type={toast.type} />
-                                    <div className="flex-1 min-w-0">
-                                        <span className="text-white text-sm font-medium block">
-                                            {toast.message}
-                                        </span>
-                                        {/* Progress bar for auto-dismiss */}
-                                        {toast.duration && toast.duration > 0 && (
-                                            <div className="mt-1.5 h-0.5 bg-white/20 rounded-full overflow-hidden">
-                                                <motion.div
-                                                    className="h-full bg-white/60 rounded-full"
-                                                    initial={{ width: '0%' }}
-                                                    animate={{ width: `${100 - Math.min(progress, 100)}%` }}
-                                                    transition={{ duration: 0.1 }}
-                                                />
-                                            </div>
-                                        )}
+                {toasts.map((toast) => (
+                    <div
+                        key={toast.id}
+                        className={`pointer-events-auto max-w-sm w-full px-4 py-3 rounded-xl border backdrop-blur-xl shadow-lg animate-toast-in ${toastStyles[toast.type]}`}
+                        onClick={() => removeToast(toast.id)}
+                    >
+                        <div className="flex items-center gap-3">
+                            <ToastIcon type={toast.type} />
+                            <div className="flex-1 min-w-0">
+                                <span className="text-white text-sm font-medium block">
+                                    {toast.message}
+                                </span>
+                                {toast.duration && toast.duration > 0 && (
+                                    <div className="mt-1.5 h-0.5 bg-white/20 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-white/60 rounded-full"
+                                            style={{ width: '100%', transition: `width ${toast.duration}ms linear`, animationFillMode: 'forwards' }}
+                                        />
                                     </div>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </AnimatePresence>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
         </ToastContext.Provider>
     );

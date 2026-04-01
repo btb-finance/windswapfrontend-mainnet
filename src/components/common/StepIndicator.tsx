@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 
 interface Step {
     label: string;
@@ -20,11 +19,9 @@ export function StepIndicator({ steps, currentStep = 0, compact = false }: StepI
             {steps.map((step, index) => (
                 <div key={index} className="flex items-center gap-2 md:gap-4">
                     {/* Step */}
-                    <motion.div
-                        className="flex flex-col items-center text-center"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
+                    <div
+                        className="flex flex-col items-center text-center animate-fade-up"
+                        style={{ animationDelay: `${index * 0.1}s` }}
                     >
                         <div
                             className={`
@@ -60,7 +57,7 @@ export function StepIndicator({ steps, currentStep = 0, compact = false }: StepI
                                 )}
                             </>
                         )}
-                    </motion.div>
+                    </div>
 
                     {/* Connector */}
                     {index < steps.length - 1 && (

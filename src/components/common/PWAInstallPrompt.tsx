@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -77,14 +76,9 @@ export function PWAInstallPrompt() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     return (
-        <AnimatePresence>
+        <>
             {isVisible && (
-                <motion.div
-                    initial={{ y: 100, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 100, opacity: 0 }}
-                    className="fixed bottom-20 left-4 right-4 z-40 md:hidden"
-                >
+                <div className="fixed bottom-20 left-4 right-4 z-40 md:hidden animate-slide-up">
                     <div className="glass-card p-4 rounded-2xl border border-primary/30 shadow-lg">
                         <div className="flex items-start gap-3">
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0">
@@ -124,8 +118,8 @@ export function PWAInstallPrompt() {
                             </div>
                         )}
                     </div>
-                </motion.div>
+                </div>
             )}
-        </AnimatePresence>
+        </>
     );
 }

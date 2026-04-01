@@ -21,6 +21,8 @@ import { useToast } from '@/providers/ToastProvider';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
 
+const publicClient = createPublicClient({ chain: base, transport: http(getRpcForPoolData()) });
+
 async function fetchGaugeAddressByPool(poolId: string): Promise<string | null> {
     try {
         const query = `query GaugeByPool($pool: String!) {
@@ -635,8 +637,7 @@ export default function PortfolioPage() {
         setActionLoading(true);
         setBurnStatus('Checking position on-chain...');
         try {
-            const client = createPublicClient({ chain: base, transport: http(getRpcForPoolData()) });
-            const onChainPos = await client.readContract({
+            const onChainPos = await publicClient.readContract({
                 address: CL_CONTRACTS.NonfungiblePositionManager as Address,
                 abi: NFT_POSITION_MANAGER_ABI,
                 functionName: 'positions',

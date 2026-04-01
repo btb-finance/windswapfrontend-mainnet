@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface TooltipProps {
     content: string | ReactNode;
@@ -35,24 +34,16 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps) {
             <span className="border-b border-dotted border-gray-500 cursor-help">
                 {children}
             </span>
-            <AnimatePresence>
-                {isVisible && (
-                    <motion.div
-                        className={`absolute z-50 ${positionStyles[position]}`}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                    >
-                        <div className="px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--glass-border)] shadow-lg text-sm text-gray-300 max-w-xs">
-                            {content}
-                        </div>
-                        <div
-                            className={`absolute w-0 h-0 border-4 border-transparent ${arrowStyles[position]}`}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {isVisible && (
+                <div className={`absolute z-50 ${positionStyles[position]} animate-scale-in`}>
+                    <div className="px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--glass-border)] shadow-lg text-sm text-gray-300 max-w-xs">
+                        {content}
+                    </div>
+                    <div
+                        className={`absolute w-0 h-0 border-4 border-transparent ${arrowStyles[position]}`}
+                    />
+                </div>
+            )}
         </span>
     );
 }
