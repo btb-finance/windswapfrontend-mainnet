@@ -3,7 +3,7 @@
 import { useMemo, useEffect, useState } from 'react';
 import { Address, isAddress, getAddress } from 'viem';
 import { useReadContract } from 'wagmi';
-import { Token, SEI, WSEI } from '@/config/tokens';
+import { Token, ETH, WETH } from '@/config/tokens';
 import { getTokenByAddress } from '@/utils/tokens';
 import { GAUGE_LIST, GaugeConfig } from '@/config/gauges';
 import { usePoolData } from '@/providers/PoolDataProvider';
@@ -160,10 +160,10 @@ export function useTokenPage(address: string | undefined): UseTokenPageResult {
     const pools = useMemo<TokenPool[]>(() => {
         if (!checksumAddr) return [];
         const lowerAddr = checksumAddr.toLowerCase();
-        // Also check WSEI if searching for SEI
-        const wseiAddr = WSEI.address.toLowerCase();
-        const searchAddrs = lowerAddr === SEI.address.toLowerCase()
-            ? [lowerAddr, wseiAddr]
+        // Also check WETH if searching for ETH
+        const wethAddr = WETH.address.toLowerCase();
+        const searchAddrs = lowerAddr === ETH.address.toLowerCase()
+            ? [lowerAddr, wethAddr]
             : [lowerAddr];
 
         const matchingPools: TokenPool[] = [];

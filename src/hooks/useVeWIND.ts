@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useAccount } from 'wagmi';
+import { useAsyncState } from '@/hooks/useAsyncState';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { parseUnits, Address } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { VOTING_ESCROW_ABI, REWARDS_DISTRIBUTOR_ABI, ERC20_ABI } from '@/config/abis';
 import { usePoolData } from '@/providers/PoolDataProvider';
+import { extractErrorMessage } from '@/utils/errors';
 
 // Lock duration presets in seconds
 export const LOCK_DURATIONS = {
@@ -32,8 +34,7 @@ export interface VeWINDPosition {
 
 export function useVeWIND() {
     const { address } = useAccount();
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { isLoading, setIsLoading, error, setError } = useAsyncState();
 
     // Use prefetched veNFT data from global provider instead of fetching locally
     const { veNFTs, veNFTsLoading, refetchVeNFTs } = usePoolData();
@@ -50,7 +51,7 @@ export function useVeWIND() {
     }));
 
     const { writeContractAsync } = useWriteContract();
-    const { executeBatch, encodeContractCall } = useBatchTransactions();
+    const { batchOrSequential, encodeContractCall } = useBatchTransactions();
 
     // Create new lock
     const createLock = useCallback(async (amount: string, durationSeconds: number) => {
@@ -67,7 +68,7 @@ export function useVeWIND() {
 
             // Try batch: approve + createLock in 1 tx
             const approveCall = encodeContractCall(
-                V2_CONTRACTS.YAKA as Address,
+                V2_CONTRACTS.WIND as Address,
                 ERC20_ABI as any,
                 'approve',
                 [V2_CONTRACTS.VotingEscrow as Address, amountWei]
@@ -78,37 +79,17 @@ export function useVeWIND() {
                 'createLock',
                 [amountWei, BigInt(durationSeconds)]
             );
-            const batchResult = await executeBatch([approveCall, lockCall]);
-
-            let hash: string | undefined;
-            if (batchResult.usedBatching && batchResult.success) {
-                hash = batchResult.hash;
-            } else {
-                // Sequential fallback
-                await writeContractAsync({
-                    address: V2_CONTRACTS.YAKA as Address,
-                    abi: ERC20_ABI,
-                    functionName: 'approve',
-                    args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
-                });
-                hash = await writeContractAsync({
-                    address: V2_CONTRACTS.VotingEscrow as Address,
-                    abi: VOTING_ESCROW_ABI,
-                    functionName: 'createLock',
-                    args: [amountWei, BigInt(durationSeconds)],
-                });
-            }
-
+            const hash = await batchOrSequential([approveCall, lockCall]);
             setIsLoading(false);
             refetchVeNFTs();
             return { hash };
         } catch (err: unknown) {
             console.error('Create lock error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to create lock');
+            setError(extractErrorMessage(err, 'Failed to create lock'));
             setIsLoading(false);
             return null;
         }
-    }, [address, writeContractAsync, executeBatch, encodeContractCall, refetchVeNFTs]);
+    }, [address, batchOrSequential, encodeContractCall, refetchVeNFTs]);
 
     // Increase lock amount
     const increaseAmount = useCallback(async (tokenId: bigint, amount: string) => {
@@ -125,7 +106,7 @@ export function useVeWIND() {
 
             // Try batch: approve + increaseAmount in 1 tx
             const approveCall = encodeContractCall(
-                V2_CONTRACTS.YAKA as Address,
+                V2_CONTRACTS.WIND as Address,
                 ERC20_ABI as any,
                 'approve',
                 [V2_CONTRACTS.VotingEscrow as Address, amountWei]
@@ -136,37 +117,17 @@ export function useVeWIND() {
                 'increaseAmount',
                 [tokenId, amountWei]
             );
-            const batchResult = await executeBatch([approveCall, increaseCall]);
-
-            let hash: string | undefined;
-            if (batchResult.usedBatching && batchResult.success) {
-                hash = batchResult.hash;
-            } else {
-                // Sequential fallback
-                await writeContractAsync({
-                    address: V2_CONTRACTS.YAKA as Address,
-                    abi: ERC20_ABI,
-                    functionName: 'approve',
-                    args: [V2_CONTRACTS.VotingEscrow as Address, amountWei],
-                });
-                hash = await writeContractAsync({
-                    address: V2_CONTRACTS.VotingEscrow as Address,
-                    abi: VOTING_ESCROW_ABI,
-                    functionName: 'increaseAmount',
-                    args: [tokenId, amountWei],
-                });
-            }
-
+            const hash = await batchOrSequential([approveCall, increaseCall]);
             setIsLoading(false);
             refetchVeNFTs();
             return { hash };
         } catch (err: unknown) {
             console.error('Increase amount error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to increase amount');
+            setError(extractErrorMessage(err, 'Failed to increase amount'));
             setIsLoading(false);
             return null;
         }
-    }, [address, writeContractAsync, executeBatch, encodeContractCall, refetchVeNFTs]);
+    }, [address, batchOrSequential, encodeContractCall, refetchVeNFTs]);
 
     // Extend lock duration
     const extendLock = useCallback(async (tokenId: bigint, durationSeconds: number) => {
@@ -191,7 +152,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Extend lock error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to extend lock');
+            setError(extractErrorMessage(err, 'Failed to extend lock'));
             setIsLoading(false);
             return null;
         }
@@ -220,7 +181,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Withdraw error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to withdraw');
+            setError(extractErrorMessage(err, 'Failed to withdraw'));
             setIsLoading(false);
             return null;
         }
@@ -249,7 +210,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Claim rebases error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to claim rebases');
+            setError(extractErrorMessage(err, 'Failed to claim rebases'));
             setIsLoading(false);
             return null;
         }
@@ -278,7 +239,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Merge error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to merge veNFTs');
+            setError(extractErrorMessage(err, 'Failed to merge veNFTs'));
             setIsLoading(false);
             return null;
         }
@@ -307,7 +268,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Lock permanent error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to lock permanently');
+            setError(extractErrorMessage(err, 'Failed to lock permanently'));
             setIsLoading(false);
             return null;
         }
@@ -336,50 +297,11 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Unlock permanent error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to unlock permanent lock');
+            setError(extractErrorMessage(err, 'Failed to unlock permanent lock'));
             setIsLoading(false);
             return null;
         }
     }, [address, writeContractAsync, refetchVeNFTs]);
-
-    // Delegate veNFT for ProtocolGovernor voting
-    // This delegates the veNFT's voting power to itself so it can vote on governance proposals
-    const delegateForGovernance = useCallback(async (tokenId: bigint) => {
-        if (!address) {
-            setError('Wallet not connected');
-            return null;
-        }
-
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            // delegate(delegator, delegatee) - delegating to self for governance voting
-            const hash = await writeContractAsync({
-                address: V2_CONTRACTS.VotingEscrow as Address,
-                abi: [...VOTING_ESCROW_ABI, {
-                    name: 'delegate',
-                    type: 'function',
-                    stateMutability: 'nonpayable',
-                    inputs: [
-                        { name: 'delegator', type: 'uint256' },
-                        { name: 'delegatee', type: 'uint256' },
-                    ],
-                    outputs: [],
-                }],
-                functionName: 'delegate',
-                args: [tokenId, tokenId], // Delegate to self
-            });
-
-            setIsLoading(false);
-            return { hash };
-        } catch (err: unknown) {
-            console.error('Delegate error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to delegate for governance');
-            setIsLoading(false);
-            return null;
-        }
-    }, [address, writeContractAsync]);
 
     return {
         positions,
@@ -392,7 +314,6 @@ export function useVeWIND() {
         merge,
         lockPermanent,
         unlockPermanent,
-        delegateForGovernance,
         isLoading: isLoading || veNFTsLoading,
         error,
         refetch: refetchVeNFTs,

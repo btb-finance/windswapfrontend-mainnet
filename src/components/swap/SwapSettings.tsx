@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 
 interface SwapSettingsProps {
     slippage: number;
@@ -59,11 +58,7 @@ export function SwapSettings({
             </button>
 
             {isOpen && (
-                <motion.div
-                    className="absolute right-0 top-12 w-72 p-4 z-50 bg-[#0d0d14] border border-white/10 rounded-xl shadow-2xl"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                >
+                <div className="absolute right-0 top-12 w-72 p-4 z-50 bg-[#0d0d14] border border-white/10 rounded-xl shadow-2xl animate-slide-down">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-semibold">Settings</h3>
                         <button
@@ -135,7 +130,7 @@ export function SwapSettings({
                             <span className="text-sm text-gray-400">minutes</span>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             )}
         </div>
     );

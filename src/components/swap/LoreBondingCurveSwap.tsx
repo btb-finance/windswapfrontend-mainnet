@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
-import { Token, SEI, LORE } from '@/config/tokens';
+import { Token, ETH, LORE } from '@/config/tokens';
 import { sei } from '@/config/chains';
 import { useTokenBalance } from '@/hooks/useToken';
 import { TokenInput } from './TokenInput';
@@ -18,6 +17,7 @@ import {
     useSellLore,
     useApproveLoreForBondingCurve,
 } from '@/hooks/useLOREBondingCurve';
+import { extractErrorMessage } from '@/utils/errors';
 
 interface LoreBondingCurveSwapProps {
     initialTokenIn?: Token;
@@ -68,7 +68,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
     const [loreAmount, setLoreAmount] = useState('');
     const [drivingField, setDrivingField] = useState<'sei' | 'lore'>('sei');
 
-    const { raw: rawSeiBalance, formatted: formattedSeiBalance } = useTokenBalance(SEI);
+    const { raw: rawEthBalance, formatted: formattedEthBalance } = useTokenBalance(ETH);
     const { raw: rawLoreBalance, formatted: formattedLoreBalance } = useTokenBalance(LORE);
 
     // Market info — drives both the buy quote and display stats
@@ -158,7 +158,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             const hash = await approve(loreWei);
             setPendingApprovalHash(hash);
         } catch (err: unknown) {
-            showError((err instanceof Error ? ((err as { shortMessage?: string }).shortMessage ?? err.message) : undefined) || 'Approval failed');
+            showError(extractErrorMessage(err, 'Approval failed'));
         }
     };
 
@@ -179,7 +179,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             refetchMarket();
             success(`${isBuying ? 'Buy' : 'Sell'} successful!`);
         } catch (err: unknown) {
-            showError((err instanceof Error ? ((err as { shortMessage?: string }).shortMessage ?? err.message) : undefined) || 'Transaction failed');
+            showError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -219,13 +219,13 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             : (loreWei !== undefined && loreWei > BigInt(0))
     );
 
-    const tokenIn  = isBuying ? SEI  : LORE;
-    const tokenOut = isBuying ? LORE : SEI;
+    const tokenIn  = isBuying ? ETH  : LORE;
+    const tokenOut = isBuying ? LORE : ETH;
     const amountIn  = isBuying ? seiAmount  : loreAmount;
     const amountOut = isBuying ? loreAmount : seiAmount;
-    const balanceIn    = isBuying ? formattedSeiBalance  : formattedLoreBalance;
-    const rawBalanceIn = isBuying ? rawSeiBalance        : rawLoreBalance;
-    const balanceOut   = isBuying ? formattedLoreBalance : formattedSeiBalance;
+    const balanceIn    = isBuying ? formattedEthBalance  : formattedLoreBalance;
+    const rawBalanceIn = isBuying ? rawEthBalance        : rawLoreBalance;
+    const balanceOut   = isBuying ? formattedLoreBalance : formattedEthBalance;
 
     return (
         <div className="swap-card max-w-md mx-auto">
@@ -276,17 +276,15 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
 
             {/* Flip button */}
             <div className="relative h-0 flex items-center justify-center z-10">
-                <motion.button
+                <button
                     onClick={handleFlip}
-                    className="swap-arrow-btn"
+                    className="swap-arrow-btn transition-transform hover:scale-110 active:scale-90"
                     aria-label="Flip direction"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                     </svg>
-                </motion.button>
+                </button>
             </div>
 
             {/* Token Out */}
@@ -307,22 +305,22 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
                             <span className="text-gray-400">
                                 {isBuying && seiWei ? 'Execution price' : 'Current price'}
                             </span>
-                            <span>1 LORE = {priceFormatted} SEI</span>
+                            <span>1 LORE = {priceFormatted} ETH</span>
                         </div>
                     )}
                     {feeAmount && parseFloat(feeAmount) > 0 && (
                         <div className="flex justify-between">
                             <span className="text-gray-400">Fee ({feePercent}%)</span>
                             <span className="text-foreground/70">
-                                {parseFloat(feeAmount).toFixed(6)} {isBuying ? 'SEI' : 'SEI'}
+                                {parseFloat(feeAmount).toFixed(6)} {isBuying ? 'ETH' : 'ETH'}
                             </span>
                         </div>
                     )}
                     {marketInfo && (
                         <>
                             <div className="flex justify-between">
-                                <span className="text-gray-400">SEI Backing</span>
-                                <span>{Number(formatEther(marketInfo[2])).toLocaleString(undefined, { maximumFractionDigits: 2 })} SEI</span>
+                                <span className="text-gray-400">ETH Backing</span>
+                                <span>{Number(formatEther(marketInfo[2])).toLocaleString(undefined, { maximumFractionDigits: 2 })} ETH</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-gray-400">Circulating Supply</span>

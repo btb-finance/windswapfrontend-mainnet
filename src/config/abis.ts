@@ -1,3 +1,4 @@
+
 // Minimal ABIs for WindSwap contracts
 // These contain only the functions needed for the frontend
 
@@ -330,51 +331,6 @@ export const ROUTER_ABI = [
             { name: 'liquidity', type: 'uint256' },
         ],
         stateMutability: 'view',
-        type: 'function',
-    },
-] as const;
-
-// CL SwapRouter ABI (Slipstream)
-export const CL_SWAP_ROUTER_ABI = [
-    {
-        inputs: [
-            {
-                components: [
-                    { name: 'tokenIn', type: 'address' },
-                    { name: 'tokenOut', type: 'address' },
-                    { name: 'tickSpacing', type: 'int24' },
-                    { name: 'recipient', type: 'address' },
-                    { name: 'deadline', type: 'uint256' },
-                    { name: 'amountIn', type: 'uint256' },
-                    { name: 'amountOutMinimum', type: 'uint256' },
-                    { name: 'sqrtPriceLimitX96', type: 'uint160' },
-                ],
-                name: 'params',
-                type: 'tuple',
-            },
-        ],
-        name: 'exactInputSingle',
-        outputs: [{ name: 'amountOut', type: 'uint256' }],
-        stateMutability: 'payable',
-        type: 'function',
-    },
-    {
-        inputs: [
-            {
-                components: [
-                    { name: 'path', type: 'bytes' },
-                    { name: 'recipient', type: 'address' },
-                    { name: 'deadline', type: 'uint256' },
-                    { name: 'amountIn', type: 'uint256' },
-                    { name: 'amountOutMinimum', type: 'uint256' },
-                ],
-                name: 'params',
-                type: 'tuple',
-            },
-        ],
-        name: 'exactInput',
-        outputs: [{ name: 'amountOut', type: 'uint256' }],
-        stateMutability: 'payable',
         type: 'function',
     },
 ] as const;
@@ -758,7 +714,7 @@ export const SWAP_ROUTER_ABI = [
         stateMutability: 'payable',
         type: 'function',
     },
-    // Unwrap WSEI to native SEI
+    // Unwrap WETH to native ETH
     {
         inputs: [
             { name: 'amountMinimum', type: 'uint256' },
@@ -1677,143 +1633,9 @@ export const FEE_REWARD_ABI = [
     },
 ] as const;
 
-// Hyperlane Warp Route ABI (bridge)
-export const WARP_ROUTE_ABI = [
-    {
-        name: 'transferRemote',
-        type: 'function',
-        stateMutability: 'payable',
-        inputs: [
-            { name: 'destination', type: 'uint32' },
-            { name: 'recipient', type: 'bytes32' },
-            { name: 'amount', type: 'uint256' },
-        ],
-        outputs: [{ name: 'messageId', type: 'bytes32' }],
-    },
-    {
-        name: 'quoteGasPayment',
-        type: 'function',
-        stateMutability: 'view',
-        inputs: [{ name: 'destination', type: 'uint32' }],
-        outputs: [{ name: '', type: 'uint256' }],
-    },
-    {
-        name: 'balanceOf',
-        type: 'function',
-        stateMutability: 'view',
-        inputs: [{ name: 'account', type: 'address' }],
-        outputs: [{ name: '', type: 'uint256' }],
-    },
-] as const;
-
-// VetoGovernor ABI (protocol governance)
-export const GOVERNOR_ABI = [
-    {
-        inputs: [
-            { name: 'tokenId', type: 'uint256' },
-            { name: 'targets', type: 'address[]' },
-            { name: 'values', type: 'uint256[]' },
-            { name: 'calldatas', type: 'bytes[]' },
-            { name: 'description', type: 'string' },
-        ],
-        name: 'propose',
-        outputs: [{ name: '', type: 'uint256' }],
-        stateMutability: 'nonpayable',
-        type: 'function',
-    },
-    {
-        inputs: [
-            { name: 'proposalId', type: 'uint256' },
-            { name: 'tokenId', type: 'uint256' },
-            { name: 'support', type: 'uint8' },
-        ],
-        name: 'castVote',
-        outputs: [{ name: '', type: 'uint256' }],
-        stateMutability: 'nonpayable',
-        type: 'function',
-    },
-    {
-        inputs: [
-            { name: 'targets', type: 'address[]' },
-            { name: 'values', type: 'uint256[]' },
-            { name: 'calldatas', type: 'bytes[]' },
-            { name: 'descriptionHash', type: 'bytes32' },
-            { name: 'proposer', type: 'address' },
-        ],
-        name: 'execute',
-        outputs: [{ name: '', type: 'uint256' }],
-        stateMutability: 'payable',
-        type: 'function',
-    },
-    {
-        inputs: [{ name: 'proposalId', type: 'uint256' }],
-        name: 'state',
-        outputs: [{ name: '', type: 'uint8' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-    {
-        inputs: [{ name: 'proposalId', type: 'uint256' }],
-        name: 'proposalVotes',
-        outputs: [
-            { name: 'againstVotes', type: 'uint256' },
-            { name: 'forVotes', type: 'uint256' },
-            { name: 'abstainVotes', type: 'uint256' },
-        ],
-        stateMutability: 'view',
-        type: 'function',
-    },
-    {
-        inputs: [],
-        name: 'proposalThreshold',
-        outputs: [{ name: '', type: 'uint256' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-    {
-        inputs: [],
-        name: 'votingDelay',
-        outputs: [{ name: '', type: 'uint256' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-    {
-        inputs: [],
-        name: 'votingPeriod',
-        outputs: [{ name: '', type: 'uint256' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-    {
-        inputs: [{ name: 'proposalId', type: 'uint256' }, { name: 'tokenId', type: 'uint256' }],
-        name: 'hasVoted',
-        outputs: [{ name: '', type: 'bool' }],
-        stateMutability: 'view',
-        type: 'function',
-    },
-] as const;
-
-// Stablecoin Zap ABI
-export const STABLECOIN_ZAP_ABI = [
-    {
-        type: 'function',
-        name: 'zap',
-        inputs: [
-            { name: 'inputToken', type: 'address' },
-            { name: 'amount', type: 'uint256' },
-            { name: 'slippageBps', type: 'uint256' },
-            { name: 'minLiquidity', type: 'uint128' },
-        ],
-        outputs: [
-            { name: 'tokenId', type: 'uint256' },
-            { name: 'liquidity', type: 'uint128' },
-        ],
-        stateMutability: 'nonpayable',
-    },
-] as const;
 
 // ============================================
-// LOREBondingCurve ABI (Sei Mainnet)
+// LOREBondingCurve ABI (Base)
 // ============================================
 export const LORE_BONDING_CURVE_ABI = [
     {
@@ -1923,7 +1745,7 @@ export const LORE_BONDING_CURVE_ABI = [
 ] as const;
 
 // ============================================
-// LOREmining ABI (Sei Mainnet)
+// LOREmining ABI (Base)
 // ============================================
 export const LORE_MINING_ABI = [
     // View functions

@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Address, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { useAccount } from 'wagmi';
-import { DEFAULT_TOKEN_LIST, WSEI } from '@/config/tokens';
+import { DEFAULT_TOKEN_LIST, WETH } from '@/config/tokens';
 import { useWindPrice as useWindPriceHook } from '@/hooks/useWindPrice';
 import { useUserPositions } from '@/hooks/useSubgraph';
 import { getRpcForUserData, rpcCall } from '@/utils/rpc';
@@ -251,11 +251,11 @@ for (const token of DEFAULT_TOKEN_LIST) {
         logoURI: token.logoURI,
     };
 }
-// Also add WSEI explicitly (some pools use WSEI address directly)
-KNOWN_TOKENS[WSEI.address.toLowerCase()] = {
-    symbol: WSEI.symbol,
-    decimals: WSEI.decimals,
-    logoURI: WSEI.logoURI,
+// Also add WETH explicitly (some pools use WETH address directly)
+KNOWN_TOKENS[WETH.address.toLowerCase()] = {
+    symbol: WETH.symbol,
+    decimals: WETH.decimals,
+    logoURI: WETH.logoURI,
 };
 
 // ============================================

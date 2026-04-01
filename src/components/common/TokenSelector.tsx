@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { getAddress } from 'viem';
 import { Token, DEFAULT_TOKEN_LIST } from '@/config/tokens';
@@ -431,30 +430,18 @@ export function TokenSelector({
     if (!mounted) return null;
 
     return createPortal(
-        <AnimatePresence>
+        <>
             {isOpen && (
-                <motion.div
-                    className="fixed inset-0 z-[110] flex items-center justify-center"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                >
+                <div className="fixed inset-0 z-[110] flex items-center justify-center animate-fade-in">
                     {/* Backdrop */}
-                    <motion.div
+                    <div
                         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                         onClick={onClose}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
                     />
 
                     {/* Modal with Swipe to Dismiss */}
-                    <motion.div
-                        className="relative w-full max-w-md mx-4 touch-auto flex flex-col max-h-[90vh]"
-                        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                    <div
+                        className="relative w-full max-w-md mx-4 touch-auto flex flex-col max-h-[90vh] animate-scale-in"
                         {...swipeHandlers}
                         style={swipeStyle}
                     >
@@ -682,10 +669,10 @@ export function TokenSelector({
                                 )}
                             </div>
                         </div>
-                    </motion.div>
-                </motion.div>
+                    </div>
+                </div>
             )}
-        </AnimatePresence>,
+        </>,
         document.body
     );
 }

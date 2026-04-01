@@ -1,7 +1,6 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { motion } from 'framer-motion';
 
 interface InfoCardProps {
     title: string;
@@ -28,11 +27,7 @@ export function InfoCard({ title, description, icon, variant = 'default', action
     };
 
     return (
-        <motion.div
-            className={variantStyles[variant]}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-        >
+        <div className={`${variantStyles[variant]} animate-fade-up`}>
             <div className="flex items-start gap-4">
                 {icon && (
                     <div className={`${iconContainerStyles[variant]} icon-container-sm`}>
@@ -52,7 +47,7 @@ export function InfoCard({ title, description, icon, variant = 'default', action
                     )}
                 </div>
             </div>
-        </motion.div>
+        </div>
     );
 }
 
@@ -67,11 +62,7 @@ interface FeatureCardProps {
 
 export function FeatureCard({ title, description, icon, stat, statLabel }: FeatureCardProps) {
     return (
-        <motion.div
-            className="feature-card"
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-        >
+        <div className="feature-card transition-transform hover:scale-[1.02]">
             <div className="icon-container mb-4" style={{ position: 'relative', zIndex: 1 }}>
                 {icon}
             </div>
@@ -83,7 +74,7 @@ export function FeatureCard({ title, description, icon, stat, statLabel }: Featu
                     {statLabel && <div className="text-xs text-gray-500">{statLabel}</div>}
                 </div>
             )}
-        </motion.div>
+        </div>
     );
 }
 
@@ -100,11 +91,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
     return (
-        <motion.div
-            className="empty-state"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-        >
+        <div className="empty-state animate-fade-up">
             <div className="empty-state-icon">{icon}</div>
             <h3 className="empty-state-title">{title}</h3>
             <p className="empty-state-description">{description}</p>
@@ -113,7 +100,7 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
                     {action.label}
                 </button>
             )}
-        </motion.div>
+        </div>
     );
 }
 

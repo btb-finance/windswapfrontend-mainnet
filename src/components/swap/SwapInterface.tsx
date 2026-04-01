@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData } from 'viem';
-import { Token, SEI, USDC, WSEI, LORE } from '@/config/tokens';
+import { parseUnits, formatUnits, Address } from 'viem';
+import { Token, ETH, USDC, WETH, LORE } from '@/config/tokens';
 import { LoreBondingCurveSwap } from './LoreBondingCurveSwap';
 import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
 import { ROUTER_ABI, ERC20_ABI, SWAP_ROUTER_ABI, WETH_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
@@ -19,6 +18,7 @@ import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { haptic } from '@/hooks/useHaptic';
 import { SLIPPAGE, DEBOUNCE_MS, ACCESSIBILITY } from '@/config/constants';
 import { getSwapErrorMessage, isUserRejection } from '@/utils/errors';
+import { getDeadline } from '@/utils/format';
 import { useToast } from '@/providers/ToastProvider';
 import { getWowMaxQuote, getWowMaxSwapData } from '@/utils/wowmax';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
@@ -74,7 +74,7 @@ function isLoreToken(t?: Token): boolean {
 
 // Public entry point — owns tokenIn/tokenOut routing state, no other hooks
 export function SwapInterface({ initialTokenIn, initialTokenOut, onTokenPairChange }: SwapInterfaceProps) {
-    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
+    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || ETH);
     const [tokenOut, setTokenOut] = useState<Token | undefined>(initialTokenOut || USDC);
 
     const handleTokenInChange = useCallback((t: Token) => {
@@ -105,7 +105,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { success, error: showError } = useToast();
 
     // Token state — local copy; changes bubble up via callbacks so parent can re-route to bonding curve
-    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || SEI);
+    const [tokenIn, setTokenIn] = useState<Token | undefined>(initialTokenIn || ETH);
     const [tokenOut, setTokenOut] = useState<Token | undefined>(initialTokenOut || USDC);
 
     const handleSetTokenIn = useCallback((t: Token) => {
@@ -152,15 +152,15 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { raw: rawBalanceIn, formatted: formattedBalanceIn } = useTokenBalance(tokenIn);
     const { formatted: formattedBalanceOut } = useTokenBalance(tokenOut);
     const { writeContractAsync } = useWriteContract();
-    const { executeBatch, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
+    const { batchOrSequential, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
 
     const [isSwappingWowmax, setIsSwappingWowmax] = useState(false);
     const isLoading = isLoadingV2 || isLoadingV3 || isBatching || isSwappingWowmax;
     const hookError = errorV2 || errorV3;
 
-    // Get actual token addresses (use WSEI for native SEI)
-    const actualTokenIn = tokenIn?.isNative ? WSEI : tokenIn;
-    const actualTokenOut = tokenOut?.isNative ? WSEI : tokenOut;
+    // Get actual token addresses (use WETH for native SEI)
+    const actualTokenIn = tokenIn?.isNative ? WETH : tokenIn;
+    const actualTokenOut = tokenOut?.isNative ? WETH : tokenOut;
 
     // Calculate amountInWei for allowance check
     const amountInWei = actualTokenIn && amountIn && parseFloat(amountIn) > 0
@@ -262,7 +262,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         const amountOutMinWei = actualTokenOut
             ? parseUnits((parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6), actualTokenOut.decimals)
             : BigInt(0);
-        const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+        const deadlineTimestamp = getDeadline(deadline);
 
         try {
             // Build the swap call based on route type
@@ -271,8 +271,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             if (bestRoute.type === 'v2') {
                 // V2 swap
                 const route = [{
-                    from: (tokenIn?.isNative ? COMMON.WSEI : actualTokenIn.address) as Address,
-                    to: (tokenOut?.isNative ? COMMON.WSEI : actualTokenOut.address) as Address,
+                    from: (tokenIn?.isNative ? COMMON.WETH : actualTokenIn.address) as Address,
+                    to: (tokenOut?.isNative ? COMMON.WETH : actualTokenOut.address) as Address,
                     stable: bestRoute.stable || false,
                     factory: V2_CONTRACTS.PoolFactory as Address,
                 }];
@@ -323,37 +323,21 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 return;
             }
 
-            // Try EIP-5792 batch (approve + swap in one popup)
+            // Approve + swap (EIP-5792 batch or sequential fallback)
             const approveCall = encodeApproveCall(
                 actualTokenIn.address as Address,
                 routerToApprove as Address,
                 amountInWei
             );
 
-            const batchResult = await executeBatch([approveCall, swapCall]);
-
-            if (batchResult.usedBatching && batchResult.success) {
-                // Single popup worked!
-                setTxHash(batchResult.hash || null);
-                setAmountIn('');
-                setAmountOut('');
-                setBestRoute(null);
-                setIsApproving(false);
-                setRouteLocked(false);
-                success('Swap successful!');
-                return;
-            }
-
-            // Batch not supported - fall back to sequential approach
-            console.log('Batch not available, using sequential approve + swap');
-            setAutoSwapAfterApproval(true);
-            const hash = await writeContractAsync({
-                address: actualTokenIn.address as Address,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [routerToApprove as Address, amountInWei],
-            });
-            setPendingApprovalHash(hash);
+            const hash = await batchOrSequential([approveCall, swapCall]);
+            setTxHash(hash || null);
+            setAmountIn('');
+            setAmountOut('');
+            setBestRoute(null);
+            setIsApproving(false);
+            setRouteLocked(false);
+            success('Swap successful!');
 
         } catch (err) {
             console.error('Approve/swap error:', err);
@@ -471,10 +455,10 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             try {
                 const routes: BestRoute[] = [];
 
-                // === Check for direct wrap/unwrap (WSEI <-> SEI) ===
+                // === Check for direct wrap/unwrap (WETH <-> SEI) ===
                 // Use address comparison for reliability (isNative may not always be preserved)
-                const seiAddress = SEI.address.toLowerCase();
-                const wseiAddress = WSEI.address.toLowerCase();
+                const seiAddress = ETH.address.toLowerCase();
+                const wseiAddress = WETH.address.toLowerCase();
                 const tokenInAddr = tokenIn.address.toLowerCase();
                 const tokenOutAddr = tokenOut.address.toLowerCase();
 
@@ -500,7 +484,11 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     const optimal = await findOptimalRoute(tokenIn, tokenOut, amountIn);
 
                     if (optimal) {
-                        if (optimal.winner === 'split' && optimal.bestSplit) {
+                        // Native ETH input cannot use split routes: each swap leg calls refundETH()
+                        // internally, which returns leftover ETH to the caller mid-multicall.
+                        // The second leg then finds 0 ETH in the router and fails with STF.
+                        const canSplit = !tokenIn.isNative;
+                        if (canSplit && optimal.winner === 'split' && optimal.bestSplit) {
                             // Split route wins
                             routes.push({
                                 type: 'split',
@@ -766,18 +754,18 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 let hash: `0x${string}`;
 
                 if (bestRoute.isWrap) {
-                    // Wrap: SEI -> WSEI (deposit)
+                    // Wrap: SEI -> WETH (deposit)
                     hash = await writeContractAsync({
-                        address: WSEI.address as Address,
+                        address: WETH.address as Address,
                         abi: WETH_ABI,
                         functionName: 'deposit',
                         args: [],
                         value: amountWei,
                     });
                 } else {
-                    // Unwrap: WSEI -> SEI (withdraw)
+                    // Unwrap: WETH -> SEI (withdraw)
                     hash = await writeContractAsync({
-                        address: WSEI.address as Address,
+                        address: WETH.address as Address,
                         abi: WETH_ABI,
                         functionName: 'withdraw',
                         args: [amountWei],
@@ -807,8 +795,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 tokenOut,
                 amountIn,
                 amountOutMin,
-                bestRoute.tickSpacing,
-                slippage
+                bestRoute.tickSpacing
             );
         } else if (bestRoute.type === 'multi-hop') {
             // Multi-hop route - execute via intermediate token
@@ -823,8 +810,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 amountIn,
                 amountOutMin,
                 bestRoute.tickSpacing1,
-                bestRoute.tickSpacing2,
-                slippage
+                bestRoute.tickSpacing2
             );
         } else if (bestRoute.type === 'split' && bestRoute.splitLegs) {
             // Split route - execute multiple legs via multicall
@@ -839,7 +825,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     intermediate: leg.intermediate,
                 };
             });
-            result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
+            result = await executeSplitSwapV3(tokenIn, tokenOut, legs);
         } else if (bestRoute.type === 'wowmax') {
             // WowMax aggregator route — routed through WindSwap Aggregator Proxy (1% fee)
             setIsSwappingWowmax(true);
@@ -1060,17 +1046,15 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
             {/* Swap Direction Button */}
             <div className="relative h-0 flex items-center justify-center z-10">
-                <motion.button
+                <button
                     onClick={handleSwapTokens}
-                    className="swap-arrow-btn"
+                    className="swap-arrow-btn transition-transform hover:scale-110 active:scale-90"
                     aria-label="Swap tokens direction"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                     </svg>
-                </motion.button>
+                </button>
             </div>
 
             {/* Token Out */}

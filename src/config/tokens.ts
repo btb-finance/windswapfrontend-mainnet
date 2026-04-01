@@ -10,7 +10,7 @@ export interface Token {
 }
 
 // Native ETH
-export const SEI: Token = {
+export const ETH: Token = {
     address: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
     symbol: 'ETH',
     name: 'Ethereum',
@@ -19,18 +19,14 @@ export const SEI: Token = {
     isNative: true,
 };
 
-export const ETH = SEI;
-
 // Wrapped ETH (Base canonical WETH)
-export const WSEI: Token = {
+export const WETH: Token = {
     address: '0x4200000000000000000000000000000000000006',
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
     logoURI: '/logo/eth.svg',
 };
-
-export const WETH = WSEI;
 
 // WIND Protocol Token
 export const WIND: Token = {
@@ -40,8 +36,6 @@ export const WIND: Token = {
     decimals: 18,
     logoURI: '/logo.png',
 };
-
-export const YAKA = WIND;
 
 // Stablecoins
 export const USDC: Token = {
@@ -53,28 +47,23 @@ export const USDC: Token = {
 };
 
 // Keep exports for code compatibility (referenced elsewhere)
-export const USDT: Token = { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: '/logo/usdt0.png' };
+export const USDT: Token = { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', symbol: 'USDT', name: 'Tether USD', decimals: 6, logoURI: '/logo/usdt0.webp' };
 export const DAI: Token = { address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 };
 export const WBTC: Token = { address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c', symbol: 'cbBTC', name: 'Coinbase Wrapped BTC', decimals: 8 };
 export const LINK: Token = { address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196', symbol: 'LINK', name: 'ChainLink Token', decimals: 18 };
-export const USDT0 = USDT;
-export const USDCN = USDC;
-export const cbBTC = WBTC;
 export const LORE: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LORE', name: 'LORE', decimals: 18 };
-export const USDVE: Token = { address: '0xbFCD661Be34C99920036F176876746b9f5B68c26', symbol: 'USDVE', name: 'USDVE', decimals: 18, logoURI: '/logo/USDVE.png' };
-export const SKI: Token = { address: '0x768BE13e1680b5ebE0024C42c896E3dB59ec0149', symbol: 'SKI', name: 'SKI', decimals: 18, logoURI: '/logo/ski.png' };
-export const VIRTUAL: Token = { address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b', symbol: 'VIRTUAL', name: 'VIRTUAL', decimals: 18, logoURI: '/logo/Virtuals.png' };
-export const BRETT: Token = { address: '0x532f27101965dd16442E59d40670FaF5eBB142E4', symbol: 'BRETT', name: 'BRETT', decimals: 18, logoURI: '/logo/brett.png' };
-export const BOOMER: Token = { address: '0xcdE172dc5ffC46D228838446c57C1227e0B82049', symbol: 'BOOMER', name: 'BOOMER', decimals: 18, logoURI: '/logo/boomer.png' };
-export const VVV: Token = { address: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf', symbol: 'VVV', name: 'VVV', decimals: 18, logoURI: '/logo/vvv.png' };
+export const SKI: Token = { address: '0x768BE13e1680b5ebE0024C42c896E3dB59ec0149', symbol: 'SKI', name: 'SKI', decimals: 18, logoURI: '/logo/ski.webp' };
+export const VIRTUAL: Token = { address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b', symbol: 'VIRTUAL', name: 'VIRTUAL', decimals: 18, logoURI: '/logo/Virtuals.webp' };
+export const BRETT: Token = { address: '0x532f27101965dd16442E59d40670FaF5eBB142E4', symbol: 'BRETT', name: 'BRETT', decimals: 18, logoURI: '/logo/brett.webp' };
+export const BOOMER: Token = { address: '0xcdE172dc5ffC46D228838446c57C1227e0B82049', symbol: 'BOOMER', name: 'BOOMER', decimals: 18, logoURI: '/logo/boomer.webp' };
+export const VVV: Token = { address: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf', symbol: 'VVV', name: 'VVV', decimals: 18, logoURI: '/logo/vvv.webp' };
 
 // Default token list - only core tokens
 export const DEFAULT_TOKEN_LIST: Token[] = [
-    SEI,
-    WSEI,
+    ETH,
+    WETH,
     WIND,
     USDC,
-    USDVE,
     SKI,
     VIRTUAL,
     BRETT,
@@ -84,22 +73,15 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
 
 // Token addresses for quick lookup
 export const TOKEN_ADDRESSES = {
-    SEI: SEI.address,
-    ETH: SEI.address,
-    WSEI: WSEI.address,
-    WETH: WSEI.address,
+    ETH: ETH.address,
+    WETH: WETH.address,
     WIND: WIND.address,
-    YAKA: WIND.address,
     USDC: USDC.address,
     USDT: USDT.address,
-    USDT0: USDT.address,
-    USDCN: USDC.address,
     DAI: DAI.address,
     WBTC: WBTC.address,
     LINK: LINK.address,
     LORE: LORE.address,
-    cbBTC: cbBTC.address,
-    USDVE: USDVE.address,
     SKI: SKI.address,
     VIRTUAL: VIRTUAL.address,
     BRETT: BRETT.address,

@@ -1,13 +1,16 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
+import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { parseUnits, formatUnits, Address } from 'viem';
-import { V2_CONTRACTS, COMMON } from '@/config/contracts';
-import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
-import { Token, WSEI } from '@/config/tokens';
+import { V2_CONTRACTS } from '@/config/contracts';
+import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
+import { Token } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
+import { extractErrorMessage } from '@/utils/errors';
+import { resolveToken, resolveTokenAddress } from '@/utils/contracts';
 
 export interface BulkSwapLeg {
     token: Token;
@@ -23,8 +26,8 @@ export interface BulkSwapLeg {
 
 export function useBulkSwap() {
     const { address } = useAccount();
-    const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { approveIfNeeded } = useBatchTransactions();
     const [isQuoting, setIsQuoting] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -43,12 +46,12 @@ export function useBulkSwap() {
             setIsQuoting(true);
             setError(null);
 
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+            const actualTokenIn = resolveToken(tokenIn);
             const totalWei = parseUnits(amountIn, tokenIn.decimals);
 
             // Calculate exact wei per leg to avoid rounding dust missing/exceeding totalWei
             const legAmountsWei = legs.map((leg, index) => {
-                if (index === legs.length - 1) return BigInt(0); // calculated after
+                if (index === legs.length - 1) return BigInt(0);
                 return (totalWei * BigInt(Math.round(leg.allocation * 10000))) / BigInt(10000);
             });
             const sumSoFar = legAmountsWei.reduce((a, b) => a + b, BigInt(0));
@@ -64,7 +67,7 @@ export function useBulkSwap() {
                             return { ...leg, status: 'failed', estimatedOut: '0' };
                         }
 
-                        const actualTokenOut = leg.token.isNative ? WSEI : leg.token;
+                        const actualTokenOut = resolveToken(leg.token);
                         const quote = await getKyberQuote(
                             actualTokenIn.address,
                             actualTokenOut.address,
@@ -118,7 +121,7 @@ export function useBulkSwap() {
             setError(null);
 
             try {
-                const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+                const actualTokenIn = resolveToken(tokenIn);
                 const totalWei = parseUnits(amountIn, tokenIn.decimals);
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
@@ -136,7 +139,7 @@ export function useBulkSwap() {
                 const orders = await Promise.all(
                     legs.map(async (leg, index) => {
                         const legAmountWei = legAmountsWei[index];
-                        const actualTokenOut = leg.token.isNative ? WSEI : leg.token;
+                        const actualTokenOut = resolveToken(leg.token);
 
                         // Build calldata — sender & recipient = proxy contract
                         const swapData = await getKyberSwapData(
@@ -165,33 +168,11 @@ export function useBulkSwap() {
 
                 // If tokenIn is native ETH, send value; contract wraps to WETH
                 const isNativeIn = tokenIn.isNative;
-                const tokenInAddress = isNativeIn
-                    ? '0x0000000000000000000000000000000000000000'
-                    : (actualTokenIn.address as Address);
+                const tokenInAddress = resolveTokenAddress(tokenIn);
 
                 // Approve if ERC20
                 if (!isNativeIn) {
-                    // Check current allowance
-                    const allowance = await publicClient!.readContract({
-                        address: actualTokenIn.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'allowance',
-                        args: [address, proxyAddress],
-                    }) as bigint;
-
-                    // Only approve if current allowance is less than needed amount
-                    if (allowance < totalWei) {
-                        const approveHash = await writeContractAsync({
-                            address: actualTokenIn.address as Address,
-                            abi: ERC20_ABI,
-                            functionName: 'approve',
-                            args: [proxyAddress, totalWei],
-                        });
-                        // Wait a moment for approval to propagate
-                        if (approveHash) {
-                            await new Promise((r) => setTimeout(r, 2000));
-                        }
-                    }
+                    await approveIfNeeded(actualTokenIn.address as Address, proxyAddress, totalWei);
                 }
 
                 const hash = await writeContractAsync({
@@ -205,7 +186,7 @@ export function useBulkSwap() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('BulkSwap error:', err);
-                setError(err instanceof Error ? err.message : 'Bulk swap failed');
+                setError(extractErrorMessage(err, 'Bulk swap failed'));
                 return null;
             } finally {
                 setIsExecuting(false);

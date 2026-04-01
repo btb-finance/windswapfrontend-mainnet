@@ -4,8 +4,15 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   compress: true,
   experimental: {
-    // Tree-shake large packages to reduce bundle size
-    optimizePackageImports: ['framer-motion', 'viem', 'wagmi', '@rainbow-me/rainbowkit'],
+    optimizePackageImports: [
+      'viem',
+      'wagmi',
+      '@rainbow-me/rainbowkit',
+      '@tanstack/react-query',
+      '@coinbase/wallet-sdk',
+      '@safe-global/safe-apps-sdk',
+    ],
+    optimizeCss: true,
   },
 
   // Headers for Safe Apps iframe support

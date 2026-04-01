@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
@@ -757,18 +756,14 @@ export default function VotePage() {
     return (
         <div className="container mx-auto px-3 sm:px-6 py-4">
             {/* Page Header - Compact */}
-            <motion.div
-                className="mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div className="mb-4 animate-fade-up">
                 <h1 className="text-xl sm:text-2xl font-bold">
                     <span className="gradient-text">Vote</span> & Earn
                 </h1>
                 <p className="text-xs sm:text-sm text-gray-400">
                     Lock WIND → Vote → Earn rewards
                 </p>
-            </motion.div>
+            </div>
 
             {/* Visual Step Flow - hidden on mobile */}
             <div className="hidden md:block mb-8">

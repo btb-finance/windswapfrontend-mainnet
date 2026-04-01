@@ -1,14 +1,18 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData, decodeFunctionResult } from 'viem';
-import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
-import { ROUTER_ABI, ERC20_ABI } from '@/config/abis';
-import { Token, WSEI } from '@/config/tokens';
-import { getRpcForQuotes } from '@/utils/rpc';
-import { swrCache, dedupeRequest, getQuoteCacheKey } from '@/utils/cache';
+import { parseUnits, formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
+import { V2_CONTRACTS, COMMON } from '@/config/contracts';
+import { ROUTER_ABI } from '@/config/abis';
+import { Token } from '@/config/tokens';
+import { ethCall } from '@/utils/rpc';
+import { swrCache, getQuoteCacheKey } from '@/utils/cache';
+import { getDeadline } from '@/utils/format';
+import { extractErrorMessage } from '@/utils/errors';
+import { resolveToken } from '@/utils/contracts';
+import { useTokenApproval } from '@/hooks/useTokenApproval';
 
 interface Route {
     from: Address;
@@ -23,6 +27,7 @@ export function useSwap() {
     const [error, setError] = useState<string | null>(null);
 
     const { writeContractAsync } = useWriteContract();
+    const { approveMax } = useTokenApproval();
 
     // Get quote for swap (Exact Input) - with caching
     const getQuote = useCallback(
@@ -35,8 +40,8 @@ export function useSwap() {
             try {
                 if (!amountIn || parseFloat(amountIn) === 0) return null;
 
-                const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-                const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+                const actualTokenIn = resolveToken(tokenIn);
+                const actualTokenOut = resolveToken(tokenOut);
                 
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
@@ -68,24 +73,13 @@ export function useSwap() {
                             args: [amountInWei, route],
                         });
 
-                        const response = await fetch(getRpcForQuotes(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0',
-                                method: 'eth_call',
-                                params: [{ to: V2_CONTRACTS.Router, data }, 'latest'],
-                                id: 1
-                            })
-                        });
+                        const callResult = await ethCall(V2_CONTRACTS.Router, data);
 
-                        const result = await response.json();
-
-                        if (result.result && result.result !== '0x') {
+                        if (callResult && callResult !== '0x') {
                             const decoded = decodeFunctionResult({
                                 abi: ROUTER_ABI,
                                 functionName: 'getAmountsOut',
-                                data: result.result,
+                                data: callResult as `0x${string}`,
                             }) as bigint[];
 
                             const amountOutWei = decoded[decoded.length - 1];
@@ -118,8 +112,8 @@ export function useSwap() {
             try {
                 if (!amountOut || parseFloat(amountOut) === 0) return null;
 
-                const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-                const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+                const actualTokenIn = resolveToken(tokenIn);
+                const actualTokenOut = resolveToken(tokenOut);
 
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
@@ -151,24 +145,13 @@ export function useSwap() {
                             args: [amountOutWei, route],
                         });
 
-                        const response = await fetch(getRpcForQuotes(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0',
-                                method: 'eth_call',
-                                params: [{ to: V2_CONTRACTS.Router, data }, 'latest'],
-                                id: 1
-                            })
-                        });
+                        const callResult = await ethCall(V2_CONTRACTS.Router, data);
 
-                        const result = await response.json();
-
-                        if (result.result && result.result !== '0x') {
+                        if (callResult && callResult !== '0x') {
                             const decoded = decodeFunctionResult({
                                 abi: ROUTER_ABI,
                                 functionName: 'getAmountsIn',
-                                data: result.result,
+                                data: callResult as `0x${string}`,
                             }) as bigint[];
 
                             const amountInWei = decoded[0];
@@ -192,24 +175,10 @@ export function useSwap() {
 
     // Check and approve token
     const approveToken = useCallback(
-        async (token: Token, amount: bigint, spender: Address): Promise<boolean> => {
-            if (!address) return false;
-
-            try {
-                const hash = await writeContractAsync({
-                    address: token.address as Address,
-                    abi: ERC20_ABI,
-                    functionName: 'approve',
-                    args: [spender, maxUint256],
-                });
-
-                return !!hash;
-            } catch (err) {
-                console.error('Approve error:', err);
-                return false;
-            }
+        async (token: Token, _amount: bigint, spender: Address): Promise<boolean> => {
+            return approveMax(token, spender);
         },
-        [address, writeContractAsync]
+        [approveMax]
     );
 
     // Execute swap
@@ -237,7 +206,7 @@ export function useSwap() {
                 // For exactOut, amountOutMin param is actually amountOut (exact)
                 // For exactIn, amountOutMin param is amountOutMinimum
 
-                const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+                const deadlineTimestamp = getDeadline(deadline);
 
                 const route: Route[] = [
                     {
@@ -248,17 +217,17 @@ export function useSwap() {
                     },
                 ];
 
-                // Check if tokenIn is native SEI
+                // Check if tokenIn is native ETH
                 const isNativeIn = tokenIn.isNative;
                 const isNativeOut = tokenOut.isNative;
 
                 let hash: `0x${string}`;
 
                 if (isNativeIn) {
-                    // Swap SEI for Token
+                    // Swap ETH for Token
                     const wethRoute: Route[] = [
                         {
-                            from: COMMON.WSEI as Address,
+                            from: COMMON.WETH as Address,
                             to: tokenOut.address as Address,
                             stable,
                             factory: V2_CONTRACTS.PoolFactory as Address,
@@ -283,11 +252,11 @@ export function useSwap() {
                         });
                     }
                 } else if (isNativeOut) {
-                    // Swap Token for SEI
+                    // Swap Token for ETH
                     const wethRoute: Route[] = [
                         {
                             from: tokenIn.address as Address,
-                            to: COMMON.WSEI as Address,
+                            to: COMMON.WETH as Address,
                             stable,
                             factory: V2_CONTRACTS.PoolFactory as Address,
                         },
@@ -336,7 +305,7 @@ export function useSwap() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('Swap error:', err);
-                setError((err instanceof Error ? err.message : undefined) || 'Swap failed');
+                setError(extractErrorMessage(err, 'Swap failed'));
                 return null;
             } finally {
                 setIsLoading(false);

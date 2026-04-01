@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
@@ -9,16 +8,19 @@ import { Address, formatUnits, createPublicClient, http, encodeFunctionData } fr
 import { base } from 'viem/chains';
 import Link from 'next/link';
 import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
-import { WSEI, Token } from '@/config/tokens';
+import { WETH, Token } from '@/config/tokens';
+const WSEI = WETH; // local alias for WETH address comparisons
 import { getTokenLogo as getTokenLogoUtil, getTokenDisplayInfo } from '@/utils/tokens';
-import { formatPrice } from '@/utils/format';
+import { formatPrice, getDeadline } from '@/utils/format';
 import { useCLPositions, useV2Positions } from '@/hooks/usePositions';
-import { NFT_POSITION_MANAGER_ABI, ERC20_ABI, ROUTER_ABI, VOTING_ESCROW_ABI, CL_GAUGE_ABI } from '@/config/abis';
+import { NFT_POSITION_MANAGER_ABI, ROUTER_ABI, CL_GAUGE_ABI } from '@/config/abis';
 import { usePoolData } from '@/providers/PoolDataProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
 import { useToast } from '@/providers/ToastProvider';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
+
+const publicClient = createPublicClient({ chain: base, transport: http(getRpcForPoolData()) });
 
 async function fetchGaugeAddressByPool(poolId: string): Promise<string | null> {
     try {
@@ -367,7 +369,7 @@ export default function PortfolioPage() {
 
     // Contract write hook
     const { writeContractAsync } = useWriteContract();
-    const { executeBatch, encodeContractCall } = useBatchTransactions();
+    const { batchOrSequential, encodeContractCall, approveIfNeeded, buildApproveCallIfNeeded } = useBatchTransactions();
 
     // Get CL and V2 positions
     const { positions: clPositions, positionCount: clCount, isLoading: clLoading, refetch: refetchCL } = useCLPositions();
@@ -440,7 +442,7 @@ export default function PortfolioPage() {
 
                 console.log('Balance responses:', bal0Response, bal1Response);
 
-                // For WSEI, fetch native SEI balance instead
+                // For WETH, fetch native ETH balance instead
                 if (isToken0WSEI) {
                     const nativeBal = await fetch(getRpcForPoolData(), {
                         method: 'POST',
@@ -634,8 +636,7 @@ export default function PortfolioPage() {
         setActionLoading(true);
         setBurnStatus('Checking position on-chain...');
         try {
-            const client = createPublicClient({ chain: base, transport: http(getRpcForPoolData()) });
-            const onChainPos = await client.readContract({
+            const onChainPos = await publicClient.readContract({
                 address: CL_CONTRACTS.NonfungiblePositionManager as Address,
                 abi: NFT_POSITION_MANAGER_ABI,
                 functionName: 'positions',
@@ -696,7 +697,7 @@ export default function PortfolioPage() {
         if (!address || position.liquidity <= BigInt(0)) return;
         setActionLoading(true);
         try {
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
             // Build batch: decrease liquidity + collect (NO burn — burn is separate & optional)
@@ -727,43 +728,8 @@ export default function PortfolioPage() {
             ];
 
             // Try batch first
-            const batchResult = await executeBatch(batchCalls);
-
-            if (batchResult.usedBatching && batchResult.success) {
-                toast.success('Liquidity removed & fees collected!');
-            } else {
-                // Fall back to sequential
-                console.log('Batch not available, using sequential remove + collect');
-
-                // Decrease liquidity
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'decreaseLiquidity',
-                    args: [{
-                        tokenId: position.tokenId,
-                        liquidity: position.liquidity,
-                        amount0Min: BigInt(0),
-                        amount1Min: BigInt(0),
-                        deadline,
-                    }],
-                });
-
-                // Then collect
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'collect',
-                    args: [{
-                        tokenId: position.tokenId,
-                        recipient: address,
-                        amount0Max: maxUint128,
-                        amount1Max: maxUint128,
-                    }],
-                });
-
-                toast.success('Liquidity removed & fees collected!');
-            }
+            await batchOrSequential(batchCalls);
+            toast.success('Liquidity removed & fees collected!');
 
             refetchCL();
         } catch (err) {
@@ -823,42 +789,7 @@ export default function PortfolioPage() {
                     'deposit',
                     [position.tokenId]
                 );
-                const batchResult = await executeBatch([approveCall, depositCall]);
-                if (!batchResult.usedBatching || !batchResult.success) {
-                    // Sequential fallback
-                    const approvalTx = await writeContractAsync({
-                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                        abi: [{ inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], name: 'approve', outputs: [], stateMutability: 'nonpayable', type: 'function' }],
-                        functionName: 'approve',
-                        args: [gaugeAddressLower as Address, position.tokenId],
-                    });
-                    // Wait for approval confirmation
-                    let confirmed = false;
-                    for (let i = 0; i < 30; i++) {
-                        const receipt = await fetch(getRpcForPoolData(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0', method: 'eth_getTransactionReceipt',
-                                params: [approvalTx],
-                                id: 1
-                            })
-                        }).then(r => r.json());
-                        if (receipt.result && receipt.result.status === '0x1') { confirmed = true; break; }
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                    if (!confirmed) {
-                        toast.error('Approval failed. Try again');
-                        setActionLoading(false);
-                        return;
-                    }
-                    await writeContractAsync({
-                        address: gaugeAddressLower as Address,
-                        abi: CL_GAUGE_ABI,
-                        functionName: 'deposit',
-                        args: [position.tokenId],
-                    });
-                }
+                await batchOrSequential([approveCall, depositCall]);
             } else {
                 // Already approved, just deposit
                 await writeContractAsync({
@@ -946,24 +877,8 @@ export default function PortfolioPage() {
             }
 
             // Try batch first
-            const batchResult = await executeBatch(batchCalls);
-
-            if (batchResult.usedBatching && batchResult.success) {
-                toast.success(`Claimed rewards from ${batchCalls.length} position(s) in one transaction!`);
-            } else {
-                // Fall back to sequential
-                for (const pos of stakedPositions) {
-                    if (pos.pendingRewards > BigInt(0)) {
-                        await writeContractAsync({
-                            address: pos.gaugeAddress as Address,
-                            abi: CL_GAUGE_ABI,
-                            functionName: 'getReward',
-                            args: [pos.tokenId],
-                        });
-                    }
-                }
-                toast.success('All rewards claimed!');
-            }
+            await batchOrSequential(batchCalls);
+            toast.success(`Claimed rewards from ${batchCalls.length} position(s) in one transaction!`);
             refetchStaked(); // Refresh staked positions
         } catch (err) {
             console.error('Claim all rewards error:', err);
@@ -977,7 +892,7 @@ export default function PortfolioPage() {
         if (!address) return;
         setActionLoading(true);
         try {
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
             const batchCalls = [];
@@ -1023,59 +938,15 @@ export default function PortfolioPage() {
             // Rewards are auto-claimed when unstaking, no separate claim needed
 
             // Execute batch
-            const batchResult = await executeBatch(batchCalls);
+            await batchOrSequential(batchCalls);
 
-            if (batchResult.usedBatching && batchResult.success) {
-                const actions = [];
-                actions.push('unstaked');
-                if (pos.liquidity && pos.liquidity > BigInt(0)) actions.push('removed liquidity');
-                actions.push('collected fees');
-                // Note: Rewards are auto-claimed when unstaking
+            const actions = [];
+            actions.push('unstaked');
+            if (pos.liquidity && pos.liquidity > BigInt(0)) actions.push('removed liquidity');
+            actions.push('collected fees');
+            // Note: Rewards are auto-claimed when unstaking
 
-                toast.success(`Position exited: ${actions.join(' + ')}!`);
-            } else {
-                // Fall back to sequential execution
-                toast.info('Batch not supported, using sequential transactions...');
-
-                // 1. Unstake FIRST (auto-claims rewards)
-                await writeContractAsync({
-                    address: pos.gaugeAddress as Address,
-                    abi: CL_GAUGE_ABI,
-                    functionName: 'withdraw',
-                    args: [pos.tokenId],
-                });
-
-                // 2. Decrease liquidity SECOND
-                if (pos.liquidity && pos.liquidity > BigInt(0)) {
-                    await writeContractAsync({
-                        address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                        abi: NFT_POSITION_MANAGER_ABI,
-                        functionName: 'decreaseLiquidity',
-                        args: [{
-                            tokenId: pos.tokenId,
-                            liquidity: pos.liquidity,
-                            amount0Min: BigInt(0),
-                            amount1Min: BigInt(0),
-                            deadline,
-                        }],
-                    });
-                }
-
-                // 3. Collect fees
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'collect',
-                    args: [{
-                        tokenId: pos.tokenId,
-                        recipient: address,
-                        amount0Max: maxUint128,
-                        amount1Max: maxUint128,
-                    }],
-                });
-
-                toast.success('Position fully exited!');
-            }
+            toast.success(`Position exited: ${actions.join(' + ')}!`);
 
             // Optimistically remove from UI immediately - no loading state!
             removeStakedPosition(pos.tokenId, pos.gaugeAddress);
@@ -1095,28 +966,10 @@ export default function PortfolioPage() {
         try {
             // Calculate amount to remove based on percentage
             const liquidityToRemove = (pos.lpBalance * BigInt(percent)) / BigInt(100);
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
-            // Check existing allowance first
-            const allowanceSelector = '0xdd62ed3e'; // allowance(address,address)
-            const ownerPadded = address.slice(2).toLowerCase().padStart(64, '0');
-            const spenderPadded = V2_CONTRACTS.Router.slice(2).toLowerCase().padStart(64, '0');
-
-            const allowanceResult = await fetch(getRpcForPoolData(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0', method: 'eth_call',
-                    params: [{
-                        to: pos.poolAddress,
-                        data: `${allowanceSelector}${ownerPadded}${spenderPadded}`
-                    }, 'latest'],
-                    id: 1
-                })
-            }).then(r => r.json());
-
-            const currentAllowance = allowanceResult.result ? BigInt(allowanceResult.result) : BigInt(0);
-            const needsApproval = currentAllowance < liquidityToRemove;
+            // Approve LP token if needed
+            await approveIfNeeded(pos.poolAddress as Address, V2_CONTRACTS.Router as Address, liquidityToRemove);
 
             // Build remove liquidity call
             const removeLiquidityCall = encodeContractCall(
@@ -1135,95 +988,8 @@ export default function PortfolioPage() {
                 ]
             );
 
-            if (needsApproval) {
-                // Build approval call
-                const approveCall = encodeContractCall(
-                    pos.poolAddress as Address,
-                    ERC20_ABI,
-                    'approve',
-                    [V2_CONTRACTS.Router as Address, liquidityToRemove]
-                );
-
-                // Try batch: approve + removeLiquidity
-                const batchResult = await executeBatch([approveCall, removeLiquidityCall]);
-
-                if (batchResult.usedBatching && batchResult.success) {
-                    toast.success(`Approved & removed ${percent}% liquidity in one transaction!`);
-                } else {
-                    // Fall back to sequential
-                    console.log('Batch not available for V2, using sequential approve + remove');
-
-                    const approvalTx = await writeContractAsync({
-                        address: pos.poolAddress as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [V2_CONTRACTS.Router as Address, liquidityToRemove],
-                    });
-
-                    // Wait for approval to confirm
-                    let confirmed = false;
-                    for (let i = 0; i < 30; i++) {
-                        const receipt = await fetch(getRpcForPoolData(), {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                jsonrpc: '2.0', method: 'eth_getTransactionReceipt',
-                                params: [approvalTx],
-                                id: 1
-                            })
-                        }).then(r => r.json());
-
-                        if (receipt.result && receipt.result.status === '0x1') {
-                            confirmed = true;
-                            break;
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-
-                    if (!confirmed) {
-                        toast.error('Approval failed. Try again');
-                        setActionLoading(false);
-                        return;
-                    }
-
-                    // Then remove liquidity
-                    await writeContractAsync({
-                        address: V2_CONTRACTS.Router as Address,
-                        abi: ROUTER_ABI,
-                        functionName: 'removeLiquidity',
-                        args: [
-                            pos.token0 as Address,
-                            pos.token1 as Address,
-                            pos.stable,
-                            liquidityToRemove,
-                            BigInt(0),
-                            BigInt(0),
-                            address,
-                            deadline,
-                        ],
-                    });
-
-                    toast.success(`Removed ${percent}% liquidity!`);
-                }
-            } else {
-                // No approval needed, just remove liquidity
-                await writeContractAsync({
-                    address: V2_CONTRACTS.Router as Address,
-                    abi: ROUTER_ABI,
-                    functionName: 'removeLiquidity',
-                    args: [
-                        pos.token0 as Address,
-                        pos.token1 as Address,
-                        pos.stable,
-                        liquidityToRemove,
-                        BigInt(0),
-                        BigInt(0),
-                        address,
-                        deadline,
-                    ],
-                });
-                toast.success(`Removed ${percent}% liquidity!`);
-            }
+            await batchOrSequential([removeLiquidityCall]);
+            toast.success(`Removed ${percent}% liquidity!`);
 
             refetchV2();
             setExpandedV2Position(null);
@@ -1257,7 +1023,7 @@ export default function PortfolioPage() {
             const t1 = getTokenInfo(selectedPosition.token1);
             const amount0Desired = amount0ToAdd ? BigInt(Math.floor(parseFloat(amount0ToAdd) * (10 ** t0.decimals))) : BigInt(0);
             const amount1Desired = amount1ToAdd ? BigInt(Math.floor(parseFloat(amount1ToAdd) * (10 ** t1.decimals))) : BigInt(0);
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             // Check if either token is WSEI (for native value handling)
             const isToken0WSEI = selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase();
@@ -1271,53 +1037,16 @@ export default function PortfolioPage() {
                 nativeValue = amount1Desired;
             }
 
-            // Helper to check allowance
-            const checkAllowance = async (tokenAddr: string, amount: bigint): Promise<boolean> => {
-                const result = await fetch(getRpcForPoolData(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0', id: 1,
-                        method: 'eth_call',
-                        params: [{
-                            to: tokenAddr,
-                            data: `0xdd62ed3e${address!.slice(2).toLowerCase().padStart(64, '0')}${CL_CONTRACTS.NonfungiblePositionManager.slice(2).toLowerCase().padStart(64, '0')}`
-                        }, 'latest']
-                    })
-                }).then(r => r.json());
-                const allowance = result.result ? BigInt(result.result) : BigInt(0);
-                return allowance >= amount;
-            };
+            // Build approval calls if needed (skip native WSEI)
+            const approve0Call = (amount0Desired > BigInt(0) && !(isToken0WSEI && nativeValue > BigInt(0)))
+                ? await buildApproveCallIfNeeded(selectedPosition.token0 as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Desired)
+                : null;
+            const approve1Call = (amount1Desired > BigInt(0) && !(isToken1WSEI && nativeValue > BigInt(0)))
+                ? await buildApproveCallIfNeeded(selectedPosition.token1 as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Desired)
+                : null;
 
-            // Determine which tokens need approval
-            const needsToken0Approval = amount0Desired > BigInt(0) && !(isToken0WSEI && nativeValue > BigInt(0)) && !(await checkAllowance(selectedPosition.token0, amount0Desired));
-            const needsToken1Approval = amount1Desired > BigInt(0) && !(isToken1WSEI && nativeValue > BigInt(0)) && !(await checkAllowance(selectedPosition.token1, amount1Desired));
-
-            // Build batch calls
-            const batchCalls = [];
-
-            // Add approval for token0 if needed
-            if (needsToken0Approval) {
-                batchCalls.push(encodeContractCall(
-                    selectedPosition.token0 as Address,
-                    ERC20_ABI,
-                    'approve',
-                    [CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Desired]
-                ));
-            }
-
-            // Add approval for token1 if needed
-            if (needsToken1Approval) {
-                batchCalls.push(encodeContractCall(
-                    selectedPosition.token1 as Address,
-                    ERC20_ABI,
-                    'approve',
-                    [CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Desired]
-                ));
-            }
-
-            // Add increaseLiquidity call
-            batchCalls.push(encodeContractCall(
+            // Build increaseLiquidity call
+            const increaseLiquidityCall = encodeContractCall(
                 CL_CONTRACTS.NonfungiblePositionManager as Address,
                 NFT_POSITION_MANAGER_ABI,
                 'increaseLiquidity',
@@ -1330,63 +1059,10 @@ export default function PortfolioPage() {
                     deadline,
                 }],
                 nativeValue
-            ));
+            );
 
-            // Try batch first
-            const batchResult = await executeBatch(batchCalls);
-
-            if (batchResult.usedBatching && batchResult.success) {
-                const actions = [];
-                if (needsToken0Approval) actions.push('approved token0');
-                if (needsToken1Approval) actions.push('approved token1');
-                actions.push('increased liquidity');
-                toast.success(`Batch complete: ${actions.join(' + ')}!`);
-            } else {
-                // Fall back to sequential
-                console.log('Batch not available, using sequential transactions');
-
-                // Approve token0 if needed
-                if (needsToken0Approval) {
-                    const approvalTx = await writeContractAsync({
-                        address: selectedPosition.token0 as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Desired],
-                    });
-                    // Wait briefly
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-
-                // Approve token1 if needed
-                if (needsToken1Approval) {
-                    const approvalTx = await writeContractAsync({
-                        address: selectedPosition.token1 as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Desired],
-                    });
-                    // Wait briefly
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-
-                // Call increaseLiquidity
-                await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'increaseLiquidity',
-                    args: [{
-                        tokenId: selectedPosition.tokenId,
-                        amount0Desired,
-                        amount1Desired,
-                        amount0Min: BigInt(0),
-                        amount1Min: BigInt(0),
-                        deadline,
-                    }],
-                    value: nativeValue,
-                });
-
-                toast.success('Liquidity increased!');
-            }
+            await batchOrSequential([approve0Call, approve1Call, increaseLiquidityCall].filter((c): c is NonNullable<typeof c> => c !== null));
+            toast.success('Increased liquidity!');
 
             setShowIncreaseLiquidityModal(false);
             setSelectedPosition(null);
@@ -1491,11 +1167,7 @@ export default function PortfolioPage() {
     return (
         <div className="container mx-auto px-3 sm:px-6 py-4">
             {/* Header - Compact inline */}
-            <motion.div
-                className="flex items-center justify-between gap-3 mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-            >
+            <div className="flex items-center justify-between gap-3 mb-4 animate-fade-up">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold">
                         <span className="gradient-text">Portfolio</span>
@@ -1512,7 +1184,7 @@ export default function PortfolioPage() {
                         </div>
                     </div>
                 )}
-            </motion.div>
+            </div>
 
             {/* Tabs - Compact */}
             <div className="flex gap-1 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
@@ -1532,7 +1204,7 @@ export default function PortfolioPage() {
 
             {/* Pull to Refresh Indicator */}
             <div className="md:hidden flex justify-center items-center h-0 overflow-visible relative z-10">
-                <motion.div
+                <div
                     className="absolute -top-6"
                     style={{
                         opacity: isPulling ? Math.min(pullProgress * 2, 1) : 0,
@@ -1544,7 +1216,7 @@ export default function PortfolioPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </div>
-                </motion.div>
+                </div>
             </div>
 
             {/* Scrollable Content with Pull-to-Refresh */}
@@ -1559,7 +1231,7 @@ export default function PortfolioPage() {
             >
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Portfolio Value Hero */}
                         <div className="glass-card p-5">
                             <div className="text-xs text-gray-400 mb-1">Total Portfolio Value</div>
@@ -1768,13 +1440,13 @@ export default function PortfolioPage() {
                                 </div>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
 
                 {/* Positions Tab */}
                 {activeTab === 'positions' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Search and Sort Controls */}
                         <div className="flex items-center gap-2">
                             <div className="relative flex-1">
@@ -1833,8 +1505,6 @@ export default function PortfolioPage() {
                                         const collectedUsd = pos.collectedUSD || 0;
                                         // Fees = collected - withdrawn (collect() returns principal + fees together)
                                         const feesEarnedUsd = Math.max(0, collectedUsd - withdrawnUsd);
-                                        const feesToken0 = Math.max(0, (pos.collectedToken0 || 0) - (pos.withdrawnToken0 || 0));
-                                        const feesToken1 = Math.max(0, (pos.collectedToken1 || 0) - (pos.withdrawnToken1 || 0));
                                         // WIND staking rewards
                                         const windEarnedUsd = (pos.totalWindEarned || 0) * (windPrice || 0);
                                         // PnL = current value + what you got back + WIND earned - what you put in
@@ -2325,12 +1995,12 @@ export default function PortfolioPage() {
                                 )}
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Staked Tab */}
                 {activeTab === 'staked' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Total Rewards Banner */}
                         {stakedPositions.length > 0 && totalPendingRewards > BigInt(0) && (
                             <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
@@ -2616,12 +2286,12 @@ export default function PortfolioPage() {
                                 })}
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Locks Tab */}
                 {activeTab === 'locks' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Summary */}
                         {veNFTs.length > 0 && (
                             <div className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
@@ -2702,12 +2372,12 @@ export default function PortfolioPage() {
                                 </Link>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Rewards Tab */}
                 {activeTab === 'rewards' && (
-                    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <div className="space-y-4 animate-fade-in">
                         {/* Rewards Hero */}
                         <div className="flex items-center justify-between p-5 rounded-2xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
                             <div>
@@ -2783,18 +2453,13 @@ export default function PortfolioPage() {
                                 })}
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 )}
 
                 {/* Increase Liquidity Modal - Compact Mobile Style */}
                 {showIncreaseLiquidityModal && selectedPosition && (
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-                        <motion.div
-                            className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto"
-                            initial={{ y: '100%', opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        >
+                        <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto animate-slide-up">
                             {/* Header */}
                             <div className="sticky top-0 bg-[#0d0d14] z-10 px-4 py-3 border-b border-white/10">
                                 <div className="flex items-center justify-between">
@@ -2842,7 +2507,7 @@ export default function PortfolioPage() {
                                     <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs text-gray-400">
-                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? 'SEI' : getTokenInfo(selectedPosition.token0).symbol}
+                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token0).symbol}
                                             </label>
                                             <span className="text-[10px] text-gray-400">
                                                 Bal: {balance0}
@@ -2888,7 +2553,7 @@ export default function PortfolioPage() {
                                     <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs text-gray-400">
-                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'SEI' : getTokenInfo(selectedPosition.token1).symbol} (auto)
+                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token1).symbol} (auto)
                                             </label>
                                             <span className="text-[10px] text-gray-400">
                                                 Bal: {balance1}
@@ -2943,7 +2608,7 @@ export default function PortfolioPage() {
                                     )}
                                 </button>
                             </div>
-                        </motion.div>
+                        </div>
                     </div>
                 )}
             </div>

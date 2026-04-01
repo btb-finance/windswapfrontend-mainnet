@@ -1,40 +1,30 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useAccount, useReadContract } from 'wagmi';
+import { useAsyncState } from '@/hooks/useAsyncState';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
-import { V2_CONTRACTS, COMMON } from '@/config/contracts';
-import { ROUTER_ABI, ERC20_ABI, POOL_FACTORY_ABI } from '@/config/abis';
+import { parseUnits, Address } from 'viem';
+import { V2_CONTRACTS } from '@/config/contracts';
+import { ROUTER_ABI, POOL_FACTORY_ABI } from '@/config/abis';
 import { Token } from '@/config/tokens';
+import { getDeadline } from '@/utils/format';
+import { extractErrorMessage } from '@/utils/errors';
+import { useTokenApproval } from '@/hooks/useTokenApproval';
 
 export function useLiquidity() {
     const { address, isConnected } = useAccount();
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { isLoading, setIsLoading, error, setError } = useAsyncState();
 
     const { writeContractAsync } = useWriteContract();
+    const { approveMax } = useTokenApproval();
 
     // Approve token for router
     const approveToken = useCallback(
         async (token: Token, spender: Address): Promise<boolean> => {
-            if (!address) return false;
-
-            try {
-                const hash = await writeContractAsync({
-                    address: token.address as Address,
-                    abi: ERC20_ABI,
-                    functionName: 'approve',
-                    args: [spender, maxUint256],
-                });
-
-                return !!hash;
-            } catch (err) {
-                console.error('Approve error:', err);
-                return false;
-            }
+            return approveMax(token, spender);
         },
-        [address, writeContractAsync]
+        [approveMax]
     );
 
     // Add liquidity (token/token)
@@ -67,7 +57,7 @@ export function useLiquidity() {
                     (parseFloat(amountB) * (1 - slippage / 100)).toFixed(tokenB.decimals),
                     tokenB.decimals
                 );
-                const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+                const deadlineTimestamp = getDeadline(deadline);
 
                 const isNativeA = tokenA.isNative;
                 const isNativeB = tokenB.isNative;
@@ -127,7 +117,7 @@ export function useLiquidity() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('Add liquidity error:', err);
-                setError((err instanceof Error ? err.message : undefined) || 'Failed to add liquidity');
+                setError(extractErrorMessage(err, 'Failed to add liquidity'));
                 return null;
             } finally {
                 setIsLoading(false);
@@ -156,7 +146,7 @@ export function useLiquidity() {
 
             try {
                 const liquidityWei = parseUnits(liquidity, 18);
-                const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+                const deadlineTimestamp = getDeadline(deadline);
 
                 // Get pool address to approve LP token
                 // For now, we'll use 0 as min amounts (should calculate properly)
@@ -182,7 +172,7 @@ export function useLiquidity() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('Remove liquidity error:', err);
-                setError((err instanceof Error ? err.message : undefined) || 'Failed to remove liquidity');
+                setError(extractErrorMessage(err, 'Failed to remove liquidity'));
                 return null;
             } finally {
                 setIsLoading(false);

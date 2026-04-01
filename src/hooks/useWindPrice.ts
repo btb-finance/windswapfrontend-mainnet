@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WIND, WSEI } from '@/config/tokens';
+import { WIND, WETH } from '@/config/tokens';
 import { fetchSubgraph } from '@/config/subgraph';
 
 /**
@@ -24,7 +24,7 @@ export function useWindPrice() {
                 }`;
 
                 const variables = {
-                    ids: [WIND.address.toLowerCase(), WSEI.address.toLowerCase()],
+                    ids: [WIND.address.toLowerCase(), WETH.address.toLowerCase()],
                 };
 
                 const data = await fetchSubgraph<{ tokens: Array<{ id: string; symbol: string; priceUSD: string }> }>(query, variables);
@@ -32,10 +32,10 @@ export function useWindPrice() {
                 const byId = new Map(tokens.map(t => [String(t.id).toLowerCase(), t]));
 
                 const wind = byId.get(WIND.address.toLowerCase());
-                const wsei = byId.get(WSEI.address.toLowerCase());
+                const weth = byId.get(WETH.address.toLowerCase());
 
                 const windUsd = wind ? parseFloat(wind.priceUSD || '0') : 0;
-                const seiUsd = wsei ? parseFloat(wsei.priceUSD || '0') : 0;
+                const seiUsd = weth ? parseFloat(weth.priceUSD || '0') : 0;
 
                 return {
                     windPrice: windUsd > 0 ? windUsd : undefined,

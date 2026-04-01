@@ -1,7 +1,7 @@
 'use client';
 
 import { useAccount, useReadContract } from 'wagmi';
-import { Address, formatUnits, parseUnits, encodeFunctionData, decodeFunctionResult } from 'viem';
+import { Address, parseUnits, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
 import { NFT_POSITION_MANAGER_ABI, ERC20_ABI, POOL_FACTORY_ABI, POOL_ABI } from '@/config/abis';
 import { useState, useEffect, useCallback } from 'react';

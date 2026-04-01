@@ -2,15 +2,13 @@
 
 import { useState, useCallback } from 'react';
 import { parseUnits, formatUnits } from 'viem';
-import { Token, WSEI, USDC, WIND } from '@/config/tokens';
+import { Token, WETH, USDC, WIND } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
-import { getRpcForQuotes } from '@/utils/rpc';
+import { batchRpcCall } from '@/utils/rpc';
+import { TICK_SPACINGS, resolveToken, encodeV3Path } from '@/utils/contracts';
 
 // Common intermediate tokens for routing
-const INTERMEDIATE_TOKENS = [WSEI, USDC, WIND];
-
-// CL tick spacings from CLFactory contract
-const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
+const INTERMEDIATE_TOKENS = [WETH, USDC, WIND];
 
 export interface RouteQuote {
     amountOut: string;
@@ -57,19 +55,6 @@ export function useMixedRouteQuoter() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Encode path for V3: token + tickSpacing (3 bytes) + token
-    const encodePath = (tokens: string[], tickSpacings: number[]): `0x${string}` => {
-        let path = tokens[0].slice(2).toLowerCase();
-        for (let i = 0; i < tickSpacings.length; i++) {
-            const ts = tickSpacings[i];
-            const tsHex = ts >= 0
-                ? ts.toString(16).padStart(6, '0')
-                : ((1 << 24) + ts).toString(16);
-            path += tsHex + tokens[i + 1].slice(2).toLowerCase();
-        }
-        return `0x${path}` as `0x${string}`;
-    };
-
     // Encode quoteExactInput call data
     const encodeQuoteData = (path: `0x${string}`, amountIn: bigint): string => {
         const selector = 'cdca1753'; // quoteExactInput(bytes,uint256)
@@ -85,33 +70,23 @@ export function useMixedRouteQuoter() {
     const batchQuote = useCallback(async (requests: BatchQuoteRequest[]): Promise<(RouteQuote | null)[]> => {
         if (requests.length === 0) return [];
 
-        const batchBody = requests.map((req, i) => ({
-            jsonrpc: '2.0',
+        const batchCalls = requests.map((req) => ({
             method: 'eth_call',
             params: [{ to: CL_CONTRACTS.MixedRouteQuoterV1, data: encodeQuoteData(req.path, req.amountIn) }, 'latest'],
-            id: i + 1
         }));
 
         try {
-            const response = await fetch(getRpcForQuotes(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(batchBody)
-            });
-
-            const results = await response.json();
+            const results = await batchRpcCall(batchCalls);
 
             return requests.map((req, i) => {
-                const result = Array.isArray(results)
-                    ? (results as Array<{ id: number; result: string }>).find((r) => r.id === i + 1)
-                    : (results as { id: number; result: string });
+                const rawResult = results[i] as string | null | undefined;
 
-                if (!result?.result || result.result === '0x' || result.result.length < 66) {
+                if (!rawResult || rawResult === '0x' || rawResult.length < 66) {
                     return null;
                 }
 
                 try {
-                    const hex = result.result.slice(2);
+                    const hex = rawResult.slice(2);
                     const amountOut = BigInt('0x' + hex.slice(0, 64));
 
                     if (amountOut <= BigInt(0)) return null;
@@ -142,14 +117,14 @@ export function useMixedRouteQuoter() {
         tokenOut: Token,
         amountInWei: bigint,
     ): BatchQuoteRequest[] => {
-        const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+        const actualTokenIn = resolveToken(tokenIn);
+        const actualTokenOut = resolveToken(tokenOut);
         const requests: BatchQuoteRequest[] = [];
 
         // Direct routes
         for (const ts of TICK_SPACINGS) {
             requests.push({
-                path: encodePath([actualTokenIn.address, actualTokenOut.address], [ts]),
+                path: encodeV3Path([actualTokenIn.address, actualTokenOut.address], [ts]),
                 amountIn: amountInWei,
                 outputDecimals: actualTokenOut.decimals,
                 routeType: 'direct',
@@ -160,14 +135,14 @@ export function useMixedRouteQuoter() {
 
         // Multi-hop routes
         for (const intermediate of INTERMEDIATE_TOKENS) {
-            const actualIntermediate = intermediate.isNative ? WSEI : intermediate;
+            const actualIntermediate = resolveToken(intermediate);
             if (actualIntermediate.address.toLowerCase() === actualTokenIn.address.toLowerCase() ||
                 actualIntermediate.address.toLowerCase() === actualTokenOut.address.toLowerCase()) continue;
 
             for (const ts1 of TICK_SPACINGS) {
                 for (const ts2 of TICK_SPACINGS) {
                     requests.push({
-                        path: encodePath(
+                        path: encodeV3Path(
                             [actualTokenIn.address, actualIntermediate.address, actualTokenOut.address],
                             [ts1, ts2]
                         ),
@@ -184,7 +159,7 @@ export function useMixedRouteQuoter() {
         }
 
         return requests;
-    }, [encodePath]);
+    }, [encodeV3Path]);
 
     /**
      * Unified route finder: finds best single route AND best split in minimal RPC calls.
@@ -205,7 +180,7 @@ export function useMixedRouteQuoter() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
+            const actualTokenIn = resolveToken(tokenIn);
             const fullAmountWei = parseUnits(amountIn, actualTokenIn.decimals);
 
             // === BATCH 1: All routes at full amount ===
@@ -384,8 +359,8 @@ export function useMixedRouteQuoter() {
         tokenOut: Token,
     ): Promise<number | null> => {
         try {
-            const actualTokenIn = tokenIn.isNative ? WSEI : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenIn = resolveToken(tokenIn);
+            const actualTokenOut = resolveToken(tokenOut);
 
             // If one side IS USDC, we only need one quote
             const isTokenInUSDC = actualTokenIn.address.toLowerCase() === USDC.address.toLowerCase();

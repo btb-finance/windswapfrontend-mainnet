@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
-import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
+import { useAccount } from 'wagmi';
+import { parseUnits, formatUnits, Address, encodeFunctionData } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
-import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
-import { Token, WSEI } from '@/config/tokens';
+import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
+import { Token } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
+import { useBatchTransactions } from '@/hooks/useBatchTransactions';
+import { resolveToken, resolveTokenAddress } from '@/utils/contracts';
 
 export interface BulkSellLeg {
     token: Token;
@@ -23,7 +24,7 @@ export interface BulkSellLeg {
 
 export function useBulkSell() {
     const { address } = useAccount();
-    const { writeContractAsync } = useWriteContract();
+    const { batchOrSequential, encodeApproveCall } = useBatchTransactions();
     const [isQuoting, setIsQuoting] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function useBulkSell() {
             setIsQuoting(true);
             setError(null);
 
-            const actualTokenOut = tokenOut.isNative ? WSEI : tokenOut;
+            const actualTokenOut = resolveToken(tokenOut);
 
             const results = await Promise.all(
                 legs.map(async (leg): Promise<BulkSellLeg> => {
@@ -50,7 +51,7 @@ export function useBulkSell() {
                             return { ...leg, status: 'idle', estimatedOut: undefined, routeSummary: undefined };
                         }
 
-                        const actualTokenIn = leg.token.isNative ? WSEI : leg.token;
+                        const actualTokenIn = resolveToken(leg.token);
                         const legAmountWei = parseUnits(leg.amountIn, leg.token.decimals);
 
                         const quote = await getKyberQuote(
@@ -79,59 +80,6 @@ export function useBulkSell() {
             return results;
         },
         [],
-    );
-
-    const publicClient = usePublicClient();
-
-    /**
-     * Approves all ERC20 tokens in the basket that need approval
-     */
-    const approveAll = useCallback(
-        async (legs: BulkSellLeg[]): Promise<boolean> => {
-            if (!address || !publicClient) return false;
-            setIsExecuting(true);
-            setError(null);
-            
-            try {
-                const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
-                for (const leg of legs) {
-                    if (leg.token.isNative) continue;
-                    if (!leg.amountIn || parseFloat(leg.amountIn) <= 0) continue;
-
-                    const legAmountWei = parseUnits(leg.amountIn, leg.token.decimals);
-
-                    // Check current allowance first
-                    const allowance = await publicClient.readContract({
-                        address: leg.token.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'allowance',
-                        args: [address, proxyAddress],
-                    });
-
-                    if ((allowance as bigint) < legAmountWei) {
-                        const hash = await writeContractAsync({
-                            address: leg.token.address as Address,
-                            abi: ERC20_ABI,
-                            functionName: 'approve',
-                            args: [proxyAddress, legAmountWei],
-                        });
-                        
-                        if (hash) {
-                            // Wait for the Tx to be visible to the RPC or just let wallet queue it
-                            await new Promise((r) => setTimeout(r, 1000));
-                        }
-                    }
-                }
-                return true;
-            } catch (err: unknown) {
-                console.error('ApproveAll error:', err);
-                setError(err instanceof Error ? err.message : 'Approval failed');
-                return false;
-            } finally {
-                setIsExecuting(false);
-            }
-        },
-        [address, writeContractAsync, publicClient]
     );
 
     /**
@@ -193,7 +141,7 @@ export function useBulkSell() {
                         const minOut = (estimatedOutWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
 
                         return {
-                            tokenIn: (leg.token.isNative ? '0x0000000000000000000000000000000000000000' : leg.token.address) as Address,
+                            tokenIn: resolveTokenAddress(leg.token),
                             amountIn: legAmountWei,
                             minAmountOut: minOut,
                             router: swapData.routerAddress as Address,
@@ -202,18 +150,30 @@ export function useBulkSell() {
                     })
                 );
 
-                const actualTokenOutAddress = tokenOut.isNative
-                    ? '0x0000000000000000000000000000000000000000'
-                    : (tokenOut.address as Address);
+                const actualTokenOutAddress = resolveTokenAddress(tokenOut);
 
-                const hash = await writeContractAsync({
-                    address: proxyAddress,
-                    abi: AGGREGATOR_PROXY_ABI,
-                    functionName: 'bulkSell',
-                    args: [orders, actualTokenOutAddress, address],
+                const bulkSellCall = {
+                    to: proxyAddress,
+                    data: encodeFunctionData({
+                        abi: AGGREGATOR_PROXY_ABI,
+                        functionName: 'bulkSell',
+                        args: [orders, actualTokenOutAddress, address],
+                    }),
                     value: totalNativeValueWei > BigInt(0) ? totalNativeValueWei : undefined,
-                });
+                };
 
+                // Build approve calls for non-native tokens that need it
+                const erc20Legs = quotedLegs.filter(l => !l.token.isNative);
+                const approveCalls = erc20Legs.map(leg =>
+                    encodeApproveCall(
+                        leg.token.address as Address,
+                        proxyAddress,
+                        parseUnits(leg.amountIn, leg.token.decimals),
+                    )
+                );
+
+                // Batch all approvals + bulkSell (EIP-5792) or sequential fallback
+                const hash = await batchOrSequential([...approveCalls, bulkSellCall]);
                 return { hash };
             } catch (err: unknown) {
                 console.error('BulkSell error:', err);
@@ -223,12 +183,11 @@ export function useBulkSell() {
                 setIsExecuting(false);
             }
         },
-        [address, writeContractAsync],
+        [address, batchOrSequential, encodeApproveCall],
     );
 
     return {
         quoteAll,
-        approveAll,
         executeBulkSell,
         isQuoting,
         isExecuting,

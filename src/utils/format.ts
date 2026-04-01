@@ -142,3 +142,11 @@ export function formatAPR(apr: number): string {
     if (apr >= 1) return `${apr.toFixed(1)}%`;
     return `${apr.toFixed(2)}%`;
 }
+
+/**
+ * Returns a transaction deadline as a Unix timestamp bigint.
+ * Defaults to 30 minutes from now.
+ */
+export function getDeadline(minutes = 30): bigint {
+  return BigInt(Math.floor(Date.now() / 1000) + minutes * 60);
+}

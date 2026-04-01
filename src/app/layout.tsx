@@ -70,13 +70,13 @@ export default function RootLayout({
         {/* Preload critical assets */}
         <link rel="preload" href="/logo.png" as="image" type="image/png" />
         
-        {/* DNS prefetch for RPC endpoints */}
-        <link rel="dns-prefetch" href="https://evm-rpc.sei-apis.com" />
-        <link rel="dns-prefetch" href="https://sei-evm-rpc.stakeme.pro" />
-        
-        {/* Preconnect to RPC endpoints */}
-        <link rel="preconnect" href="https://evm-rpc.sei-apis.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://sei-evm-rpc.stakeme.pro" crossOrigin="anonymous" />
+        {/* DNS prefetch for Base RPC endpoints */}
+        <link rel="dns-prefetch" href="https://base-rpc.publicnode.com" />
+        <link rel="dns-prefetch" href="https://base.meowrpc.com" />
+
+        {/* Preconnect to Base RPC endpoints */}
+        <link rel="preconnect" href="https://base-rpc.publicnode.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://base.meowrpc.com" crossOrigin="anonymous" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}

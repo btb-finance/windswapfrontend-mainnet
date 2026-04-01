@@ -3,11 +3,14 @@
 import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
+import { useAsyncState } from '@/hooks/useAsyncState';
 import { Address, parseUnits } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { usePoolData, GaugeInfo, RewardToken } from '@/providers/PoolDataProvider';
-import { VOTER_EXTENDED_ABI, VOTER_ABI, BRIBE_VOTING_REWARD_ABI, ERC20_ABI } from '@/config/abis';
+import { VOTER_ABI, BRIBE_VOTING_REWARD_ABI, ERC20_ABI } from '@/config/abis';
 import { fetchSubgraph } from '@/config/subgraph';
+import { extractErrorMessage } from '@/utils/errors';
+import { useTokenApproval } from '@/hooks/useTokenApproval';
 
 // Re-export types for backward compatibility
 export type { GaugeInfo, RewardToken };
@@ -19,10 +22,11 @@ export interface VoteInfo {
 
 export function useVoter() {
     const { address, isConnected } = useAccount();
-    const [error, setError] = useState<string | null>(null);
+    const { error, setError } = useAsyncState();
     const [existingVotes, setExistingVotes] = useState<Record<string, bigint>>({});
 
     const { writeContractAsync } = useWriteContract();
+    const { approveAmount } = useTokenApproval();
 
     // Get gauge data from global provider (instant!)
     const { gauges, totalVoteWeight, epochCount, gaugesLoading, refetch } = usePoolData();
@@ -80,12 +84,7 @@ export function useVoter() {
             const amountWei = parseUnits(amount, tokenDecimals);
 
             // First approve the bribe contract to spend tokens
-            await writeContractAsync({
-                address: tokenAddress as Address,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [bribeAddress as Address, amountWei],
-            });
+            await approveAmount(tokenAddress as Address, bribeAddress as Address, amountWei);
 
             // Then add the incentive
             const hash = await writeContractAsync({
@@ -100,7 +99,7 @@ export function useVoter() {
 
             return { hash };
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to add incentive');
+            setError(extractErrorMessage(err, 'Failed to add incentive'));
             return null;
         }
     }, [gauges, writeContractAsync, refetch]);
@@ -128,7 +127,7 @@ export function useVoter() {
 
             return { hash };
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Vote failed');
+            setError(extractErrorMessage(err, 'Vote failed'));
             return null;
         }
     };
@@ -153,7 +152,7 @@ export function useVoter() {
 
             return { hash };
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Reset failed');
+            setError(extractErrorMessage(err, 'Reset failed'));
             return null;
         }
     };
