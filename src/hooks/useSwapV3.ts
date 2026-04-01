@@ -5,15 +5,13 @@ import { useState, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { parseUnits, formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
-import { Token, WETH } from '@/config/tokens';
+import { Token } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
-import { SWAP_ROUTER_ABI, ERC20_ABI, QUOTER_V2_ABI } from '@/config/abis';
+import { SWAP_ROUTER_ABI, QUOTER_V2_ABI } from '@/config/abis';
 import { swrCache, getQuoteCacheKey } from '@/utils/cache';
 import { getDeadline } from '@/utils/format';
 import { extractErrorMessage } from '@/utils/errors';
-
-// CL tick spacings from CLFactory contract
-const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
+import { TICK_SPACINGS, resolveToken, encodeTickSpacing, encodeV3Path } from '@/utils/contracts';
 
 interface SwapQuoteV3 {
     amountOut: string;
@@ -67,8 +65,8 @@ export function useSwapV3() {
     ): Promise<SwapQuoteV3 | null> => {
         if (!amountIn || parseFloat(amountIn) <= 0) return null;
 
-        const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+        const actualTokenIn = resolveToken(tokenIn);
+        const actualTokenOut = resolveToken(tokenOut);
 
         // Generate cache key
         const cacheKey = getQuoteCacheKey(
@@ -139,8 +137,8 @@ export function useSwapV3() {
     ): Promise<SwapQuoteV3 | null> => {
         if (!amountOut || parseFloat(amountOut) <= 0) return null;
 
-        const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+        const actualTokenIn = resolveToken(tokenIn);
+        const actualTokenOut = resolveToken(tokenOut);
 
         // Generate cache key
         const cacheKey = getQuoteCacheKey(
@@ -307,8 +305,8 @@ export function useSwapV3() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+            const actualTokenIn = resolveToken(tokenIn);
+            const actualTokenOut = resolveToken(tokenOut);
 
             // For exactIn: amountIn is exact, amountOutMin is minimum output
             // For exactOut: amountOutMin param is exact output, amountIn param is maximum input
@@ -441,9 +439,9 @@ export function useSwapV3() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-            const actualIntermediate = intermediate.isNative ? WETH : intermediate;
-            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+            const actualTokenIn = resolveToken(tokenIn);
+            const actualIntermediate = resolveToken(intermediate);
+            const actualTokenOut = resolveToken(tokenOut);
 
             const amountInWei = parseUnits(amountIn, actualTokenIn.decimals);
 
@@ -488,20 +486,10 @@ export function useSwapV3() {
             }
 
             // Encode path: tokenIn(20) + tickSpacing1(3) + intermediate(20) + tickSpacing2(3) + tokenOut(20)
-            const encodeTickSpacing = (ts: number): string => {
-                // Convert to signed int24 hex (3 bytes)
-                const hex = ts >= 0
-                    ? ts.toString(16).padStart(6, '0')
-                    : ((1 << 24) + ts).toString(16);
-                return hex;
-            };
-
-            const path = '0x' +
-                actualTokenIn.address.slice(2).toLowerCase() +
-                encodeTickSpacing(tickSpacing1) +
-                actualIntermediate.address.slice(2).toLowerCase() +
-                encodeTickSpacing(tickSpacing2) +
-                actualTokenOut.address.slice(2).toLowerCase();
+            const path = encodeV3Path(
+                [actualTokenIn.address, actualIntermediate.address, actualTokenOut.address],
+                [tickSpacing1, tickSpacing2]
+            );
 
             // NOTE: Approval is handled by SwapInterface before calling this function
 
@@ -582,8 +570,8 @@ export function useSwapV3() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+            const actualTokenIn = resolveToken(tokenIn);
+            const actualTokenOut = resolveToken(tokenOut);
             const deadline = getDeadline();
 
             const swapCalls: `0x${string}`[] = [];
@@ -613,16 +601,11 @@ export function useSwapV3() {
                         }],
                     }));
                 } else if (leg.routeType === 'multi-hop' && leg.intermediate) {
-                    const actualIntermediate = leg.intermediate.isNative ? WETH : leg.intermediate;
-                    const encodeTS = (ts: number) => {
-                        return ts >= 0 ? ts.toString(16).padStart(6, '0') : ((1 << 24) + ts).toString(16);
-                    };
-                    const path = ('0x' +
-                        actualTokenIn.address.slice(2).toLowerCase() +
-                        encodeTS(leg.tickSpacing1) +
-                        actualIntermediate.address.slice(2).toLowerCase() +
-                        encodeTS(leg.tickSpacing2 || leg.tickSpacing1) +
-                        actualTokenOut.address.slice(2).toLowerCase()) as `0x${string}`;
+                    const actualIntermediate = resolveToken(leg.intermediate);
+                    const path = encodeV3Path(
+                        [actualTokenIn.address, actualIntermediate.address, actualTokenOut.address],
+                        [leg.tickSpacing1, leg.tickSpacing2 || leg.tickSpacing1]
+                    );
 
                     swapCalls.push(encodeFunctionData({
                         abi: SWAP_ROUTER_ABI,

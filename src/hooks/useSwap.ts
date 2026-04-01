@@ -3,14 +3,16 @@
 import { useCallback, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256, encodeFunctionData, decodeFunctionResult } from 'viem';
+import { parseUnits, formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { V2_CONTRACTS, COMMON } from '@/config/contracts';
-import { ROUTER_ABI, ERC20_ABI } from '@/config/abis';
-import { Token, WETH } from '@/config/tokens';
+import { ROUTER_ABI } from '@/config/abis';
+import { Token } from '@/config/tokens';
 import { ethCall } from '@/utils/rpc';
 import { swrCache, getQuoteCacheKey } from '@/utils/cache';
 import { getDeadline } from '@/utils/format';
 import { extractErrorMessage } from '@/utils/errors';
+import { resolveToken } from '@/utils/contracts';
+import { useTokenApproval } from '@/hooks/useTokenApproval';
 
 interface Route {
     from: Address;
@@ -25,6 +27,7 @@ export function useSwap() {
     const [error, setError] = useState<string | null>(null);
 
     const { writeContractAsync } = useWriteContract();
+    const { approveMax } = useTokenApproval();
 
     // Get quote for swap (Exact Input) - with caching
     const getQuote = useCallback(
@@ -37,8 +40,8 @@ export function useSwap() {
             try {
                 if (!amountIn || parseFloat(amountIn) === 0) return null;
 
-                const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-                const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+                const actualTokenIn = resolveToken(tokenIn);
+                const actualTokenOut = resolveToken(tokenOut);
                 
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
@@ -109,8 +112,8 @@ export function useSwap() {
             try {
                 if (!amountOut || parseFloat(amountOut) === 0) return null;
 
-                const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-                const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+                const actualTokenIn = resolveToken(tokenIn);
+                const actualTokenOut = resolveToken(tokenOut);
 
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
@@ -172,24 +175,10 @@ export function useSwap() {
 
     // Check and approve token
     const approveToken = useCallback(
-        async (token: Token, amount: bigint, spender: Address): Promise<boolean> => {
-            if (!address) return false;
-
-            try {
-                const hash = await writeContractAsync({
-                    address: token.address as Address,
-                    abi: ERC20_ABI,
-                    functionName: 'approve',
-                    args: [spender, maxUint256],
-                });
-
-                return !!hash;
-            } catch (err) {
-                console.error('Approve error:', err);
-                return false;
-            }
+        async (token: Token, _amount: bigint, spender: Address): Promise<boolean> => {
+            return approveMax(token, spender);
         },
-        [address, writeContractAsync]
+        [approveMax]
     );
 
     // Execute swap

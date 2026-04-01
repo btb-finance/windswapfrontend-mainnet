@@ -5,12 +5,10 @@ import { parseUnits, formatUnits } from 'viem';
 import { Token, WETH, USDC, WIND } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { batchRpcCall } from '@/utils/rpc';
+import { TICK_SPACINGS, resolveToken, encodeV3Path } from '@/utils/contracts';
 
 // Common intermediate tokens for routing
 const INTERMEDIATE_TOKENS = [WETH, USDC, WIND];
-
-// CL tick spacings from CLFactory contract
-const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
 
 export interface RouteQuote {
     amountOut: string;
@@ -56,19 +54,6 @@ interface BatchQuoteRequest {
 export function useMixedRouteQuoter() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Encode path for V3: token + tickSpacing (3 bytes) + token
-    const encodePath = (tokens: string[], tickSpacings: number[]): `0x${string}` => {
-        let path = tokens[0].slice(2).toLowerCase();
-        for (let i = 0; i < tickSpacings.length; i++) {
-            const ts = tickSpacings[i];
-            const tsHex = ts >= 0
-                ? ts.toString(16).padStart(6, '0')
-                : ((1 << 24) + ts).toString(16);
-            path += tsHex + tokens[i + 1].slice(2).toLowerCase();
-        }
-        return `0x${path}` as `0x${string}`;
-    };
 
     // Encode quoteExactInput call data
     const encodeQuoteData = (path: `0x${string}`, amountIn: bigint): string => {
@@ -132,14 +117,14 @@ export function useMixedRouteQuoter() {
         tokenOut: Token,
         amountInWei: bigint,
     ): BatchQuoteRequest[] => {
-        const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-        const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+        const actualTokenIn = resolveToken(tokenIn);
+        const actualTokenOut = resolveToken(tokenOut);
         const requests: BatchQuoteRequest[] = [];
 
         // Direct routes
         for (const ts of TICK_SPACINGS) {
             requests.push({
-                path: encodePath([actualTokenIn.address, actualTokenOut.address], [ts]),
+                path: encodeV3Path([actualTokenIn.address, actualTokenOut.address], [ts]),
                 amountIn: amountInWei,
                 outputDecimals: actualTokenOut.decimals,
                 routeType: 'direct',
@@ -150,14 +135,14 @@ export function useMixedRouteQuoter() {
 
         // Multi-hop routes
         for (const intermediate of INTERMEDIATE_TOKENS) {
-            const actualIntermediate = intermediate.isNative ? WETH : intermediate;
+            const actualIntermediate = resolveToken(intermediate);
             if (actualIntermediate.address.toLowerCase() === actualTokenIn.address.toLowerCase() ||
                 actualIntermediate.address.toLowerCase() === actualTokenOut.address.toLowerCase()) continue;
 
             for (const ts1 of TICK_SPACINGS) {
                 for (const ts2 of TICK_SPACINGS) {
                     requests.push({
-                        path: encodePath(
+                        path: encodeV3Path(
                             [actualTokenIn.address, actualIntermediate.address, actualTokenOut.address],
                             [ts1, ts2]
                         ),
@@ -174,7 +159,7 @@ export function useMixedRouteQuoter() {
         }
 
         return requests;
-    }, [encodePath]);
+    }, [encodeV3Path]);
 
     /**
      * Unified route finder: finds best single route AND best split in minimal RPC calls.
@@ -195,7 +180,7 @@ export function useMixedRouteQuoter() {
         setError(null);
 
         try {
-            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
+            const actualTokenIn = resolveToken(tokenIn);
             const fullAmountWei = parseUnits(amountIn, actualTokenIn.decimals);
 
             // === BATCH 1: All routes at full amount ===
@@ -374,8 +359,8 @@ export function useMixedRouteQuoter() {
         tokenOut: Token,
     ): Promise<number | null> => {
         try {
-            const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
-            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+            const actualTokenIn = resolveToken(tokenIn);
+            const actualTokenOut = resolveToken(tokenOut);
 
             // If one side IS USDC, we only need one quote
             const isTokenInUSDC = actualTokenIn.address.toLowerCase() === USDC.address.toLowerCase();

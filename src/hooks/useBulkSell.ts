@@ -5,9 +5,10 @@ import { useAccount } from 'wagmi';
 import { parseUnits, formatUnits, Address, encodeFunctionData } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
-import { Token, WETH } from '@/config/tokens';
+import { Token } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
+import { resolveToken, resolveTokenAddress } from '@/utils/contracts';
 
 export interface BulkSellLeg {
     token: Token;
@@ -41,7 +42,7 @@ export function useBulkSell() {
             setIsQuoting(true);
             setError(null);
 
-            const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
+            const actualTokenOut = resolveToken(tokenOut);
 
             const results = await Promise.all(
                 legs.map(async (leg): Promise<BulkSellLeg> => {
@@ -50,7 +51,7 @@ export function useBulkSell() {
                             return { ...leg, status: 'idle', estimatedOut: undefined, routeSummary: undefined };
                         }
 
-                        const actualTokenIn = leg.token.isNative ? WETH : leg.token;
+                        const actualTokenIn = resolveToken(leg.token);
                         const legAmountWei = parseUnits(leg.amountIn, leg.token.decimals);
 
                         const quote = await getKyberQuote(
@@ -140,7 +141,7 @@ export function useBulkSell() {
                         const minOut = (estimatedOutWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
 
                         return {
-                            tokenIn: (leg.token.isNative ? '0x0000000000000000000000000000000000000000' : leg.token.address) as Address,
+                            tokenIn: resolveTokenAddress(leg.token),
                             amountIn: legAmountWei,
                             minAmountOut: minOut,
                             router: swapData.routerAddress as Address,
@@ -149,9 +150,7 @@ export function useBulkSell() {
                     })
                 );
 
-                const actualTokenOutAddress = tokenOut.isNative
-                    ? '0x0000000000000000000000000000000000000000'
-                    : (tokenOut.address as Address);
+                const actualTokenOutAddress = resolveTokenAddress(tokenOut);
 
                 const bulkSellCall = {
                     to: proxyAddress,

@@ -10,6 +10,7 @@
  */
 
 import { useToast } from '@/providers/ToastProvider';
+import { parseError } from '@/utils/errors';
 
 // Error messages - use these instead of inline strings
 export const toastErrors = {
@@ -81,39 +82,29 @@ export const toastInfo = {
   pendingWithdraw: 'Withdrawing...',
 } as const;
 
+// Map error types from parseError to toast error keys
+const ERROR_TYPE_TO_TOAST: Record<string, keyof typeof toastErrors> = {
+  user: 'userRejected',
+  validation: 'slippageExceeded',
+  network: 'networkError',
+  transaction: 'transactionFailed',
+};
+
 /**
- * Get user-friendly error message from error object
+ * Get user-friendly error message from error object.
+ * Uses the centralized parseError() from errors.ts instead of duplicating logic.
  */
 export function getErrorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
   
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    
-    // User rejected
-    if (message.includes('user rejected') || message.includes('user denied') || message.includes('user cancelled')) {
-      return toastErrors.userRejected;
-    }
-    
-    // Insufficient balance
-    if (message.includes('insufficient balance') || message.includes('exceeds balance')) {
-      return toastErrors.insufficientBalance;
-    }
-    
-    // Network error
-    if (message.includes('network') || message.includes('rpc') || message.includes('timeout')) {
-      return toastErrors.networkError;
-    }
-    
-    // Slippage
-    if (message.includes('slippage') || message.includes('price impact')) {
-      return toastErrors.slippageExceeded;
-    }
-    
-    return error.message || toastErrors.somethingWrong;
+  const parsed = parseError(error);
+  const toastKey = ERROR_TYPE_TO_TOAST[parsed.type];
+  
+  if (toastKey && parsed.type !== 'unknown') {
+    return toastErrors[toastKey];
   }
   
-  return toastErrors.somethingWrong;
+  return parsed.message || toastErrors.somethingWrong;
 }
 
 /**
