@@ -125,7 +125,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const { raw: rawBalanceA, rawBigInt: rawBigIntA, formatted: balanceA } = useTokenBalance(tokenA);
     const { raw: rawBalanceB, rawBigInt: rawBigIntB, formatted: balanceB } = useTokenBalance(tokenB);
     const { writeContractAsync } = useWriteContract();
-    const { executeBatch, encodeApproveCall, encodeContractCall } = useBatchTransactions();
+    const { batchOrSequential, encodeApproveCall, encodeContractCall } = useBatchTransactions();
     const { poolRewards, windPrice, seiPrice, allPools } = usePoolData();
     const toast = useToast();
 
@@ -784,62 +784,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
 
             // Try EIP-5792 batch first
             setTxProgress('minting');
-            const batchResult = await executeBatch(batchCalls);
-
-            let mintHash: string;
-
-            if (batchResult.usedBatching && batchResult.success) {
-                // Batch worked! All approvals + mint in one popup
-                mintHash = batchResult.hash || '';
-                console.log('Batch transaction successful:', mintHash);
-            } else {
-                // Batch not supported - fall back to sequential
-                console.log('EIP-5792 batch not available, using sequential transactions');
-
-                // Execute token approvals sequentially if needed
-                if (needsToken0Approval) {
-                    setTxProgress('approving0');
-                    await writeContractAsync({
-                        address: token0.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Wei],
-                    });
-                }
-
-                if (needsToken1Approval) {
-                    setTxProgress('approving1');
-                    await writeContractAsync({
-                        address: token1.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Wei],
-                    });
-                }
-
-                // Mint NFT
-                setTxProgress('minting');
-                mintHash = await writeContractAsync({
-                    address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    abi: NFT_POSITION_MANAGER_ABI,
-                    functionName: 'mint',
-                    args: [{
-                        token0: token0.address as Address,
-                        token1: token1.address as Address,
-                        tickSpacing,
-                        tickLower,
-                        tickUpper,
-                        amount0Desired: amount0Wei,
-                        amount1Desired: amount1Wei,
-                        amount0Min,
-                        amount1Min,
-                        recipient: address,
-                        deadline,
-                        sqrtPriceX96,
-                    }],
-                    value: nativeValue,
-                });
-            }
+            const mintHash = await batchOrSequential(batchCalls);
+            console.log('Transaction successful:', mintHash);
 
             setTxHash(mintHash);
             toast.success('Liquidity position created successfully!');
@@ -895,54 +841,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                         );
 
                         setTxProgress('staking');
-                        const stakeBatchResult = await executeBatch([nftApproveCall, stakeCall]);
-
-                        if (stakeBatchResult.usedBatching && stakeBatchResult.success) {
-                            // Both approve NFT + stake in one popup!
-                            toast.success('Position staked! Earning WIND rewards');
-                        } else {
-                            // Fall back to sequential
-                            setTxProgress('approving_nft');
-                            const approveNftHash = await writeContractAsync({
-                                address: CL_CONTRACTS.NonfungiblePositionManager as Address,
-                                abi: [{ inputs: [{ name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], name: 'approve', outputs: [], stateMutability: 'nonpayable', type: 'function' }],
-                                functionName: 'approve',
-                                args: [gaugeAddress as Address, tokenId],
-                            });
-
-                            // Wait for NFT approval to confirm
-                            let approvalConfirmed = false;
-                            for (let i = 0; i < 30; i++) {
-                                const receipt = await fetch(getRpcForPoolData(), {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        jsonrpc: '2.0', method: 'eth_getTransactionReceipt',
-                                        params: [approveNftHash],
-                                        id: 1
-                                    })
-                                }).then(r => r.json());
-
-                                if (receipt.result && receipt.result.status === '0x1') {
-                                    approvalConfirmed = true;
-                                    break;
-                                }
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                            }
-
-                            if (!approvalConfirmed) {
-                                toast.error('NFT approval to gauge failed. Position not staked.');
-                            } else {
-                                setTxProgress('staking');
-                                await writeContractAsync({
-                                    address: gaugeAddress as Address,
-                                    abi: [{ inputs: [{ name: 'tokenId', type: 'uint256' }], name: 'deposit', outputs: [], stateMutability: 'nonpayable', type: 'function' }],
-                                    functionName: 'deposit',
-                                    args: [tokenId],
-                                });
-                                toast.success('Position staked! Earning WIND rewards');
-                            }
-                        }
+                        await batchOrSequential([nftApproveCall, stakeCall]);
+                        toast.success('Position staked! Earning WIND rewards');
                     }
                 } catch (stakeErr: unknown) {
                     // Staking failed (user rejected, network error, etc.)
@@ -1071,42 +971,9 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                     )
                 ];
 
-                const batchResult = await executeBatch(batchCalls);
-
-                if (batchResult.usedBatching && batchResult.success) {
-                    toast.success('Zap complete! Approved & created LP position in one transaction.');
-                    haptic('success');
-                } else {
-                    // Fall back to sequential
-                    console.log('Batch not available, using sequential approve + zap');
-
-                    // Approve first
-                    await writeContractAsync({
-                        address: zapToken.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [STABLECOIN_ZAP_ADDRESS, parsedZapAmount],
-                    });
-
-                    toast.info('Approval submitted, now zapping...');
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-
-                    // Then zap
-                    await writeContractAsync({
-                        address: STABLECOIN_ZAP_ADDRESS,
-                        abi: STABLECOIN_ZAP_ABI,
-                        functionName: 'zap',
-                        args: [
-                            zapToken.address as Address,
-                            parsedZapAmount,
-                            BigInt(50),
-                            BigInt(0),
-                        ],
-                    });
-
-                    toast.success('LP position created! Check your portfolio.');
-                    haptic('success');
-                }
+                await batchOrSequential(batchCalls);
+                toast.success('Zap complete! Approved & created LP position in one transaction.');
+                haptic('success');
             } else {
                 // No approval needed, just zap
                 await writeContractAsync({
@@ -1576,8 +1443,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                 // Medium pairs (tick 4) = medium range (5%)
                                                 // Volatile pairs (tick 5) = wider range (5%)
                                                 // Exotic pairs (tick 2) = wide range (10%)
-                                                const rangePercent = tickSpacing === 1 ? 0.005 : tickSpacing === 3 ? 0.03 : tickSpacing === 4 ? 0.05 : tickSpacing === 5 ? 0.05 : tickSpacing === 2 ? 0.10 : 0.10;
-                                                const rangeLabel = tickSpacing === 1 ? '±0.5%' : tickSpacing === 3 ? '±3%' : tickSpacing === 4 ? '±5%' : tickSpacing === 5 ? '±5%' : tickSpacing === 2 ? '±10%' : '±10%';
+                                                const rangeLabel =tickSpacing === 1 ? '±0.5%' : tickSpacing === 3 ? '±3%' : tickSpacing === 4 ? '±5%' : tickSpacing === 5 ? '±5%' : tickSpacing === 2 ? '±10%' : '±10%';
 
                                                 return (
                                                     <div className="mt-3">

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useSendCalls } from 'wagmi';
+import { useSendCalls, useWalletClient } from 'wagmi';
 import { encodeFunctionData, Address, Abi } from 'viem';
 import { ERC20_ABI } from '@/config/abis';
 
@@ -21,15 +21,15 @@ interface BatchResult {
 /**
  * Hook for executing batch transactions using EIP-5792 (wallet_sendCalls)
  * Falls back to sequential transactions if wallet doesn't support batching
- * 
+ *
  * Works with MetaMask Smart Accounts, Coinbase Wallet, and other EIP-5792 wallets
  */
 export function useBatchTransactions() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // EIP-5792 batch send calls
     const { sendCallsAsync } = useSendCalls();
+    const { data: walletClient } = useWalletClient();
 
     /**
      * Execute a batch of calls - tries EIP-5792 first
@@ -73,6 +73,31 @@ export function useBatchTransactions() {
     }, [sendCallsAsync]);
 
     /**
+     * Try EIP-5792 batch first; if not supported, execute calls sequentially.
+     * Returns the hash of the last transaction (or the batch ID).
+     * Throws on failure.
+     */
+    const batchOrSequential = useCallback(async (calls: Call[]): Promise<string> => {
+        const batchResult = await executeBatch(calls);
+
+        if (batchResult.usedBatching && batchResult.success) {
+            return batchResult.hash!;
+        }
+
+        if (!walletClient) throw new Error('Wallet not connected');
+
+        let lastHash = '';
+        for (const call of calls) {
+            lastHash = await walletClient.sendTransaction({
+                to: call.to,
+                data: call.data,
+                value: call.value,
+            });
+        }
+        return lastHash;
+    }, [executeBatch, walletClient]);
+
+    /**
      * Helper: Encode an approve call
      */
     const encodeApproveCall = useCallback((
@@ -113,6 +138,7 @@ export function useBatchTransactions() {
 
     return {
         executeBatch,
+        batchOrSequential,
         encodeApproveCall,
         encodeContractCall,
         isLoading,

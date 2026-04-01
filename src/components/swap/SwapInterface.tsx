@@ -152,7 +152,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const { raw: rawBalanceIn, formatted: formattedBalanceIn } = useTokenBalance(tokenIn);
     const { formatted: formattedBalanceOut } = useTokenBalance(tokenOut);
     const { writeContractAsync } = useWriteContract();
-    const { executeBatch, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
+    const { batchOrSequential, encodeApproveCall, encodeContractCall, isLoading: isBatching } = useBatchTransactions();
 
     const [isSwappingWowmax, setIsSwappingWowmax] = useState(false);
     const isLoading = isLoadingV2 || isLoadingV3 || isBatching || isSwappingWowmax;
@@ -323,37 +323,21 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 return;
             }
 
-            // Try EIP-5792 batch (approve + swap in one popup)
+            // Approve + swap (EIP-5792 batch or sequential fallback)
             const approveCall = encodeApproveCall(
                 actualTokenIn.address as Address,
                 routerToApprove as Address,
                 amountInWei
             );
 
-            const batchResult = await executeBatch([approveCall, swapCall]);
-
-            if (batchResult.usedBatching && batchResult.success) {
-                // Single popup worked!
-                setTxHash(batchResult.hash || null);
-                setAmountIn('');
-                setAmountOut('');
-                setBestRoute(null);
-                setIsApproving(false);
-                setRouteLocked(false);
-                success('Swap successful!');
-                return;
-            }
-
-            // Batch not supported - fall back to sequential approach
-            console.log('Batch not available, using sequential approve + swap');
-            setAutoSwapAfterApproval(true);
-            const hash = await writeContractAsync({
-                address: actualTokenIn.address as Address,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [routerToApprove as Address, amountInWei],
-            });
-            setPendingApprovalHash(hash);
+            const hash = await batchOrSequential([approveCall, swapCall]);
+            setTxHash(hash || null);
+            setAmountIn('');
+            setAmountOut('');
+            setBestRoute(null);
+            setIsApproving(false);
+            setRouteLocked(false);
+            success('Swap successful!');
 
         } catch (err) {
             console.error('Approve/swap error:', err);

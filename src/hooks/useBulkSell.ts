@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
-import { useWriteContract } from '@/hooks/useWriteContract';
+import { useAccount } from 'wagmi';
 import { parseUnits, formatUnits, Address, encodeFunctionData } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
-import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
+import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
 import { Token, WETH } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
@@ -24,8 +23,7 @@ export interface BulkSellLeg {
 
 export function useBulkSell() {
     const { address } = useAccount();
-    const { writeContractAsync } = useWriteContract();
-    const { executeBatch, encodeApproveCall } = useBatchTransactions();
+    const { batchOrSequential, encodeApproveCall } = useBatchTransactions();
     const [isQuoting, setIsQuoting] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -82,8 +80,6 @@ export function useBulkSell() {
         },
         [],
     );
-
-    const publicClient = usePublicClient();
 
     /**
      * Execute bulkSell on the AggregatorProxy contract
@@ -177,41 +173,8 @@ export function useBulkSell() {
                     )
                 );
 
-                // Try EIP-5792: batch all approvals + bulkSell into a single wallet popup
-                const batchResult = await executeBatch([...approveCalls, bulkSellCall]);
-
-                if (batchResult.usedBatching && batchResult.success) {
-                    return { hash: batchResult.hash! };
-                }
-
-                // EIP-5792 not supported — fall back to sequential approvals then bulkSell
-                for (const leg of erc20Legs) {
-                    const legAmountWei = parseUnits(leg.amountIn, leg.token.decimals);
-                    const allowance = await publicClient!.readContract({
-                        address: leg.token.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'allowance',
-                        args: [address as Address, proxyAddress],
-                    });
-                    if ((allowance as bigint) < legAmountWei) {
-                        await writeContractAsync({
-                            address: leg.token.address as Address,
-                            abi: ERC20_ABI,
-                            functionName: 'approve',
-                            args: [proxyAddress, legAmountWei],
-                        });
-                        await new Promise((r) => setTimeout(r, 1000));
-                    }
-                }
-
-                const hash = await writeContractAsync({
-                    address: proxyAddress,
-                    abi: AGGREGATOR_PROXY_ABI,
-                    functionName: 'bulkSell',
-                    args: [orders, actualTokenOutAddress, address],
-                    value: totalNativeValueWei > BigInt(0) ? totalNativeValueWei : undefined,
-                });
-
+                // Batch all approvals + bulkSell (EIP-5792) or sequential fallback
+                const hash = await batchOrSequential([...approveCalls, bulkSellCall]);
                 return { hash };
             } catch (err: unknown) {
                 console.error('BulkSell error:', err);
@@ -221,7 +184,7 @@ export function useBulkSell() {
                 setIsExecuting(false);
             }
         },
-        [address, writeContractAsync, executeBatch, encodeApproveCall, publicClient],
+        [address, batchOrSequential, encodeApproveCall],
     );
 
     return {
