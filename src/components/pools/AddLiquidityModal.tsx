@@ -125,7 +125,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
     const { raw: rawBalanceA, rawBigInt: rawBigIntA, formatted: balanceA } = useTokenBalance(tokenA);
     const { raw: rawBalanceB, rawBigInt: rawBigIntB, formatted: balanceB } = useTokenBalance(tokenB);
     const { writeContractAsync } = useWriteContract();
-    const { batchOrSequential, encodeApproveCall, encodeContractCall } = useBatchTransactions();
+    const { batchOrSequential, encodeContractCall, buildApproveCallIfNeeded } = useBatchTransactions();
     const { poolRewards, windPrice, seiPrice, allPools } = usePoolData();
     const toast = useToast();
 
@@ -674,32 +674,11 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
             }
             // For existing pools, sqrtPriceX96 stays as 0 - the contract ignores it
 
-            // Check token allowances
-            const checkAllowance = async (tokenAddr: string, amount: bigint): Promise<boolean> => {
-                const result = await fetch(getRpcForPoolData(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0', id: 1,
-                        method: 'eth_call',
-                        params: [{
-                            to: tokenAddr,
-                            data: `0xdd62ed3e${address!.slice(2).toLowerCase().padStart(64, '0')}${CL_CONTRACTS.NonfungiblePositionManager.slice(2).toLowerCase().padStart(64, '0')}`
-                        }, 'latest']
-                    })
-                }).then(r => r.json());
-                const allowance = result.result ? BigInt(result.result) : BigInt(0);
-                return allowance >= amount;
-            };
-
-            // Determine which tokens need approval
+            // Determine which tokens are native
             const token0IsNative = (tokenA.isNative && token0.address.toLowerCase() === WETH.address.toLowerCase()) ||
                 (tokenB.isNative && token0.address.toLowerCase() === WETH.address.toLowerCase());
             const token1IsNative = (tokenA.isNative && token1.address.toLowerCase() === WETH.address.toLowerCase()) ||
                 (tokenB.isNative && token1.address.toLowerCase() === WETH.address.toLowerCase());
-
-            const needsToken0Approval = !token0IsNative && !(await checkAllowance(token0.address, amount0Wei));
-            const needsToken1Approval = !token1IsNative && !(await checkAllowance(token1.address, amount1Wei));
 
             // Calculate native value - simple check for native tokens
             let nativeValue = BigInt(0);
@@ -731,28 +710,14 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                 sqrtPriceX96: sqrtPriceX96.toString(),
                 poolExists,
                 nativeValue: nativeValue.toString(),
-                needsToken0Approval,
-                needsToken1Approval,
             });
 
+            // Build approval calls if needed (skip native tokens)
+            const approve0Call = token0IsNative ? null : await buildApproveCallIfNeeded(token0.address as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Wei);
+            const approve1Call = token1IsNative ? null : await buildApproveCallIfNeeded(token1.address as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Wei);
+
             // Build batch calls: approve token0 (if needed) + approve token1 (if needed) + mint
-            const batchCalls = [];
-
-            if (needsToken0Approval) {
-                batchCalls.push(encodeApproveCall(
-                    token0.address as Address,
-                    CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    amount0Wei
-                ));
-            }
-
-            if (needsToken1Approval) {
-                batchCalls.push(encodeApproveCall(
-                    token1.address as Address,
-                    CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    amount1Wei
-                ));
-            }
+            const batchCalls = [approve0Call, approve1Call].filter((c): c is NonNullable<typeof c> => c !== null);
 
             // Mint NFT call
             const mintCall = encodeContractCall(
@@ -933,67 +898,22 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
         haptic('medium');
 
         try {
-            // Check if approval is needed
-            const allowanceResult = await fetch(getRpcForPoolData(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0', id: 1,
-                    method: 'eth_call',
-                    params: [{
-                        to: zapToken.address,
-                        data: `0xdd62ed3e${address.slice(2).toLowerCase().padStart(64, '0')}${STABLECOIN_ZAP_ADDRESS.slice(2).toLowerCase().padStart(64, '0')}`
-                    }, 'latest']
-                })
-            }).then(r => r.json());
+            const zapCall = encodeContractCall(
+                STABLECOIN_ZAP_ADDRESS,
+                STABLECOIN_ZAP_ABI,
+                'zap',
+                [
+                    zapToken.address as Address,
+                    parsedZapAmount,
+                    BigInt(50), // 0.5% slippage
+                    BigInt(0),  // min liquidity
+                ]
+            );
 
-            const currentAllowance = allowanceResult.result ? BigInt(allowanceResult.result) : BigInt(0);
-            const needsApproval = currentAllowance < parsedZapAmount;
-
-            if (needsApproval) {
-                // Try batch: approve + zap
-                const batchCalls = [
-                    encodeApproveCall(
-                        zapToken.address as Address,
-                        STABLECOIN_ZAP_ADDRESS,
-                        parsedZapAmount
-                    ),
-                    encodeContractCall(
-                        STABLECOIN_ZAP_ADDRESS,
-                        STABLECOIN_ZAP_ABI,
-                        'zap',
-                        [
-                            zapToken.address as Address,
-                            parsedZapAmount,
-                            BigInt(50), // 0.5% slippage
-                            BigInt(0),  // min liquidity
-                        ]
-                    )
-                ];
-
-                await batchOrSequential(batchCalls);
-                toast.success('Zap complete! Approved & created LP position in one transaction.');
-                haptic('success');
-            } else {
-                // No approval needed, just zap
-                await writeContractAsync({
-                    address: STABLECOIN_ZAP_ADDRESS,
-                    abi: STABLECOIN_ZAP_ABI,
-                    functionName: 'zap',
-                    args: [
-                        zapToken.address as Address,
-                        parsedZapAmount,
-                        BigInt(50),
-                        BigInt(0),
-                    ],
-                });
-
-                toast.info('Zap submitted! Creating LP position...');
-                await new Promise(resolve => setTimeout(resolve, 5000));
-
-                toast.success('LP position created! Check your portfolio.');
-                haptic('success');
-            }
+            const approveCall = await buildApproveCallIfNeeded(zapToken.address as Address, STABLECOIN_ZAP_ADDRESS, parsedZapAmount);
+            await batchOrSequential([approveCall, zapCall].filter((c): c is NonNullable<typeof c> => c !== null));
+            toast.success('Zap complete! LP position created.');
+            haptic('success');
 
             setZapAmount('');
             refetchZapBalance();

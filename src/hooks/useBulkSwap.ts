@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
+import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { parseUnits, formatUnits, Address } from 'viem';
 import { V2_CONTRACTS, COMMON } from '@/config/contracts';
-import { ERC20_ABI, AGGREGATOR_PROXY_ABI } from '@/config/abis';
+import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
 import { Token, WETH } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
 
@@ -23,8 +24,8 @@ export interface BulkSwapLeg {
 
 export function useBulkSwap() {
     const { address } = useAccount();
-    const publicClient = usePublicClient();
     const { writeContractAsync } = useWriteContract();
+    const { approveIfNeeded } = useBatchTransactions();
     const [isQuoting, setIsQuoting] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -171,27 +172,7 @@ export function useBulkSwap() {
 
                 // Approve if ERC20
                 if (!isNativeIn) {
-                    // Check current allowance
-                    const allowance = await publicClient!.readContract({
-                        address: actualTokenIn.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'allowance',
-                        args: [address, proxyAddress],
-                    }) as bigint;
-
-                    // Only approve if current allowance is less than needed amount
-                    if (allowance < totalWei) {
-                        const approveHash = await writeContractAsync({
-                            address: actualTokenIn.address as Address,
-                            abi: ERC20_ABI,
-                            functionName: 'approve',
-                            args: [proxyAddress, totalWei],
-                        });
-                        // Wait a moment for approval to propagate
-                        if (approveHash) {
-                            await new Promise((r) => setTimeout(r, 2000));
-                        }
-                    }
+                    await approveIfNeeded(actualTokenIn.address as Address, proxyAddress, totalWei);
                 }
 
                 const hash = await writeContractAsync({

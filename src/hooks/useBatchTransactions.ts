@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useSendCalls, useWalletClient } from 'wagmi';
+import { useSendCalls, useWalletClient, usePublicClient, useAccount } from 'wagmi';
 import { encodeFunctionData, Address, Abi } from 'viem';
 import { ERC20_ABI } from '@/config/abis';
 
@@ -30,11 +30,12 @@ export function useBatchTransactions() {
 
     const { sendCallsAsync } = useSendCalls();
     const { data: walletClient } = useWalletClient();
+    const publicClient = usePublicClient();
+    const { address } = useAccount();
 
     /**
      * Execute a batch of calls - tries EIP-5792 first
      * Returns { success: false, usedBatching: false } if wallet doesn't support it
-     * The caller should then fall back to their own sequential approach
      */
     const executeBatch = useCallback(async (
         calls: Call[],
@@ -42,7 +43,6 @@ export function useBatchTransactions() {
         setIsLoading(true);
         setError(null);
 
-        // Try EIP-5792 batch
         try {
             const result = await sendCallsAsync({
                 calls: calls.map(call => ({
@@ -60,7 +60,6 @@ export function useBatchTransactions() {
             };
 
         } catch (batchError: unknown) {
-            // EIP-5792 not supported - this is expected for most wallets
             console.log('EIP-5792 batch not available:', batchError instanceof Error ? batchError.message : batchError);
             setIsLoading(false);
             return {
@@ -74,8 +73,7 @@ export function useBatchTransactions() {
 
     /**
      * Try EIP-5792 batch first; if not supported, execute calls sequentially.
-     * Returns the hash of the last transaction (or the batch ID).
-     * Throws on failure.
+     * Returns the hash of the last transaction (or the batch ID). Throws on failure.
      */
     const batchOrSequential = useCallback(async (calls: Call[]): Promise<string> => {
         const batchResult = await executeBatch(calls);
@@ -96,6 +94,56 @@ export function useBatchTransactions() {
         }
         return lastHash;
     }, [executeBatch, walletClient]);
+
+    /**
+     * Check allowance and approve if insufficient. No-op if allowance is already enough.
+     */
+    const approveIfNeeded = useCallback(async (
+        tokenAddress: Address,
+        spender: Address,
+        amount: bigint,
+    ): Promise<void> => {
+        if (!walletClient || !publicClient || !address) throw new Error('Wallet not connected');
+
+        const allowance = await publicClient.readContract({
+            address: tokenAddress,
+            abi: ERC20_ABI,
+            functionName: 'allowance',
+            args: [address, spender],
+        }) as bigint;
+
+        if (allowance >= amount) return;
+
+        await walletClient.writeContract({
+            address: tokenAddress,
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [spender, amount],
+        });
+    }, [walletClient, publicClient, address]);
+
+    /**
+     * Check allowance and return an approve Call if insufficient, or null if already approved.
+     * Use this to conditionally include an approve in a batchOrSequential call.
+     */
+    const buildApproveCallIfNeeded = useCallback(async (
+        tokenAddress: Address,
+        spender: Address,
+        amount: bigint,
+    ): Promise<Call | null> => {
+        if (!publicClient || !address) return null;
+
+        const allowance = await publicClient.readContract({
+            address: tokenAddress,
+            abi: ERC20_ABI,
+            functionName: 'allowance',
+            args: [address, spender],
+        }) as bigint;
+
+        if (allowance >= amount) return null;
+
+        return encodeApproveCall(tokenAddress, spender, amount);
+    }, [publicClient, address]);
 
     /**
      * Helper: Encode an approve call
@@ -139,6 +187,8 @@ export function useBatchTransactions() {
     return {
         executeBatch,
         batchOrSequential,
+        approveIfNeeded,
+        buildApproveCallIfNeeded,
         encodeApproveCall,
         encodeContractCall,
         isLoading,

@@ -14,7 +14,7 @@ const WSEI = WETH; // local alias for WETH address comparisons
 import { getTokenLogo as getTokenLogoUtil, getTokenDisplayInfo } from '@/utils/tokens';
 import { formatPrice } from '@/utils/format';
 import { useCLPositions, useV2Positions } from '@/hooks/usePositions';
-import { NFT_POSITION_MANAGER_ABI, ERC20_ABI, ROUTER_ABI, VOTING_ESCROW_ABI, CL_GAUGE_ABI } from '@/config/abis';
+import { NFT_POSITION_MANAGER_ABI, ROUTER_ABI, CL_GAUGE_ABI } from '@/config/abis';
 import { usePoolData } from '@/providers/PoolDataProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
 import { useToast } from '@/providers/ToastProvider';
@@ -368,7 +368,7 @@ export default function PortfolioPage() {
 
     // Contract write hook
     const { writeContractAsync } = useWriteContract();
-    const { batchOrSequential, encodeContractCall } = useBatchTransactions();
+    const { batchOrSequential, encodeContractCall, approveIfNeeded, buildApproveCallIfNeeded } = useBatchTransactions();
 
     // Get CL and V2 positions
     const { positions: clPositions, positionCount: clCount, isLoading: clLoading, refetch: refetchCL } = useCLPositions();
@@ -968,26 +968,8 @@ export default function PortfolioPage() {
             const liquidityToRemove = (pos.lpBalance * BigInt(percent)) / BigInt(100);
             const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
 
-            // Check existing allowance first
-            const allowanceSelector = '0xdd62ed3e'; // allowance(address,address)
-            const ownerPadded = address.slice(2).toLowerCase().padStart(64, '0');
-            const spenderPadded = V2_CONTRACTS.Router.slice(2).toLowerCase().padStart(64, '0');
-
-            const allowanceResult = await fetch(getRpcForPoolData(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0', method: 'eth_call',
-                    params: [{
-                        to: pos.poolAddress,
-                        data: `${allowanceSelector}${ownerPadded}${spenderPadded}`
-                    }, 'latest'],
-                    id: 1
-                })
-            }).then(r => r.json());
-
-            const currentAllowance = allowanceResult.result ? BigInt(allowanceResult.result) : BigInt(0);
-            const needsApproval = currentAllowance < liquidityToRemove;
+            // Approve LP token if needed
+            await approveIfNeeded(pos.poolAddress as Address, V2_CONTRACTS.Router as Address, liquidityToRemove);
 
             // Build remove liquidity call
             const removeLiquidityCall = encodeContractCall(
@@ -1006,37 +988,8 @@ export default function PortfolioPage() {
                 ]
             );
 
-            if (needsApproval) {
-                // Build approval call
-                const approveCall = encodeContractCall(
-                    pos.poolAddress as Address,
-                    ERC20_ABI,
-                    'approve',
-                    [V2_CONTRACTS.Router as Address, liquidityToRemove]
-                );
-
-                // Try batch: approve + removeLiquidity
-                await batchOrSequential([approveCall, removeLiquidityCall]);
-                toast.success(`Approved & removed ${percent}% liquidity in one transaction!`);
-            } else {
-                // No approval needed, just remove liquidity
-                await writeContractAsync({
-                    address: V2_CONTRACTS.Router as Address,
-                    abi: ROUTER_ABI,
-                    functionName: 'removeLiquidity',
-                    args: [
-                        pos.token0 as Address,
-                        pos.token1 as Address,
-                        pos.stable,
-                        liquidityToRemove,
-                        BigInt(0),
-                        BigInt(0),
-                        address,
-                        deadline,
-                    ],
-                });
-                toast.success(`Removed ${percent}% liquidity!`);
-            }
+            await batchOrSequential([removeLiquidityCall]);
+            toast.success(`Removed ${percent}% liquidity!`);
 
             refetchV2();
             setExpandedV2Position(null);
@@ -1084,53 +1037,16 @@ export default function PortfolioPage() {
                 nativeValue = amount1Desired;
             }
 
-            // Helper to check allowance
-            const checkAllowance = async (tokenAddr: string, amount: bigint): Promise<boolean> => {
-                const result = await fetch(getRpcForPoolData(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0', id: 1,
-                        method: 'eth_call',
-                        params: [{
-                            to: tokenAddr,
-                            data: `0xdd62ed3e${address!.slice(2).toLowerCase().padStart(64, '0')}${CL_CONTRACTS.NonfungiblePositionManager.slice(2).toLowerCase().padStart(64, '0')}`
-                        }, 'latest']
-                    })
-                }).then(r => r.json());
-                const allowance = result.result ? BigInt(result.result) : BigInt(0);
-                return allowance >= amount;
-            };
+            // Build approval calls if needed (skip native WSEI)
+            const approve0Call = (amount0Desired > BigInt(0) && !(isToken0WSEI && nativeValue > BigInt(0)))
+                ? await buildApproveCallIfNeeded(selectedPosition.token0 as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Desired)
+                : null;
+            const approve1Call = (amount1Desired > BigInt(0) && !(isToken1WSEI && nativeValue > BigInt(0)))
+                ? await buildApproveCallIfNeeded(selectedPosition.token1 as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Desired)
+                : null;
 
-            // Determine which tokens need approval
-            const needsToken0Approval = amount0Desired > BigInt(0) && !(isToken0WSEI && nativeValue > BigInt(0)) && !(await checkAllowance(selectedPosition.token0, amount0Desired));
-            const needsToken1Approval = amount1Desired > BigInt(0) && !(isToken1WSEI && nativeValue > BigInt(0)) && !(await checkAllowance(selectedPosition.token1, amount1Desired));
-
-            // Build batch calls
-            const batchCalls = [];
-
-            // Add approval for token0 if needed
-            if (needsToken0Approval) {
-                batchCalls.push(encodeContractCall(
-                    selectedPosition.token0 as Address,
-                    ERC20_ABI,
-                    'approve',
-                    [CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Desired]
-                ));
-            }
-
-            // Add approval for token1 if needed
-            if (needsToken1Approval) {
-                batchCalls.push(encodeContractCall(
-                    selectedPosition.token1 as Address,
-                    ERC20_ABI,
-                    'approve',
-                    [CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Desired]
-                ));
-            }
-
-            // Add increaseLiquidity call
-            batchCalls.push(encodeContractCall(
+            // Build increaseLiquidity call
+            const increaseLiquidityCall = encodeContractCall(
                 CL_CONTRACTS.NonfungiblePositionManager as Address,
                 NFT_POSITION_MANAGER_ABI,
                 'increaseLiquidity',
@@ -1143,16 +1059,10 @@ export default function PortfolioPage() {
                     deadline,
                 }],
                 nativeValue
-            ));
+            );
 
-            // Try batch first
-            await batchOrSequential(batchCalls);
-
-            const actions = [];
-            if (needsToken0Approval) actions.push('approved token0');
-            if (needsToken1Approval) actions.push('approved token1');
-            actions.push('increased liquidity');
-            toast.success(`Batch complete: ${actions.join(' + ')}!`);
+            await batchOrSequential([approve0Call, approve1Call, increaseLiquidityCall].filter((c): c is NonNullable<typeof c> => c !== null));
+            toast.success('Increased liquidity!');
 
             setShowIncreaseLiquidityModal(false);
             setSelectedPosition(null);
@@ -1599,8 +1509,6 @@ export default function PortfolioPage() {
                                         const collectedUsd = pos.collectedUSD || 0;
                                         // Fees = collected - withdrawn (collect() returns principal + fees together)
                                         const feesEarnedUsd = Math.max(0, collectedUsd - withdrawnUsd);
-                                        const feesToken0 = Math.max(0, (pos.collectedToken0 || 0) - (pos.withdrawnToken0 || 0));
-                                        const feesToken1 = Math.max(0, (pos.collectedToken1 || 0) - (pos.withdrawnToken1 || 0));
                                         // WIND staking rewards
                                         const windEarnedUsd = (pos.totalWindEarned || 0) * (windPrice || 0);
                                         // PnL = current value + what you got back + WIND earned - what you put in
