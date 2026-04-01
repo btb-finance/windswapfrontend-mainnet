@@ -52,7 +52,7 @@ export function useSwapV3() {
             const poolAddress = await ethCall(CL_CONTRACTS.CLFactory, encodeGetPoolCall(token0, token1, tickSpacing));
 
             // If pool address is not zero, pool exists
-            return poolAddress && poolAddress !== '0x' + '0'.repeat(64);
+            return !!poolAddress && poolAddress !== '0x' + '0'.repeat(64);
         } catch {
             return false;
         }

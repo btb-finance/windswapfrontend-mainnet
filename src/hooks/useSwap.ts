@@ -76,7 +76,7 @@ export function useSwap() {
                             const decoded = decodeFunctionResult({
                                 abi: ROUTER_ABI,
                                 functionName: 'getAmountsOut',
-                                data: callResult,
+                                data: callResult as `0x${string}`,
                             }) as bigint[];
 
                             const amountOutWei = decoded[decoded.length - 1];
@@ -148,7 +148,7 @@ export function useSwap() {
                             const decoded = decodeFunctionResult({
                                 abi: ROUTER_ABI,
                                 functionName: 'getAmountsIn',
-                                data: callResult,
+                                data: callResult as `0x${string}`,
                             }) as bigint[];
 
                             const amountInWei = decoded[0];
