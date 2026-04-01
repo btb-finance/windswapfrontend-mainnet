@@ -485,7 +485,11 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     const optimal = await findOptimalRoute(tokenIn, tokenOut, amountIn);
 
                     if (optimal) {
-                        if (optimal.winner === 'split' && optimal.bestSplit) {
+                        // Native ETH input cannot use split routes: each swap leg calls refundETH()
+                        // internally, which returns leftover ETH to the caller mid-multicall.
+                        // The second leg then finds 0 ETH in the router and fails with STF.
+                        const canSplit = !tokenIn.isNative;
+                        if (canSplit && optimal.winner === 'split' && optimal.bestSplit) {
                             // Split route wins
                             routes.push({
                                 type: 'split',
