@@ -28,6 +28,8 @@ import {
     MIN_TICK
 } from '@/utils/liquidityMath';
 import { useTickLensData } from '@/hooks/useTickLensData';
+import { getDeadline } from '@/utils/format';
+import { extractErrorMessage } from '@/utils/errors';
 import { LiquidityDepthChart } from '@/components/pools/LiquidityDepthChart';
 
 // Smart price formatter for displaying very small or large prices
@@ -625,7 +627,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
 
             console.log('Tick calculation:', { tickLower, tickUpper, tickSpacing, priceLower, priceUpper });
 
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             // Check if pool exists
             const tickSpacingHex = tickSpacing >= 0
@@ -829,7 +831,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
         } catch (err: unknown) {
             console.error('CL mint error:', err);
             setTxProgress('error');
-            setTxError(err instanceof Error ? err.message : 'Transaction failed');
+            setTxError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -883,7 +885,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
             haptic('success');
         } catch (err: unknown) {
             console.error('Approval failed:', err);
-            toast.error((err instanceof Error ? (err as { shortMessage?: string }).shortMessage ?? err.message : undefined) || 'Approval failed');
+            toast.error(extractErrorMessage(err, 'Approval failed'));
             haptic('error');
         } finally {
             setIsApproving(false);
@@ -920,7 +922,7 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
             onClose();
         } catch (err: unknown) {
             console.error('Zap failed:', err);
-            toast.error((err instanceof Error ? (err as { shortMessage?: string }).shortMessage ?? err.message : undefined) || 'Zap failed');
+            toast.error(extractErrorMessage(err, 'Zap failed'));
             haptic('error');
         } finally {
             setIsZapping(false);

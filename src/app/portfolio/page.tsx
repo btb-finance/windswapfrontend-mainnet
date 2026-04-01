@@ -12,7 +12,7 @@ import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
 import { WETH, Token } from '@/config/tokens';
 const WSEI = WETH; // local alias for WETH address comparisons
 import { getTokenLogo as getTokenLogoUtil, getTokenDisplayInfo } from '@/utils/tokens';
-import { formatPrice } from '@/utils/format';
+import { formatPrice, getDeadline } from '@/utils/format';
 import { useCLPositions, useV2Positions } from '@/hooks/usePositions';
 import { NFT_POSITION_MANAGER_ABI, ROUTER_ABI, CL_GAUGE_ABI } from '@/config/abis';
 import { usePoolData } from '@/providers/PoolDataProvider';
@@ -697,7 +697,7 @@ export default function PortfolioPage() {
         if (!address || position.liquidity <= BigInt(0)) return;
         setActionLoading(true);
         try {
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
             // Build batch: decrease liquidity + collect (NO burn — burn is separate & optional)
@@ -892,7 +892,7 @@ export default function PortfolioPage() {
         if (!address) return;
         setActionLoading(true);
         try {
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
             const batchCalls = [];
@@ -966,7 +966,7 @@ export default function PortfolioPage() {
         try {
             // Calculate amount to remove based on percentage
             const liquidityToRemove = (pos.lpBalance * BigInt(percent)) / BigInt(100);
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             // Approve LP token if needed
             await approveIfNeeded(pos.poolAddress as Address, V2_CONTRACTS.Router as Address, liquidityToRemove);
@@ -1023,7 +1023,7 @@ export default function PortfolioPage() {
             const t1 = getTokenInfo(selectedPosition.token1);
             const amount0Desired = amount0ToAdd ? BigInt(Math.floor(parseFloat(amount0ToAdd) * (10 ** t0.decimals))) : BigInt(0);
             const amount1Desired = amount1ToAdd ? BigInt(Math.floor(parseFloat(amount1ToAdd) * (10 ** t1.decimals))) : BigInt(0);
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             // Check if either token is WSEI (for native value handling)
             const isToken0WSEI = selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase();

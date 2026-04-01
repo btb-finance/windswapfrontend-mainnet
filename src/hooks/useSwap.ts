@@ -9,6 +9,8 @@ import { ROUTER_ABI, ERC20_ABI } from '@/config/abis';
 import { Token, WETH } from '@/config/tokens';
 import { getRpcForQuotes } from '@/utils/rpc';
 import { swrCache, dedupeRequest, getQuoteCacheKey } from '@/utils/cache';
+import { getDeadline } from '@/utils/format';
+import { extractErrorMessage } from '@/utils/errors';
 
 interface Route {
     from: Address;
@@ -237,7 +239,7 @@ export function useSwap() {
                 // For exactOut, amountOutMin param is actually amountOut (exact)
                 // For exactIn, amountOutMin param is amountOutMinimum
 
-                const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+                const deadlineTimestamp = getDeadline(deadline);
 
                 const route: Route[] = [
                     {
@@ -336,7 +338,7 @@ export function useSwap() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('Swap error:', err);
-                setError((err instanceof Error ? err.message : undefined) || 'Swap failed');
+                setError(extractErrorMessage(err, 'Swap failed'));
                 return null;
             } finally {
                 setIsLoading(false);

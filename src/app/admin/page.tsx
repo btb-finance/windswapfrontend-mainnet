@@ -11,6 +11,7 @@ import { getRpcForVoting } from '@/utils/rpc';
 import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
 import { VOTER_ABI, FACTORY_REGISTRY_ABI, CL_FACTORY_ABI, MINTER_ABI } from '@/config/abis';
 import { TIME } from '@/config/constants';
+import { extractErrorMessage } from '@/utils/errors';
 
 type AdminTab = 'tokens' | 'gauges' | 'factories' | 'config';
 
@@ -180,7 +181,7 @@ export default function AdminPage() {
             });
             setTxHash(hash);
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -198,7 +199,7 @@ export default function AdminPage() {
             });
             setTxHash(hash);
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Distribute failed');
+            setError(extractErrorMessage(err, 'Distribute failed'));
         }
     };
 
@@ -216,7 +217,7 @@ export default function AdminPage() {
             setTxHash(hash);
             refetchWhitelist();
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -232,7 +233,7 @@ export default function AdminPage() {
             });
             setTxHash(hash);
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -269,7 +270,7 @@ export default function AdminPage() {
             });
             setTxHash(hash);
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -300,7 +301,7 @@ export default function AdminPage() {
                 setError('No gauge found for this pool');
             }
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to lookup gauge');
+            setError(extractErrorMessage(err, 'Failed to lookup gauge'));
         }
     };
 
@@ -318,7 +319,7 @@ export default function AdminPage() {
             setTxHash(hash);
             setGaugeAddress('');
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -335,7 +336,7 @@ export default function AdminPage() {
             });
             setTxHash(hash);
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -357,7 +358,7 @@ export default function AdminPage() {
             refetchV2Approval();
             refetchCLApproval();
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 
@@ -378,7 +379,7 @@ export default function AdminPage() {
             setTxHash(hash);
             refetchCLApproval();
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Transaction failed');
+            setError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 

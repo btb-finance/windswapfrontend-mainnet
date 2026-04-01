@@ -7,6 +7,7 @@ import { Address, encodeFunctionData, keccak256, toBytes, parseUnits } from 'vie
 import { V2_CONTRACTS, CL_CONTRACTS } from '@/config/contracts';
 import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/hooks/useSubgraph';
 import { GOVERNOR_ABI, VOTER_ABI } from '@/config/abis';
+import { extractErrorMessage } from '@/utils/errors';
 
 // Subgraph proposal shape
 interface SubgraphProposal {
@@ -225,7 +226,7 @@ export function useGovernance() {
 
             return { hash };
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to create proposal');
+            setError(extractErrorMessage(err, 'Failed to create proposal'));
             return null;
         }
     }, [writeContractAsync]);
@@ -260,7 +261,7 @@ export function useGovernance() {
 
             return { hash };
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to create proposal');
+            setError(extractErrorMessage(err, 'Failed to create proposal'));
             return null;
         }
     }, [writeContractAsync]);
@@ -294,7 +295,7 @@ export function useGovernance() {
 
             return { hash };
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to create proposal');
+            setError(extractErrorMessage(err, 'Failed to create proposal'));
             return null;
         }
     }, [writeContractAsync]);
@@ -313,7 +314,7 @@ export function useGovernance() {
 
             return { hash };
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to cast vote');
+            setError(extractErrorMessage(err, 'Failed to cast vote'));
             return null;
         }
     }, [writeContractAsync]);
@@ -339,7 +340,7 @@ export function useGovernance() {
 
             return { hash };
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to execute proposal');
+            setError(extractErrorMessage(err, 'Failed to execute proposal'));
             return null;
         }
     }, [writeContractAsync]);

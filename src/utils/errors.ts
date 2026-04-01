@@ -129,6 +129,24 @@ export function getSwapErrorMessage(error: string | Error | unknown): string {
 }
 
 /**
+ * Extract the best available message from any thrown value.
+ * Prefers wagmi's shortMessage (concise on-chain revert reason) over the full message.
+ * Falls back to `fallback` if nothing useful is found.
+ */
+export function extractErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
+  if (!error) return fallback;
+  if (typeof error === 'string') return error || fallback;
+  if (error instanceof Error) {
+    const short = (error as { shortMessage?: string }).shortMessage;
+    return short ?? error.message ?? fallback;
+  }
+  if (typeof error === 'object' && 'message' in error) {
+    return String((error as { message: unknown }).message) || fallback;
+  }
+  return fallback;
+}
+
+/**
  * Check if error is a user rejection (should not show as error toast)
  */
 export function isUserRejection(error: unknown): boolean {

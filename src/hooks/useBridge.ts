@@ -5,6 +5,7 @@ import { useAccount, useWalletClient, useSwitchChain } from 'wagmi';
 import { parseUnits, formatUnits, pad } from 'viem';
 import { BRIDGE_TOKENS, BRIDGE_CHAINS, HYPERLANE_DOMAIN_IDS, BridgeToken } from '@/config/bridge';
 import { WARP_ROUTE_ABI, ERC20_ABI } from '@/config/abis';
+import { extractErrorMessage } from '@/utils/errors';
 
 export type BridgeDirection = 'base-to-sei' | 'sei-to-base';
 
@@ -182,7 +183,7 @@ export function useBridge(): UseBridgeReturn {
             await fetchData();
         } catch (err: unknown) {
             console.error('Approval error:', err);
-            setError(err instanceof Error ? err.message : 'Approval failed');
+            setError(extractErrorMessage(err, 'Approval failed'));
         } finally {
             setIsApproving(false);
         }
@@ -235,7 +236,7 @@ export function useBridge(): UseBridgeReturn {
             await fetchData();
         } catch (err: unknown) {
             console.error('Bridge error:', err);
-            setError(err instanceof Error ? err.message : 'Bridge failed');
+            setError(extractErrorMessage(err, 'Bridge failed'));
         } finally {
             setIsBridging(false);
         }

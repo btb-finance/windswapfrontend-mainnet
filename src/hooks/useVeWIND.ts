@@ -8,6 +8,7 @@ import { parseUnits, Address } from 'viem';
 import { V2_CONTRACTS } from '@/config/contracts';
 import { VOTING_ESCROW_ABI, REWARDS_DISTRIBUTOR_ABI, ERC20_ABI } from '@/config/abis';
 import { usePoolData } from '@/providers/PoolDataProvider';
+import { extractErrorMessage } from '@/utils/errors';
 
 // Lock duration presets in seconds
 export const LOCK_DURATIONS = {
@@ -84,7 +85,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Create lock error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to create lock');
+            setError(extractErrorMessage(err, 'Failed to create lock'));
             setIsLoading(false);
             return null;
         }
@@ -122,7 +123,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Increase amount error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to increase amount');
+            setError(extractErrorMessage(err, 'Failed to increase amount'));
             setIsLoading(false);
             return null;
         }
@@ -151,7 +152,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Extend lock error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to extend lock');
+            setError(extractErrorMessage(err, 'Failed to extend lock'));
             setIsLoading(false);
             return null;
         }
@@ -180,7 +181,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Withdraw error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to withdraw');
+            setError(extractErrorMessage(err, 'Failed to withdraw'));
             setIsLoading(false);
             return null;
         }
@@ -209,7 +210,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Claim rebases error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to claim rebases');
+            setError(extractErrorMessage(err, 'Failed to claim rebases'));
             setIsLoading(false);
             return null;
         }
@@ -238,7 +239,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Merge error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to merge veNFTs');
+            setError(extractErrorMessage(err, 'Failed to merge veNFTs'));
             setIsLoading(false);
             return null;
         }
@@ -267,7 +268,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Lock permanent error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to lock permanently');
+            setError(extractErrorMessage(err, 'Failed to lock permanently'));
             setIsLoading(false);
             return null;
         }
@@ -296,7 +297,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Unlock permanent error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to unlock permanent lock');
+            setError(extractErrorMessage(err, 'Failed to unlock permanent lock'));
             setIsLoading(false);
             return null;
         }
@@ -335,7 +336,7 @@ export function useVeWIND() {
             return { hash };
         } catch (err: unknown) {
             console.error('Delegate error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to delegate for governance');
+            setError(extractErrorMessage(err, 'Failed to delegate for governance'));
             setIsLoading(false);
             return null;
         }

@@ -9,6 +9,7 @@ import { V2_CONTRACTS, COMMON } from '@/config/contracts';
 import { AGGREGATOR_PROXY_ABI } from '@/config/abis';
 import { Token, WETH } from '@/config/tokens';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
+import { extractErrorMessage } from '@/utils/errors';
 
 export interface BulkSwapLeg {
     token: Token;
@@ -186,7 +187,7 @@ export function useBulkSwap() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('BulkSwap error:', err);
-                setError(err instanceof Error ? err.message : 'Bulk swap failed');
+                setError(extractErrorMessage(err, 'Bulk swap failed'));
                 return null;
             } finally {
                 setIsExecuting(false);

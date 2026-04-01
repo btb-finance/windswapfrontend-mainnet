@@ -7,6 +7,8 @@ import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
 import { V2_CONTRACTS, COMMON } from '@/config/contracts';
 import { ROUTER_ABI, ERC20_ABI, POOL_FACTORY_ABI } from '@/config/abis';
 import { Token } from '@/config/tokens';
+import { getDeadline } from '@/utils/format';
+import { extractErrorMessage } from '@/utils/errors';
 
 export function useLiquidity() {
     const { address, isConnected } = useAccount();
@@ -67,7 +69,7 @@ export function useLiquidity() {
                     (parseFloat(amountB) * (1 - slippage / 100)).toFixed(tokenB.decimals),
                     tokenB.decimals
                 );
-                const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+                const deadlineTimestamp = getDeadline(deadline);
 
                 const isNativeA = tokenA.isNative;
                 const isNativeB = tokenB.isNative;
@@ -127,7 +129,7 @@ export function useLiquidity() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('Add liquidity error:', err);
-                setError((err instanceof Error ? err.message : undefined) || 'Failed to add liquidity');
+                setError(extractErrorMessage(err, 'Failed to add liquidity'));
                 return null;
             } finally {
                 setIsLoading(false);
@@ -156,7 +158,7 @@ export function useLiquidity() {
 
             try {
                 const liquidityWei = parseUnits(liquidity, 18);
-                const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+                const deadlineTimestamp = getDeadline(deadline);
 
                 // Get pool address to approve LP token
                 // For now, we'll use 0 as min amounts (should calculate properly)
@@ -182,7 +184,7 @@ export function useLiquidity() {
                 return { hash };
             } catch (err: unknown) {
                 console.error('Remove liquidity error:', err);
-                setError((err instanceof Error ? err.message : undefined) || 'Failed to remove liquidity');
+                setError(extractErrorMessage(err, 'Failed to remove liquidity'));
                 return null;
             } finally {
                 setIsLoading(false);

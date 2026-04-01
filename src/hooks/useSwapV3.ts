@@ -9,6 +9,8 @@ import { Token, WETH } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { SWAP_ROUTER_ABI, ERC20_ABI, QUOTER_V2_ABI } from '@/config/abis';
 import { swrCache, getQuoteCacheKey } from '@/utils/cache';
+import { getDeadline } from '@/utils/format';
+import { extractErrorMessage } from '@/utils/errors';
 
 // CL tick spacings from CLFactory contract
 const TICK_SPACINGS = [1, 2, 3, 4, 5] as const;
@@ -358,7 +360,7 @@ export function useSwapV3() {
             const amountInWei = parseUnits(amountIn, actualTokenIn.decimals);
             const amountOutWei = parseUnits(amountOutMin, actualTokenOut.decimals);
 
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             // NOTE: Approval is handled by SwapInterface before calling this function
 
@@ -458,7 +460,7 @@ export function useSwapV3() {
             return { hash };
         } catch (err: unknown) {
             console.error('V3 swap error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Swap failed');
+            setError(extractErrorMessage(err, 'Swap failed'));
             setIsLoading(false);
             return null;
         }
@@ -497,7 +499,7 @@ export function useSwapV3() {
             const multiHopBuffer = (minOut * BigInt(50)) / BigInt(10000); // 0.5%
             const amountOutMinimum = minOut - multiHopBuffer;
 
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             // Find tick spacings for both legs
             let tickSpacing1 = tickSpacing1Override || 0;
@@ -600,7 +602,7 @@ export function useSwapV3() {
             return { hash };
         } catch (err: unknown) {
             console.error('Multi-hop V3 swap error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Multi-hop swap failed');
+            setError(extractErrorMessage(err, 'Multi-hop swap failed'));
             setIsLoading(false);
             return null;
         }
@@ -628,7 +630,7 @@ export function useSwapV3() {
         try {
             const actualTokenIn = tokenIn.isNative ? WETH : tokenIn;
             const actualTokenOut = tokenOut.isNative ? WETH : tokenOut;
-            const deadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+            const deadline = getDeadline();
 
             const swapCalls: `0x${string}`[] = [];
             let totalValueWei = BigInt(0);
@@ -704,7 +706,7 @@ export function useSwapV3() {
             return { hash };
         } catch (err: unknown) {
             console.error('Split swap error:', err);
-            setError((err instanceof Error ? err.message : undefined) || 'Split swap failed');
+            setError(extractErrorMessage(err, 'Split swap failed'));
             setIsLoading(false);
             return null;
         }

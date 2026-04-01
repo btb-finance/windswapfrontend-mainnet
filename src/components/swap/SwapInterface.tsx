@@ -19,6 +19,7 @@ import { useBatchTransactions } from '@/hooks/useBatchTransactions';
 import { haptic } from '@/hooks/useHaptic';
 import { SLIPPAGE, DEBOUNCE_MS, ACCESSIBILITY } from '@/config/constants';
 import { getSwapErrorMessage, isUserRejection } from '@/utils/errors';
+import { getDeadline } from '@/utils/format';
 import { useToast } from '@/providers/ToastProvider';
 import { getWowMaxQuote, getWowMaxSwapData } from '@/utils/wowmax';
 import { getKyberQuote, getKyberSwapData } from '@/utils/kyberswap';
@@ -262,7 +263,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         const amountOutMinWei = actualTokenOut
             ? parseUnits((parseFloat(amountOut) * (1 - slippage / 100)).toFixed(6), actualTokenOut.decimals)
             : BigInt(0);
-        const deadlineTimestamp = BigInt(Math.floor(Date.now() / 1000) + deadline * 60);
+        const deadlineTimestamp = getDeadline(deadline);
 
         try {
             // Build the swap call based on route type

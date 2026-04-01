@@ -18,6 +18,7 @@ import {
     useSellLore,
     useApproveLoreForBondingCurve,
 } from '@/hooks/useLOREBondingCurve';
+import { extractErrorMessage } from '@/utils/errors';
 
 interface LoreBondingCurveSwapProps {
     initialTokenIn?: Token;
@@ -158,7 +159,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             const hash = await approve(loreWei);
             setPendingApprovalHash(hash);
         } catch (err: unknown) {
-            showError((err instanceof Error ? ((err as { shortMessage?: string }).shortMessage ?? err.message) : undefined) || 'Approval failed');
+            showError(extractErrorMessage(err, 'Approval failed'));
         }
     };
 
@@ -179,7 +180,7 @@ export function LoreBondingCurveSwap({ initialTokenIn, initialTokenOut }: LoreBo
             refetchMarket();
             success(`${isBuying ? 'Buy' : 'Sell'} successful!`);
         } catch (err: unknown) {
-            showError((err instanceof Error ? ((err as { shortMessage?: string }).shortMessage ?? err.message) : undefined) || 'Transaction failed');
+            showError(extractErrorMessage(err, 'Transaction failed'));
         }
     };
 

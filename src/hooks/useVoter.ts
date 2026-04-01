@@ -8,6 +8,7 @@ import { V2_CONTRACTS } from '@/config/contracts';
 import { usePoolData, GaugeInfo, RewardToken } from '@/providers/PoolDataProvider';
 import { VOTER_EXTENDED_ABI, VOTER_ABI, BRIBE_VOTING_REWARD_ABI, ERC20_ABI } from '@/config/abis';
 import { fetchSubgraph } from '@/config/subgraph';
+import { extractErrorMessage } from '@/utils/errors';
 
 // Re-export types for backward compatibility
 export type { GaugeInfo, RewardToken };
@@ -100,7 +101,7 @@ export function useVoter() {
 
             return { hash };
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Failed to add incentive');
+            setError(extractErrorMessage(err, 'Failed to add incentive'));
             return null;
         }
     }, [gauges, writeContractAsync, refetch]);
@@ -128,7 +129,7 @@ export function useVoter() {
 
             return { hash };
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Vote failed');
+            setError(extractErrorMessage(err, 'Vote failed'));
             return null;
         }
     };
@@ -153,7 +154,7 @@ export function useVoter() {
 
             return { hash };
         } catch (err: unknown) {
-            setError((err instanceof Error ? err.message : undefined) || 'Reset failed');
+            setError(extractErrorMessage(err, 'Reset failed'));
             return null;
         }
     };
