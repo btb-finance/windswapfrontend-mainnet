@@ -792,8 +792,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 tokenOut,
                 amountIn,
                 amountOutMin,
-                bestRoute.tickSpacing,
-                slippage
+                bestRoute.tickSpacing
             );
         } else if (bestRoute.type === 'multi-hop') {
             // Multi-hop route - execute via intermediate token
@@ -808,8 +807,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 amountIn,
                 amountOutMin,
                 bestRoute.tickSpacing1,
-                bestRoute.tickSpacing2,
-                slippage
+                bestRoute.tickSpacing2
             );
         } else if (bestRoute.type === 'split' && bestRoute.splitLegs) {
             // Split route - execute multiple legs via multicall
@@ -824,7 +822,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     intermediate: leg.intermediate,
                 };
             });
-            result = await executeSplitSwapV3(tokenIn, tokenOut, legs, slippage);
+            result = await executeSplitSwapV3(tokenIn, tokenOut, legs);
         } else if (bestRoute.type === 'wowmax') {
             // WowMax aggregator route — routed through WindSwap Aggregator Proxy (1% fee)
             setIsSwappingWowmax(true);
