@@ -65,77 +65,7 @@ export function useWalletConnectProvider() {
 }
 
 // ==========================================
-// 2. Coinbase Wallet SDK
-// ==========================================
-export function useCoinbaseWallet() {
-    const [coinbaseProvider, setCoinbaseProvider] = useState<any>(null);
-
-    const initializeCoinbase = useCallback(async () => {
-        try {
-            const mod = await import('@coinbase/wallet-sdk');
-            const CoinbaseWalletSDK = mod.default || mod;
-            if (!CoinbaseWalletSDK) {
-                throw new Error('CoinbaseWalletSDK not available');
-            }
-            
-            const sdk = new CoinbaseWalletSDK({
-                appName: 'Wind Swap',
-                appChainIds: [1329, 1, 8453], // Sei, Ethereum, Base
-            });
-
-            const provider = sdk.makeWeb3Provider({
-                options: 'smartWalletOnly', // Use Smart Wallet for gasless transactions
-            });
-
-            setCoinbaseProvider(provider);
-            return provider;
-        } catch (error) {
-            console.error('Failed to initialize Coinbase Wallet:', error);
-            return null;
-        }
-    }, []);
-
-    const connectCoinbase = useCallback(async () => {
-        let provider = coinbaseProvider;
-        if (!provider) {
-            provider = await initializeCoinbase();
-        }
-        
-        if (provider) {
-            try {
-                const accounts = await provider.request({
-                    method: 'eth_requestAccounts',
-                });
-                return accounts;
-            } catch (error) {
-                console.error('Coinbase connection failed:', error);
-            }
-        }
-    }, [coinbaseProvider, initializeCoinbase]);
-
-    const switchChainCoinbase = useCallback(async (chainId: number) => {
-        if (coinbaseProvider) {
-            try {
-                await coinbaseProvider.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: `0x${chainId.toString(16)}` }],
-                });
-            } catch (error) {
-                console.error('Chain switch failed:', error);
-            }
-        }
-    }, [coinbaseProvider]);
-
-    return {
-        coinbaseProvider,
-        initializeCoinbase,
-        connectCoinbase,
-        switchChainCoinbase,
-    };
-}
-
-// ==========================================
-// 3. MetaMask SDK
+// 2. MetaMask SDK
 // ==========================================
 export function useMetaMaskSDK() {
     const [metaMaskSDK, setMetaMaskSDK] = useState<any>(null);
@@ -203,7 +133,7 @@ export function useMetaMaskSDK() {
 }
 
 // ==========================================
-// 4. Safe Apps SDK
+// 3. Safe Apps SDK
 // ==========================================
 export function useSafeAppsSDK() {
     const [safeSDK, setSafeSDK] = useState<any>(null);
@@ -284,7 +214,7 @@ export function useSafeAppsSDK() {
 }
 
 // ==========================================
-// 5. Unified Wallet Connector
+// 4. Unified Wallet Connector
 // ==========================================
 export function useUnifiedWallet() {
     const { connect: wagmiConnect, connectors } = useConnect();
@@ -293,11 +223,10 @@ export function useUnifiedWallet() {
     const chainId = useChainId();
 
     const walletConnect = useWalletConnectProvider();
-    const coinbase = useCoinbaseWallet();
     const metaMask = useMetaMaskSDK();
     const safe = useSafeAppsSDK();
 
-    const connectWithFallback = useCallback(async (walletType: 'metamask' | 'coinbase' | 'walletconnect' | 'safe') => {
+    const connectWithFallback = useCallback(async (walletType: 'metamask' | 'walletconnect' | 'safe') => {
         switch (walletType) {
             case 'metamask':
                 // Try MetaMask SDK first, then fall back to wagmi connector
@@ -306,17 +235,6 @@ export function useUnifiedWallet() {
                     const metaMaskConnector = connectors.find(c => c.id === 'metaMask');
                     if (metaMaskConnector) {
                         await wagmiConnect({ connector: metaMaskConnector });
-                    }
-                }
-                break;
-                
-            case 'coinbase':
-                // Try Coinbase SDK first, then fall back to wagmi connector
-                const cbAccounts = await coinbase.connectCoinbase();
-                if (!cbAccounts) {
-                    const coinbaseConnector = connectors.find(c => c.id === 'coinbaseWallet');
-                    if (coinbaseConnector) {
-                        await wagmiConnect({ connector: coinbaseConnector });
                     }
                 }
                 break;
@@ -334,7 +252,7 @@ export function useUnifiedWallet() {
                 }
                 break;
         }
-    }, [metaMask, coinbase, walletConnect, safe, connectors, wagmiConnect]);
+    }, [metaMask, walletConnect, safe, connectors, wagmiConnect]);
 
     const disconnectAll = useCallback(async () => {
         await wagmiDisconnect();
@@ -350,7 +268,6 @@ export function useUnifiedWallet() {
         
         // Individual wallet hooks
         walletConnect,
-        coinbase,
         metaMask,
         safe,
         

@@ -2,7 +2,6 @@
 // NOTE: These hooks use dynamic imports to avoid SSR/HMR issues
 export { 
     useWalletConnectProvider,
-    useCoinbaseWallet,
     useMetaMaskSDK,
     useSafeAppsSDK,
     useUnifiedWallet,
