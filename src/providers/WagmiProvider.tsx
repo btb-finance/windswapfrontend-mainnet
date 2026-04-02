@@ -9,6 +9,7 @@ import {
     getDefaultConfig,
 } from '@rainbow-me/rainbowkit';
 import {
+    baseAccount,
     metaMaskWallet,
     coinbaseWallet,
     walletConnectWallet,
@@ -45,6 +46,7 @@ const config = getDefaultConfig({
         {
             groupName: 'Popular',
             wallets: [
+                baseAccount,
                 rabbyWallet,
                 metaMaskWallet,
                 coinbaseWallet,

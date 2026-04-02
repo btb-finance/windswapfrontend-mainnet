@@ -11,7 +11,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@coinbase/wallet-sdk": "^4.3.7",
+    "@base-org/account": "^2.5.3",
     "@metamask/sdk": "^0.34.0",
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@safe-global/safe-apps-provider": "^0.18.6",
