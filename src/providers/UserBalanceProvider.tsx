@@ -5,7 +5,7 @@ import { formatUnits, Address, encodeFunctionData, decodeFunctionResult, getAddr
 import { useAccount } from 'wagmi';
 import { DEFAULT_TOKEN_LIST, Token, WETH } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
-import { getRpcForUserData, rpcCall } from '@/utils/rpc';
+import { getRpcForUserData, rpcCall, FALLBACK_RPCS } from '@/utils/rpc';
 
 // ============================================
 // CLInterfaceMulticall ABI (minimal)
@@ -42,72 +42,9 @@ const MULTICALL_ABI = [
 ] as const;
 
 const BALANCE_OF_SELECTOR = '0x70a08231';
-const GAS_PER_CALL = 50000n;
-const CHUNK_SIZE = 200; // tokens per multicall batch
+const GAS_PER_CALL = 35000n; // real worst-case (USDC proxy) = ~31k, +10% buffer
+const CHUNK_SIZE = 400; // 400 × 35k = 14M gas per batch, well within RPC limits
 
-// ============================================
-// Fetch all ERC20 balances via CLInterfaceMulticall
-// ============================================
-async function fetchBalancesMulticall(
-    tokens: Token[],
-    userAddress: string,
-    rpc: string
-): Promise<Map<string, bigint>> {
-    const result = new Map<string, bigint>();
-    if (tokens.length === 0) return result;
-
-    const addrPadded = userAddress.slice(2).toLowerCase().padStart(64, '0');
-    const callData = `0x${BALANCE_OF_SELECTOR.slice(2)}${addrPadded}` as `0x${string}`;
-
-    // Chunk into batches to avoid hitting RPC gas limits
-    for (let i = 0; i < tokens.length; i += CHUNK_SIZE) {
-        const chunk = tokens.slice(i, i + CHUNK_SIZE);
-        try {
-            const encoded = encodeFunctionData({
-                abi: MULTICALL_ABI,
-                functionName: 'multicall',
-                args: [chunk.map(t => ({
-                    target: t.address as Address,
-                    gasLimit: GAS_PER_CALL,
-                    callData,
-                }))],
-            });
-
-            const raw = await rpcCall<string>(
-                'eth_call',
-                [{ to: CL_CONTRACTS.CLInterfaceMulticall, data: encoded }, 'latest'],
-                rpc
-            );
-
-            if (!raw || raw === '0x') continue;
-
-            const decoded = decodeFunctionResult({
-                abi: MULTICALL_ABI,
-                functionName: 'multicall',
-                data: raw as `0x${string}`,
-            }) as [bigint, { success: boolean; gasUsed: bigint; returnData: `0x${string}` }[]];
-
-            const returnData = decoded[1];
-            chunk.forEach((token, j) => {
-                const r = returnData[j];
-                if (r?.success && r.returnData && r.returnData.length > 2) {
-                    try {
-                        result.set(token.address.toLowerCase(), BigInt(r.returnData));
-                    } catch {
-                        result.set(token.address.toLowerCase(), 0n);
-                    }
-                } else {
-                    result.set(token.address.toLowerCase(), 0n);
-                }
-            });
-        } catch {
-            // Fallback: zero balances for this chunk
-            chunk.forEach(t => result.set(t.address.toLowerCase(), 0n));
-        }
-    }
-
-    return result;
-}
 
 // ============================================
 // Fetch token prices from DexScreener (only for tokens user holds)
@@ -303,19 +240,18 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
     const [allTokens, setAllTokens] = useState<Token[]>(DEFAULT_TOKEN_LIST);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Fetch extended token list once on mount
+    const allTokensRef = useRef<Token[]>(DEFAULT_TOKEN_LIST);
+
+    // Fetch extended token list once on mount, then trigger a balance refresh
     useEffect(() => {
         fetchExtendedTokenList().then(extended => {
-            setAllTokens([...DEFAULT_TOKEN_LIST, ...extended]);
+            const full = [...DEFAULT_TOKEN_LIST, ...extended];
+            allTokensRef.current = full;
+            setAllTokens(full);
         }).catch(() => {});
     }, []);
 
-    // Keep a ref to allTokens so fetchBalances doesn't need it as a dep
-    // (allTokens only changes once on mount when extended list loads)
-    const allTokensRef = useRef<Token[]>(allTokens);
-    useEffect(() => { allTokensRef.current = allTokens; }, [allTokens]);
-
-    const fetchBalances = useCallback(async () => {
+    const fetchBalances = useCallback(async (tokenOverride?: Token[]) => {
         if (!address || !isConnected) {
             setBalances(new Map());
             setSortedTokens(allTokensRef.current);
@@ -328,78 +264,138 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         try {
             const rpc = getRpcForUserData();
-            const currentTokens = allTokensRef.current;
+            const currentTokens = tokenOverride ?? allTokensRef.current;
             const erc20Tokens = currentTokens.filter(t => !t.isNative);
-
-            // Step 1: get native + ERC20 balances in parallel
-            const [nativeHex, erc20Balances] = await Promise.all([
-                rpcCall<string>('eth_getBalance', [address, 'latest'], rpc),
-                fetchBalancesMulticall(erc20Tokens, address, rpc),
-            ]);
-
-            const nativeBalance = nativeHex ? BigInt(nativeHex) : 0n;
-
-            // Step 2: collect addresses with non-zero balance for price fetch
-            const tokensWithBalance: string[] = [];
             const nativeToken = currentTokens.find(t => t.isNative);
-            if (nativeToken && nativeBalance > 0n) tokensWithBalance.push(WETH.address);
-            for (const token of erc20Tokens) {
-                const bal = erc20Balances.get(token.address.toLowerCase()) ?? 0n;
-                if (bal > 0n) tokensWithBalance.push(token.address);
-            }
 
-            // Step 3: fetch prices only for tokens user holds
-            const priceUsdMap = await fetchTokenPricesUsd(tokensWithBalance);
-            const wseiUsd = priceUsdMap.get(WETH.address.toLowerCase()) || 0;
-            const newBalances = new Map<string, TokenBalance>();
+            // Shared mutable state — updated as chunks and prices arrive
+            const liveBalances = new Map<string, TokenBalance>();
+            const livePrices = new Map<string, number>();
 
-            // Native token
-            if (nativeToken) {
-                const formatted = formatUnits(nativeBalance, nativeToken.decimals);
-                const amount = parseFloat(formatted);
-                newBalances.set(nativeToken.address.toLowerCase(), {
-                    token: nativeToken,
-                    balance: nativeBalance,
-                    formatted,
-                    usdValue: wseiUsd > 0 && isFinite(amount) ? amount * wseiUsd : undefined,
+            const applyAndFlush = (tokens: Token[]) => {
+                for (const token of tokens) {
+                    const key = token.address.toLowerCase();
+                    const entry = liveBalances.get(key);
+                    if (!entry) continue;
+                    const priceUsd = livePrices.get(key) || 0;
+                    const amount = parseFloat(entry.formatted);
+                    liveBalances.set(key, {
+                        ...entry,
+                        usdValue: priceUsd > 0 && isFinite(amount) ? amount * priceUsd : entry.usdValue,
+                    });
+                }
+                const snapshot = new Map(liveBalances);
+                setBalances(snapshot);
+                const sorted = [...currentTokens].sort((a, b) => {
+                    const aRow = snapshot.get(a.address.toLowerCase());
+                    const bRow = snapshot.get(b.address.toLowerCase());
+                    const aUsd = aRow?.usdValue;
+                    const bUsd = bRow?.usdValue;
+                    if (aUsd !== undefined && bUsd !== undefined && aUsd !== bUsd) return bUsd - aUsd;
+                    if (aUsd !== undefined && bUsd === undefined) return -1;
+                    if (bUsd !== undefined && aUsd === undefined) return 1;
+                    const balA = aRow?.balance ?? 0n;
+                    const balB = bRow?.balance ?? 0n;
+                    if (balA > 0n && balB === 0n) return -1;
+                    if (balB > 0n && balA === 0n) return 1;
+                    if (balA > 0n && balB > 0n) return balB > balA ? 1 : -1;
+                    return 0;
                 });
+                setSortedTokens(sorted);
+            };
+
+            // Native balance — show immediately when it arrives
+            rpcCall<string>('eth_getBalance', [address, 'latest'], rpc).then(nativeHex => {
+                if (!nativeToken) return;
+                const balance = nativeHex ? BigInt(nativeHex) : 0n;
+                const formatted = formatUnits(balance, nativeToken.decimals);
+                liveBalances.set(nativeToken.address.toLowerCase(), { token: nativeToken, balance, formatted });
+                applyAndFlush([nativeToken]);
+
+                // Fetch native price independently
+                if (balance > 0n) {
+                    fetchTokenPricesUsd([WETH.address]).then(prices => {
+                        for (const [k, v] of prices) livePrices.set(k, v);
+                        applyAndFlush([nativeToken]);
+                    }).catch(() => {});
+                }
+            }).catch(() => {});
+
+            // Multicall chunks — update UI as each chunk resolves
+            const addrPadded = address.slice(2).toLowerCase().padStart(64, '0');
+            const callData = `0x${BALANCE_OF_SELECTOR.slice(2)}${addrPadded}` as `0x${string}`;
+            const chunks: Token[][] = [];
+            for (let i = 0; i < erc20Tokens.length; i += CHUNK_SIZE) {
+                chunks.push(erc20Tokens.slice(i, i + CHUNK_SIZE));
             }
+            const allRpcs = [rpc, ...FALLBACK_RPCS.filter(r => r !== rpc)];
 
-            // ERC20 tokens
-            for (const token of erc20Tokens) {
-                const key = token.address.toLowerCase();
-                const balance = erc20Balances.get(key) ?? 0n;
-                const formatted = formatUnits(balance, token.decimals);
-                const amount = parseFloat(formatted);
-                const priceUsd = priceUsdMap.get(key) || 0;
-                newBalances.set(key, {
-                    token,
-                    balance,
-                    formatted,
-                    usdValue: priceUsd > 0 && isFinite(amount) ? amount * priceUsd : undefined,
-                });
-            }
+            await Promise.all(chunks.map(async (chunk, i) => {
+                let chunkResult: Map<string, bigint> | null = null;
 
-            setBalances(newBalances);
+                for (let attempt = 0; attempt < allRpcs.length && !chunkResult; attempt++) {
+                    const tryRpc = allRpcs[(i + attempt) % allRpcs.length];
+                    try {
+                        const encoded = encodeFunctionData({
+                            abi: MULTICALL_ABI,
+                            functionName: 'multicall',
+                            args: [chunk.map(t => ({
+                                target: t.address as Address,
+                                gasLimit: GAS_PER_CALL,
+                                callData,
+                            }))],
+                        });
+                        const raw = await rpcCall<string>(
+                            'eth_call',
+                            [{ to: CL_CONTRACTS.CLInterfaceMulticall, data: encoded }, 'latest'],
+                            tryRpc
+                        );
+                        if (!raw || raw === '0x') { chunkResult = new Map(); continue; }
+                        const decoded = decodeFunctionResult({
+                            abi: MULTICALL_ABI,
+                            functionName: 'multicall',
+                            data: raw as `0x${string}`,
+                        }) as [bigint, { success: boolean; gasUsed: bigint; returnData: `0x${string}` }[]];
 
-            // Sort: tokens with balance first (by USD value desc), then zero-balance tokens
-            const sorted = [...currentTokens].sort((a, b) => {
-                const aRow = newBalances.get(a.address.toLowerCase());
-                const bRow = newBalances.get(b.address.toLowerCase());
-                const aUsd = aRow?.usdValue;
-                const bUsd = bRow?.usdValue;
-                if (aUsd !== undefined && bUsd !== undefined && aUsd !== bUsd) return bUsd - aUsd;
-                if (aUsd !== undefined && bUsd === undefined) return -1;
-                if (bUsd !== undefined && aUsd === undefined) return 1;
-                const balA = aRow?.balance ?? 0n;
-                const balB = bRow?.balance ?? 0n;
-                if (balA > 0n && balB === 0n) return -1;
-                if (balB > 0n && balA === 0n) return 1;
-                if (balA > 0n && balB > 0n) return balB > balA ? 1 : -1;
-                return 0;
-            });
+                        chunkResult = new Map();
+                        decoded[1].forEach((r, j) => {
+                            const token = chunk[j];
+                            const key = token.address.toLowerCase();
+                            if (r?.success && r.returnData && r.returnData.length > 2) {
+                                try { chunkResult!.set(key, BigInt(r.returnData)); }
+                                catch { chunkResult!.set(key, 0n); }
+                            } else {
+                                chunkResult!.set(key, 0n);
+                            }
+                        });
+                    } catch { /* try next RPC */ }
+                }
 
-            setSortedTokens(sorted);
+                if (!chunkResult) {
+                    chunk.forEach(t => liveBalances.set(t.address.toLowerCase(), {
+                        token: t, balance: 0n, formatted: '0',
+                    }));
+                } else {
+                    // Write balances for this chunk
+                    for (const token of chunk) {
+                        const key = token.address.toLowerCase();
+                        const balance = chunkResult.get(key) ?? 0n;
+                        const formatted = formatUnits(balance, token.decimals);
+                        liveBalances.set(key, { token, balance, formatted });
+                    }
+                    // Show this chunk immediately, then fetch prices for non-zero tokens
+                    applyAndFlush(chunk);
+
+                    const nonZero = chunk.filter(t => (chunkResult!.get(t.address.toLowerCase()) ?? 0n) > 0n);
+                    if (nonZero.length > 0) {
+                        fetchTokenPricesUsd(nonZero.map(t => t.address)).then(prices => {
+                            for (const [k, v] of prices) livePrices.set(k, v);
+                            applyAndFlush(nonZero);
+                        }).catch(() => {});
+                    }
+                }
+            }));
+
         } catch (err) {
             console.error('[UserBalanceProvider] Error fetching balances:', err);
         }
@@ -407,13 +403,22 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
     // allTokens removed from deps — accessed via ref to avoid callback churn
     }, [address, isConnected]);
 
-    useEffect(() => { fetchBalances(); }, [fetchBalances]);
+    // Pass 1: fetch core token balances immediately on connect (fast — ~30 tokens)
+    useEffect(() => { fetchBalances(DEFAULT_TOKEN_LIST); }, [fetchBalances]);
+
+    // Pass 2: re-fetch once the extended list is ready (runs after allTokens updates)
+    useEffect(() => {
+        if (allTokens.length > DEFAULT_TOKEN_LIST.length) {
+            fetchBalances(allTokens);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allTokens]);
 
     useEffect(() => {
         if (!isConnected) return;
 
-        // Poll every 60s (not 15s) — balances don't change that fast when idle
-        const interval = setInterval(fetchBalances, 60_000);
+        // Poll every 60s — balances don't change that fast when idle
+        const interval = setInterval(() => fetchBalances(), 60_000);
 
         // Pause polling when tab is hidden, resume and fetch immediately when visible again
         const onVisibilityChange = () => {
@@ -432,7 +437,7 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
     }, [balances]);
 
     return (
-        <UserBalanceContext.Provider value={{ balances, getBalance, sortedTokens, allTokens, isLoading, refetch: fetchBalances }}>
+        <UserBalanceContext.Provider value={{ balances, getBalance, sortedTokens, allTokens, isLoading, refetch: () => fetchBalances() }}>
             {children}
         </UserBalanceContext.Provider>
     );

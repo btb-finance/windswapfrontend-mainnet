@@ -1,11 +1,27 @@
 // Centralized RPC configuration for Base
 
 const DEFAULT_RPC = 'https://base-rpc.publicnode.com';
-const FALLBACK_RPCS = [
+export const FALLBACK_RPCS = [
     'https://base-rpc.publicnode.com',
+    'https://mainnet.base.org',
     'https://base.meowrpc.com',
-    'https://rpc.ankr.com/base',
     'https://1rpc.io/base',
+    'https://base.llamarpc.com',
+    'https://rpc.ankr.com/base',
+    'https://base-mainnet.public.blastapi.io',
+    'https://base.gateway.tenderly.co',
+    'https://base.public.blockpi.network/v1/rpc/public',
+    'https://base.lava.build',
+    'https://base-public.nodies.app',
+    'https://api.zan.top/base-mainnet',
+    'https://base.rpc.subquery.network/public',
+    'https://base.api.onfinality.io/public',
+    'https://base.drpc.org',
+    'https://developer-access-mainnet.base.org',
+    'https://base.rpc.blxrbdn.com',
+    'https://gateway.tenderly.co/public/base',
+    'https://public.stackup.sh/api/v1/node/base-mainnet',
+    'https://endpoints.omniatech.io/v1/base/mainnet/public',
 ];
 
 function getPrimaryRpc(): string {
