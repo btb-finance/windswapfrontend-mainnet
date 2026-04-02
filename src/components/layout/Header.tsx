@@ -20,6 +20,12 @@ export function Header() {
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50">
+            {/* Legacy Sei Project Banner */}
+            <div className="bg-[#0052FF] text-white text-xs sm:text-sm py-1.5 px-4 text-center font-medium">
+                <a href="https://sei.windswap.org/" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-white/80 transition-colors inline-flex items-center gap-1">
+                    Explore legacy Sei project <span aria-hidden="true">&rarr;</span>
+                </a>
+            </div>
             <div className="glass-header">
                 <div className="container mx-auto px-3 md:px-6 py-2 md:py-4">
                     <div className="flex items-center justify-between">
