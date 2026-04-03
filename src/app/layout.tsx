@@ -60,6 +60,7 @@ export const metadata: Metadata = {
         title: 'Open Wind Swap',
         action: {
           type: 'launch_miniapp',
+          name: 'Wind Swap',
           url: 'https://windswap.org/swap',
           splashImageUrl: 'https://windswap.org/splash.png',
           splashBackgroundColor: '#0a0a14',
