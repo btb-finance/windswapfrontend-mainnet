@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { http, fallback } from 'viem';
+import { Attribution } from 'ox/erc8021';
 import {
     RainbowKitProvider,
     darkTheme,
@@ -30,6 +31,9 @@ import '@rainbow-me/rainbowkit/styles.css';
 
 const projectId = 'ecd20f8c23408a4397afc0f5466eb6b6';
 
+// Base Builder Code — attributes onchain activity to Wind Swap (ERC-8021)
+const DATA_SUFFIX = Attribution.toDataSuffix({ codes: ['bc_rco9r2hr'] });
+
 const config = getDefaultConfig({
     appName: 'Wind Swap',
     projectId,
@@ -42,6 +46,7 @@ const config = getDefaultConfig({
         ]),
     },
     ssr: false,
+    dataSuffix: DATA_SUFFIX,
     wallets: [
         {
             groupName: 'Popular',

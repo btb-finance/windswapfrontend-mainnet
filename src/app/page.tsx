@@ -1,31 +1,6 @@
-'use client';
-
 import Link from 'next/link';
-import { useAccount } from 'wagmi';
-import { BulkSwapCard } from '@/components/swap/BulkSwapCard';
-import { useCLPositions, useV2Positions } from '@/hooks/usePositions';
-import { useVeWIND } from '@/hooks/useVeWIND';
-import { usePoolData } from '@/providers/PoolDataProvider';
 
 export default function Home() {
-  const { isConnected } = useAccount();
-
-  const { allPools, gauges, veNFTs: providerVeNFTs } = usePoolData();
-  const poolCount = allPools.length;
-  const gaugeCount = gauges.length;
-
-  const { positionCount: clCount } = useCLPositions();
-  const { positions: v2Positions } = useV2Positions();
-  const { veNFTCount } = useVeWIND();
-
-  const totalWindLocked = providerVeNFTs.reduce((sum, nft) => sum + Number(nft.amount) / 1e18, 0);
-  const formattedVeSupply = totalWindLocked > 0
-    ? totalWindLocked.toLocaleString(undefined, { maximumFractionDigits: 0 })
-    : '--';
-
-  const totalLPPositions = (clCount || 0) + (v2Positions?.length || 0);
-  const totalVeNFTs = veNFTCount || 0;
-
   return (
     <div className="min-h-screen">
 
@@ -61,12 +36,12 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Live Stats Bar */}
+        {/* Stats Bar */}
         <div className="max-w-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-px rounded-2xl overflow-hidden border border-white/8 bg-white/8">
           {[
-            { label: 'Pools', value: poolCount > 0 ? poolCount.toString() : '--', color: 'text-indigo-400' },
-            { label: 'Gauges', value: gaugeCount > 0 ? gaugeCount.toString() : '--', color: 'text-purple-400' },
-            { label: 'WIND Locked', value: formattedVeSupply, color: 'text-amber-400' },
+            { label: 'Liquidity', value: 'V2 + V3', color: 'text-indigo-400' },
+            { label: 'Routing', value: 'Best Rate', color: 'text-purple-400' },
+            { label: 'Governance', value: 'veWIND', color: 'text-amber-400' },
             { label: 'Network', value: 'Base', color: 'text-blue-400' },
           ].map((s) => (
             <div key={s.label} className="bg-[#0d0d14] px-4 py-4 text-center">
@@ -76,40 +51,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      {/* ── SWAP CARD ── */}
-      <section className="max-w-lg mx-auto px-4 py-6 md:py-10">
-        <BulkSwapCard />
-      </section>
-
-      {/* ── veWIND HOLDER BANNER ── */}
-      {isConnected && totalVeNFTs > 0 && (
-        <section className="max-w-2xl mx-auto px-4 pb-6">
-          <div className="rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-cyan-500/15 border border-emerald-500/30 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-emerald-400 mb-0.5">You&apos;re a veWIND Holder!</p>
-              <p className="text-sm text-gray-400">Vote every week to earn trading fees and bribes from pools.</p>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Link href="/vote">
-                <button className="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-semibold hover:bg-emerald-500/30 transition active:scale-95">
-                  Vote Now →
-                </button>
-              </Link>
-              <Link href="/portfolio">
-                <button className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 text-sm font-semibold hover:bg-white/10 transition active:scale-95">
-                  Portfolio
-                </button>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ── HOW IT WORKS ── */}
       <section className="max-w-5xl mx-auto px-4 py-10 md:py-16">
@@ -246,51 +187,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── PORTFOLIO (connected) ── */}
-      {isConnected && (
-        <section className="max-w-5xl mx-auto px-4 py-8 md:py-12">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold">Your Portfolio</h2>
-              <p className="text-sm text-gray-500">All your positions at a glance</p>
-            </div>
-            <Link href="/portfolio">
-              <button className="btn-secondary px-4 py-2 text-sm hover:scale-[1.02] active:scale-95 transition-transform">
-                View All →
-              </button>
-            </Link>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            {[
-              { label: 'LP Positions', value: totalLPPositions, sub: 'CL + V2', color: 'from-amber-500/10 to-amber-500/5 border-amber-500/20' },
-              { label: 'CL Positions', value: clCount || 0, sub: 'Concentrated', color: 'from-indigo-500/10 to-indigo-500/5 border-indigo-500/20' },
-              { label: 'V2 Positions', value: v2Positions?.length || 0, sub: 'Classic AMM', color: 'from-cyan-500/10 to-cyan-500/5 border-cyan-500/20' },
-              { label: 'veNFTs', value: totalVeNFTs, sub: 'Voting Power', color: 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' },
-            ].map((c) => (
-              <div key={c.label} className={`rounded-2xl bg-gradient-to-br ${c.color} border p-4`}>
-                <div className="text-xs text-gray-400 mb-1">{c.label}</div>
-                <div className="text-2xl font-bold">{c.value}</div>
-                <div className="text-xs text-gray-600 mt-0.5">{c.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: 'Add Liquidity', href: '/pools' },
-              { label: 'Manage Staking', href: '/portfolio' },
-              { label: 'Lock WIND', href: '/vote' },
-            ].map((a) => (
-              <Link key={a.href} href={a.href} className="flex-1 min-w-[140px]">
-                <button className="w-full py-2.5 px-4 rounded-xl bg-white/5 border border-white/8 text-sm font-medium hover:bg-white/10 transition active:scale-95">
-                  {a.label}
-                </button>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── WIND TOKEN ── */}
       <section className="max-w-5xl mx-auto px-4 py-8 md:py-12">

@@ -27,6 +27,14 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: '/.well-known/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET' },
+          { key: 'Content-Type', value: 'application/json' },
+        ],
+      },
+      {
         source: '/:path*',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },
