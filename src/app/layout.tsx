@@ -55,7 +55,7 @@ export const metadata: Metadata = {
     // Farcaster Mini App embed card — shown when link is shared in a cast
     'fc:frame': JSON.stringify({
       version: '1',
-      imageUrl: 'https://windswap.org/logo.png',
+      imageUrl: 'https://windswap.org/EmbedPreview.png',
       button: {
         title: 'Open Wind Swap',
         action: {
