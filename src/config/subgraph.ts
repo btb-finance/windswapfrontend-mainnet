@@ -4,11 +4,10 @@
  */
 
 // The Graph gateway endpoint for WindSwap protocol data
-export const SUBGRAPH_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL ||
-  'https://gateway.thegraph.com/api/subgraphs/id/4xkN7MDbfzm1p4MfHCSzyhNTpjYk4URUnA5ysyKRfij';
+export const SUBGRAPH_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL || '';
 
 // API key for The Graph gateway (required for authenticated access)
-export const SUBGRAPH_API_KEY = process.env.NEXT_PUBLIC_SUBGRAPH_API_KEY || 'd65849208eee868786c36b6acb3b1987';
+export const SUBGRAPH_API_KEY = process.env.NEXT_PUBLIC_SUBGRAPH_API_KEY || '';
 
 // Standard headers for subgraph requests
 export const SUBGRAPH_HEADERS: Record<string, string> = {
