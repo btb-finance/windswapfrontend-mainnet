@@ -42,13 +42,13 @@ export const metadata: Metadata = {
     title: 'Wind Swap | DEX on Base',
     description: 'Swap, provide liquidity, and earn real yield on Base with ve(3,3) tokenomics.',
     type: 'website',
-    images: ['/logo.png'],
+    images: [{ url: '/og.png', width: 1200, height: 630 }],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'Wind Swap | DEX on Base',
     description: 'Swap, provide liquidity, and earn real yield on Base with ve(3,3) tokenomics.',
-    images: ['/logo.png'],
+    images: ['/og.png'],
   },
   other: {
     'base:app_id': '69cbc4f32b941e5a27786850',
@@ -56,10 +56,12 @@ export const metadata: Metadata = {
     'fc:frame': JSON.stringify({
       version: '1',
       imageUrl: 'https://windswap.org/EmbedPreview.png',
+      aspectRatio: '3:2',
       button: {
         title: 'Open Wind Swap',
         action: {
           type: 'launch_miniapp',
+          name: 'Wind Swap',
           url: 'https://windswap.org/swap',
           splashImageUrl: 'https://windswap.org/splash.png',
           splashBackgroundColor: '#0a0a14',

@@ -27,7 +27,7 @@
     "ogTitle": "Wind Swap",
     "ogDescription": "Swap, provide liquidity, and earn real yield on Base.",
     "ogImageUrl": "https://windswap.org/og.png",
-    "castShareUrl": "https://warpcast.com/~/compose?text=Swapping%20on%20Wind%20Swap%20%F0%9F%92%A8%20The%20premier%20DEX%20on%20Base&embeds[]=https://windswap.org",
+    "castShareUrl": "https://windswap.org/swap",
     "requiredChains": ["eip155:8453"]
   }
 }
