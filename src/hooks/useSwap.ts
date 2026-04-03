@@ -42,7 +42,7 @@ export function useSwap() {
 
                 const actualTokenIn = resolveToken(tokenIn);
                 const actualTokenOut = resolveToken(tokenOut);
-                
+
                 // Generate cache key for this quote
                 const cacheKey = getQuoteCacheKey(
                     'v2',

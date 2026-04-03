@@ -834,7 +834,6 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
                 // Get swap calldata from WowMax (targeting the proxy as recipient)
-                // Use higher slippage for aggregator route (user slippage + 1% fee buffer)
                 // WowMax API expects plain percentage (e.g. 20 = 20%), multiplies by 100 internally.
                 // Contract max is 2000 (= 20%). We pass max to let WowMax be lenient —
                 // our proxy's own minAmountOut check still enforces the user's actual slippage.
@@ -857,37 +856,29 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 const tokenInAddr = isNativeIn ? '0x0000000000000000000000000000000000000000' as Address : actualTokenIn.address as Address;
                 const tokenOutAddr = tokenOut?.isNative ? '0x0000000000000000000000000000000000000000' as Address : actualTokenOut.address as Address;
 
-                // Approve proxy to pull input tokens (ERC20 only, skip if already sufficient)
-                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
-                    await writeContractAsync({
-                        address: actualTokenIn.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [proxyAddress, amountInWei],
-                    });
-                    refetchAllowanceProxy();
-                }
-
                 // minAmountOut: amountOut[0] is already in wei — use BigInt to avoid double-scaling
                 const expectedOutWei = BigInt(swapData.amountOut[0] ?? '0');
                 const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100)); // e.g. 5% → 500
                 const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n; // subtract slippage + 1% fee
 
-                // Call proxy.swap() — it routes through WowMax, deducts 1% fee, sends rest to user
-                const hash = await writeContractAsync({
-                    address: proxyAddress,
-                    abi: AGGREGATOR_PROXY_ABI,
-                    functionName: 'swap',
-                    args: [
-                        tokenInAddr,
-                        tokenOutAddr,
-                        amountInWei,
-                        minOut,
-                        swapData.contract as Address,
-                        swapData.data as `0x${string}`,
-                    ],
-                    value: isNativeIn ? amountInWei : BigInt(0),
-                });
+                // Build swap call for proxy.swap()
+                const swapCall = encodeContractCall(
+                    proxyAddress,
+                    AGGREGATOR_PROXY_ABI,
+                    'swap',
+                    [tokenInAddr, tokenOutAddr, amountInWei, minOut, swapData.contract as Address, swapData.data as `0x${string}`],
+                    isNativeIn ? amountInWei : undefined,
+                );
+
+                // Batch approve + swap via EIP-5792 (same tx), sequential fallback if unsupported
+                const calls = [];
+                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
+                    calls.push(encodeApproveCall(actualTokenIn.address as Address, proxyAddress, amountInWei));
+                }
+                calls.push(swapCall);
+
+                const hash = await batchOrSequential(calls);
+                refetchAllowanceProxy();
                 result = { hash };
             } catch (err: unknown) {
                 console.error('WowMax swap error:', err);
@@ -925,35 +916,28 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     return;
                 }
 
-                // Approve proxy for ERC20 input
-                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
-                    await writeContractAsync({
-                        address: actualTokenIn.address as Address,
-                        abi: ERC20_ABI,
-                        functionName: 'approve',
-                        args: [proxyAddress, amountInWei],
-                    });
-                    refetchAllowanceProxy();
-                }
-
                 const expectedOutWei = BigInt(swapData.amountOut ?? '0');
                 const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100));
                 const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n;
 
-                const hash = await writeContractAsync({
-                    address: proxyAddress,
-                    abi: AGGREGATOR_PROXY_ABI,
-                    functionName: 'swap',
-                    args: [
-                        tokenInAddr,
-                        tokenOutAddr,
-                        amountInWei,
-                        minOut,
-                        swapData.routerAddress as Address,
-                        swapData.data as `0x${string}`,
-                    ],
-                    value: isNativeIn ? amountInWei : BigInt(0),
-                });
+                // Build swap call for proxy.swap()
+                const swapCall = encodeContractCall(
+                    proxyAddress,
+                    AGGREGATOR_PROXY_ABI,
+                    'swap',
+                    [tokenInAddr, tokenOutAddr, amountInWei, minOut, swapData.routerAddress as Address, swapData.data as `0x${string}`],
+                    isNativeIn ? amountInWei : undefined,
+                );
+
+                // Batch approve + swap via EIP-5792 (same tx), sequential fallback if unsupported
+                const calls = [];
+                if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
+                    calls.push(encodeApproveCall(actualTokenIn.address as Address, proxyAddress, amountInWei));
+                }
+                calls.push(swapCall);
+
+                const hash = await batchOrSequential(calls);
+                refetchAllowanceProxy();
                 result = { hash };
             } catch (err: unknown) {
                 console.error('KyberSwap swap error:', err);
