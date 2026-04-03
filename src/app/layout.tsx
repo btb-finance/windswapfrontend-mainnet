@@ -61,7 +61,7 @@ export const metadata: Metadata = {
         action: {
           type: 'launch_miniapp',
           url: 'https://windswap.org/swap',
-          splashImageUrl: 'https://windswap.org/logo.png',
+          splashImageUrl: 'https://windswap.org/splash.png',
           splashBackgroundColor: '#0a0a14',
         },
       },

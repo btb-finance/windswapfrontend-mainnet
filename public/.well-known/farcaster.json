@@ -11,7 +11,7 @@
     "iconUrl": "https://windswap.org/logo.png",
     "imageUrl": "https://windswap.org/EmbedPreview.png",
     "buttonTitle": "Open Wind Swap",
-    "splashImageUrl": "https://windswap.org/logo.png",
+    "splashImageUrl": "https://windswap.org/splash.png",
     "splashBackgroundColor": "#0a0a14",
     "subtitle": "DEX on Base",
     "description": "Swap tokens, provide liquidity, and earn real yield on Base with ve33 tokenomics.",
