@@ -52,6 +52,20 @@ export const metadata: Metadata = {
   },
   other: {
     'base:app_id': '69cbc4f32b941e5a27786850',
+    // Farcaster Mini App embed card — shown when link is shared in a cast
+    'fc:frame': JSON.stringify({
+      version: '1',
+      imageUrl: 'https://windswap.org/logo.png',
+      button: {
+        title: 'Open Wind Swap',
+        action: {
+          type: 'launch_miniapp',
+          url: 'https://windswap.org/swap',
+          splashImageUrl: 'https://windswap.org/logo.png',
+          splashBackgroundColor: '#0a0a14',
+        },
+      },
+    }),
   },
 };
 

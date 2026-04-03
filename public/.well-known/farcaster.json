@@ -1,0 +1,22 @@
+{
+  "accountAssociation": {
+    "header": "REPLACE_WITH_HEADER_FROM_WARPCAST",
+    "payload": "REPLACE_WITH_PAYLOAD_FROM_WARPCAST",
+    "signature": "REPLACE_WITH_SIGNATURE_FROM_WARPCAST"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Wind Swap",
+    "homeUrl": "https://windswap.org/swap",
+    "iconUrl": "https://windswap.org/logo.png",
+    "splashBackgroundColor": "#0a0a14",
+    "subtitle": "DEX on Base",
+    "description": "The premier AMM and ve(3,3) DEX on Base. Swap, provide liquidity, and earn rewards with WIND.",
+    "primaryCategory": "defi",
+    "tagline": "Swap & earn on Base",
+    "ogTitle": "Wind Swap",
+    "ogDescription": "Swap, provide liquidity, and earn real yield on Base.",
+    "ogImageUrl": "https://windswap.org/logo.png",
+    "requiredChains": ["eip155:8453"]
+  }
+}

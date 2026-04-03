@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { ToastProvider } from '@/providers/ToastProvider';
 import { WalletModalProvider } from '@/providers/WalletModalContext';
 import { ReferralProvider } from '@/providers/ReferralProvider';
+import { FarcasterProvider } from '@/providers/FarcasterProvider';
 
 // Dynamic import with SSR disabled to prevent WalletConnect's idb-keyval
 // from accessing indexedDB during server-side rendering in serverless environments
@@ -23,15 +24,17 @@ const Providers = dynamic(
 export function ClientProviders({ children }: { children: React.ReactNode }) {
     return (
         <Providers>
-            <WalletModalProvider>
-                <ToastProvider>
-                    <Suspense>
-                        <ReferralProvider>
-                            {children}
-                        </ReferralProvider>
-                    </Suspense>
-                </ToastProvider>
-            </WalletModalProvider>
+            <FarcasterProvider>
+                <WalletModalProvider>
+                    <ToastProvider>
+                        <Suspense>
+                            <ReferralProvider>
+                                {children}
+                            </ReferralProvider>
+                        </Suspense>
+                    </ToastProvider>
+                </WalletModalProvider>
+            </FarcasterProvider>
         </Providers>
     );
 }
