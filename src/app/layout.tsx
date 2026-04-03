@@ -56,6 +56,7 @@ export const metadata: Metadata = {
     'fc:frame': JSON.stringify({
       version: '1',
       imageUrl: 'https://windswap.org/EmbedPreview.png',
+      aspectRatio: '3:2',
       button: {
         title: 'Open Wind Swap',
         action: {
