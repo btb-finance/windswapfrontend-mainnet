@@ -7,16 +7,21 @@
   "miniapp": {
     "version": "1",
     "name": "Wind Swap",
-    "homeUrl": "https://windswap.org/swap",
+    "homeUrl": "https://windswap.org/",
     "iconUrl": "https://windswap.org/logo.png",
+    "imageUrl": "https://windswap.org/logo.png",
+    "buttonTitle": "Open Wind Swap",
+    "splashImageUrl": "https://windswap.org/logo.png",
     "splashBackgroundColor": "#0a0a14",
     "subtitle": "DEX on Base",
-    "description": "The premier AMM and ve(3,3) DEX on Base. Swap, provide liquidity, and earn rewards with WIND.",
-    "primaryCategory": "defi",
-    "tagline": "Swap & earn on Base",
+    "description": "Swap tokens, provide liquidity, and earn real yield on Base with ve33 tokenomics.",
+    "primaryCategory": "finance",
+    "tagline": "Swap and earn on Base",
+    "tags": ["defi", "swap", "dex", "base", "liquidity"],
     "ogTitle": "Wind Swap",
     "ogDescription": "Swap, provide liquidity, and earn real yield on Base.",
     "ogImageUrl": "https://windswap.org/logo.png",
+    "castShareUrl": "https://warpcast.com/~/compose?text=Swapping%20on%20Wind%20Swap%20%F0%9F%92%A8%20The%20premier%20DEX%20on%20Base&embeds[]=https://windswap.org",
     "requiredChains": ["eip155:8453"]
   }
 }
