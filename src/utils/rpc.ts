@@ -94,42 +94,81 @@ export async function rpcCall<T = unknown>(
     throw lastError;
 }
 
-export async function batchRpcCall(
-    calls: Array<{ method: string; params: unknown[] }>,
-    preferredRpc?: string
-): Promise<unknown[]> {
-    const rpc = preferredRpc || getPrimaryRpc();
+// Max calls per single HTTP batch request — keeps any one RPC from being overwhelmed
+const BATCH_CHUNK_SIZE = 12;
+
+async function sendBatchChunk(
+    chunk: Array<{ method: string; params: unknown[]; id: number }>,
+    rpc: string
+): Promise<Array<{ id: number; result: unknown }>> {
     const response = await fetch(rpc, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-            calls.map((call, i) => ({
-                jsonrpc: '2.0',
-                method: call.method,
-                params: call.params,
-                id: i + 1,
-            }))
-        ),
+        body: JSON.stringify(chunk),
     });
 
+    if (response.status === 429 || response.status === 502 || response.status === 503 || response.status === 504) {
+        throw new Error(`RPC batch HTTP ${response.status} from ${rpc}`);
+    }
+
     const text = await response.text();
-    let results: Array<{ result: unknown }> | { result: unknown };
+    let results: Array<{ id: number; result: unknown }> | { result: unknown };
     try {
         results = JSON.parse(text) as typeof results;
     } catch {
         const ct = response.headers.get('content-type') || '';
-        const snippet = text.slice(0, 200);
-        throw new Error(`RPC batch returned non-JSON response (status=${response.status}, content-type=${ct}): ${snippet}`);
+        throw new Error(`RPC batch non-JSON (status=${response.status}, ct=${ct}): ${text.slice(0, 200)}`);
     }
-    if (Array.isArray(results)) {
-        const sorted = [...results].sort((a, b) => {
-            const aId = (a as { id?: number }).id ?? 0;
-            const bId = (b as { id?: number }).id ?? 0;
-            return aId - bId;
-        });
-        return sorted.map(r => (r as { result: unknown }).result);
+
+    if (Array.isArray(results)) return results as Array<{ id: number; result: unknown }>;
+    return [{ id: chunk[0]?.id ?? 1, result: (results as { result: unknown }).result }];
+}
+
+export async function batchRpcCall(
+    calls: Array<{ method: string; params: unknown[] }>,
+    preferredRpc?: string
+): Promise<unknown[]> {
+    if (calls.length === 0) return [];
+
+    // Assign globally unique IDs so we can reassemble after chunking
+    const tagged = calls.map((call, i) => ({ ...call, id: i + 1 }));
+
+    // Split into chunks
+    const chunks: typeof tagged[] = [];
+    for (let i = 0; i < tagged.length; i += BATCH_CHUNK_SIZE) {
+        chunks.push(tagged.slice(i, i + BATCH_CHUNK_SIZE));
     }
-    return [(results as { result: unknown }).result];
+
+    // Build RPC rotation list — preferred first, then rest
+    const primary = preferredRpc || getPrimaryRpc();
+    const rotation = [primary, ...FALLBACK_RPCS.filter(r => r !== primary)];
+
+    // Fire all chunks in parallel, each chunk tries RPCs in order on failure
+    const chunkResults = await Promise.all(
+        chunks.map(async (chunk, chunkIdx) => {
+            // Stagger RPC selection so chunks spread across endpoints
+            const orderedRpcs = [
+                rotation[chunkIdx % rotation.length],
+                ...rotation.filter((_, i) => i !== chunkIdx % rotation.length),
+            ];
+
+            let lastErr: Error = new Error('No RPC available');
+            for (const rpc of orderedRpcs) {
+                try {
+                    return await sendBatchChunk(chunk, rpc);
+                } catch (err) {
+                    lastErr = err instanceof Error ? err : new Error(String(err));
+                }
+            }
+            // If all RPCs fail for this chunk, return nulls so callers degrade gracefully
+            console.warn('[batchRpcCall] All RPCs failed for chunk:', lastErr.message);
+            return chunk.map(c => ({ id: c.id, result: null }));
+        })
+    );
+
+    // Flatten and sort by original ID to restore call order
+    const flat = chunkResults.flat().sort((a, b) => a.id - b.id);
+    return flat.map(r => r.result);
 }
 
 export async function ethCall(to: string, data: string): Promise<string> {
