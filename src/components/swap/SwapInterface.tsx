@@ -168,7 +168,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         : BigInt(0);
 
     // ===== Pre-check allowance for ALL routers =====
-    const { data: allowanceV2, refetch: refetchAllowanceV2 } = useReadContract({
+    const { data: allowanceV2, refetch: refetchAllowanceV2, isFetched: isFetchedAllowanceV2 } = useReadContract({
         address: actualTokenIn?.address as Address,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -178,7 +178,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         },
     });
 
-    const { data: allowanceV3, refetch: refetchAllowanceV3 } = useReadContract({
+    const { data: allowanceV3, refetch: refetchAllowanceV3, isFetched: isFetchedAllowanceV3 } = useReadContract({
         address: actualTokenIn?.address as Address,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -205,16 +205,19 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
     // Get the relevant allowance based on best route
     const currentAllowance = bestRoute?.type === 'v2' ? allowanceV2 : allowanceV3;
+    const allowanceLoaded = bestRoute?.type === 'v2' ? isFetchedAllowanceV2 : isFetchedAllowanceV3;
 
     // Check if approval is needed for the CURRENT best route
-    // WowMax handles approval inline during swap execution
+    // Don't show approve button while allowance is still loading (prevents false re-approve on refresh)
+    // WowMax/KyberSwap handle approval inline during swap execution
     const needsApproval = !tokenIn?.isNative &&
         amountInWei > BigInt(0) &&
         bestRoute !== null &&
         bestRoute.type !== 'wrap' &&
         bestRoute.type !== 'wowmax' &&
         bestRoute.type !== 'kyberswap' &&
-        (currentAllowance === undefined || (currentAllowance as bigint) < amountInWei);
+        allowanceLoaded &&
+        (currentAllowance as bigint) < amountInWei;
 
     // Track pending approval transaction hash
     const [pendingApprovalHash, setPendingApprovalHash] = useState<`0x${string}` | undefined>(undefined);
