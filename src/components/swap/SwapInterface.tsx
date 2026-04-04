@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAccount, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
-import { parseUnits, formatUnits, Address, maxUint256 } from 'viem';
+import { parseUnits, formatUnits, Address } from 'viem';
 import { Token, ETH, USDC, WETH, LORE } from '@/config/tokens';
 import { LoreBondingCurveSwap } from './LoreBondingCurveSwap';
 import { V2_CONTRACTS, CL_CONTRACTS, COMMON } from '@/config/contracts';
@@ -317,7 +317,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     address: actualTokenIn.address as Address,
                     abi: ERC20_ABI,
                     functionName: 'approve',
-                    args: [routerToApprove as Address, maxUint256],
+                    args: [routerToApprove as Address, amountInWei],
                 });
                 setPendingApprovalHash(hash);
                 return;
@@ -327,7 +327,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             const approveCall = encodeApproveCall(
                 actualTokenIn.address as Address,
                 routerToApprove as Address,
-                maxUint256
+                amountInWei
             );
 
             const hash = await batchOrSequential([approveCall, swapCall]);
@@ -878,7 +878,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 // Batch approve + swap via EIP-5792 (same tx), sequential fallback if unsupported
                 const calls = [];
                 if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
-                    calls.push(encodeApproveCall(actualTokenIn.address as Address, proxyAddress, maxUint256));
+                    calls.push(encodeApproveCall(actualTokenIn.address as Address, proxyAddress, amountInWei));
                 }
                 calls.push(swapCall);
 
@@ -937,7 +937,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 // Batch approve + swap via EIP-5792 (same tx), sequential fallback if unsupported
                 const calls = [];
                 if (!isNativeIn && (allowanceProxy === undefined || (allowanceProxy as bigint) < amountInWei)) {
-                    calls.push(encodeApproveCall(actualTokenIn.address as Address, proxyAddress, maxUint256));
+                    calls.push(encodeApproveCall(actualTokenIn.address as Address, proxyAddress, amountInWei));
                 }
                 calls.push(swapCall);
 
