@@ -4,14 +4,18 @@ import { useState } from 'react';
 
 interface SwapSettingsProps {
     slippage: number;
+    isAutoSlippage: boolean;
     deadline: number;
+    priceImpact?: number | null;
     onSlippageChange?: (slippage: number) => void;
     onDeadlineChange?: (deadline: number) => void;
 }
 
 export function SwapSettings({
     slippage,
+    isAutoSlippage,
     deadline,
+    priceImpact,
     onSlippageChange,
     onDeadlineChange,
 }: SwapSettingsProps) {
@@ -78,6 +82,19 @@ export function SwapSettings({
                             Slippage Tolerance
                         </label>
                         <div className="flex gap-2">
+                            {/* Auto button */}
+                            <button
+                                onClick={() => {
+                                    onSlippageChange?.(-1); // -1 = reset to auto
+                                    setCustomSlippage('');
+                                }}
+                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${isAutoSlippage
+                                    ? 'bg-primary text-white'
+                                    : 'bg-white/5 hover:bg-white/10'
+                                    }`}
+                            >
+                                Auto
+                            </button>
                             {slippagePresets.map((preset) => (
                                 <button
                                     key={preset}
@@ -85,7 +102,7 @@ export function SwapSettings({
                                         onSlippageChange?.(preset);
                                         setCustomSlippage('');
                                     }}
-                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${slippage === preset && !customSlippage
+                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${!isAutoSlippage && slippage === preset && !customSlippage
                                         ? 'bg-primary text-white'
                                         : 'bg-white/5 hover:bg-white/10'
                                         }`}
@@ -106,6 +123,11 @@ export function SwapSettings({
                                 </span>
                             </div>
                         </div>
+                        {isAutoSlippage && priceImpact != null && priceImpact > 0.5 && (
+                            <p className="text-xs text-blue-400 mt-2">
+                                Auto-adjusted to {slippage.toFixed(1)}% based on {priceImpact.toFixed(1)}% price impact
+                            </p>
+                        )}
                         {slippage > 5 && (
                             <p className="text-xs text-warning mt-2">
                                 High slippage: Transaction may be frontrun

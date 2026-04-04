@@ -132,7 +132,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     const [typedValue, setTypedValue] = useState('');
 
     // Settings state
-    const [slippage, setSlippage] = useState<number>(SLIPPAGE.DEFAULT);
+    const [manualSlippage, setManualSlippage] = useState<number | null>(null); // null = auto
     const [deadline, setDeadline] = useState<number>(30);
     const [slippageError, setSlippageError] = useState<string | null>(null);
 
@@ -168,7 +168,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         : BigInt(0);
 
     // ===== Pre-check allowance for ALL routers =====
-    const { data: allowanceV2, refetch: refetchAllowanceV2 } = useReadContract({
+    const { data: allowanceV2, refetch: refetchAllowanceV2, isFetched: isFetchedAllowanceV2 } = useReadContract({
         address: actualTokenIn?.address as Address,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -178,7 +178,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         },
     });
 
-    const { data: allowanceV3, refetch: refetchAllowanceV3 } = useReadContract({
+    const { data: allowanceV3, refetch: refetchAllowanceV3, isFetched: isFetchedAllowanceV3 } = useReadContract({
         address: actualTokenIn?.address as Address,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -205,16 +205,19 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
     // Get the relevant allowance based on best route
     const currentAllowance = bestRoute?.type === 'v2' ? allowanceV2 : allowanceV3;
+    const allowanceLoaded = bestRoute?.type === 'v2' ? isFetchedAllowanceV2 : isFetchedAllowanceV3;
 
     // Check if approval is needed for the CURRENT best route
-    // WowMax handles approval inline during swap execution
+    // Don't show approve button while allowance is still loading (prevents false re-approve on refresh)
+    // WowMax/KyberSwap handle approval inline during swap execution
     const needsApproval = !tokenIn?.isNative &&
         amountInWei > BigInt(0) &&
         bestRoute !== null &&
         bestRoute.type !== 'wrap' &&
         bestRoute.type !== 'wowmax' &&
         bestRoute.type !== 'kyberswap' &&
-        (currentAllowance === undefined || (currentAllowance as bigint) < amountInWei);
+        allowanceLoaded &&
+        (currentAllowance as bigint) < amountInWei;
 
     // Track pending approval transaction hash
     const [pendingApprovalHash, setPendingApprovalHash] = useState<`0x${string}` | undefined>(undefined);
@@ -423,6 +426,14 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
     })();
 
     const highPriceImpact = priceImpact !== null && priceImpact > 2;
+
+    // Auto-slippage: if user hasn't manually set slippage, auto-adjust based on price impact
+    // Adds 1% buffer on top of price impact, with a floor of 0.5% and cap at 50%
+    const slippage = manualSlippage !== null
+        ? manualSlippage
+        : priceImpact !== null && priceImpact > 0.5
+            ? Math.min(Math.max(priceImpact + 1, 0.5), 50)
+            : SLIPPAGE.DEFAULT;
 
     // Reset acceptance when amounts/tokens change
     useEffect(() => {
@@ -675,7 +686,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         const debounce = setTimeout(findBestRoute, DEBOUNCE_MS.QUOTE);
         return () => clearTimeout(debounce);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tokenIn, tokenOut, amountIn, amountOut, actualTokenOut, routeLocked, independentField, quoteRefreshTick]);
+    }, [tokenIn, tokenOut, amountIn, amountOut, actualTokenOut, routeLocked, independentField, quoteRefreshTick, v2VolatileQuote, v2StableQuote]);
 
     // Auto-refresh quote every 30 seconds (not on every RPC data change)
     useEffect(() => {
@@ -684,8 +695,14 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
         return () => clearInterval(interval);
     }, [tokenIn, tokenOut, amountIn]);
 
-    // Handle slippage change with validation
+    // Handle slippage change with validation — pass -1 to reset to auto
     const handleSlippageChange = useCallback((value: number) => {
+        if (value === -1) {
+            // Reset to auto
+            setManualSlippage(null);
+            setSlippageError(null);
+            return;
+        }
         if (value < SLIPPAGE.MIN) {
             setSlippageError(`Slippage must be at least ${SLIPPAGE.MIN}%`);
             return;
@@ -695,7 +712,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
             return;
         }
         setSlippageError(null);
-        setSlippage(value);
+        setManualSlippage(value);
     }, []);
 
     // Swap tokens
@@ -1000,7 +1017,9 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     )}
                     <SwapSettings
                         slippage={slippage}
+                        isAutoSlippage={manualSlippage === null}
                         deadline={deadline}
+                        priceImpact={priceImpact}
                         onSlippageChange={handleSlippageChange}
                         onDeadlineChange={setDeadline}
                     />
@@ -1077,7 +1096,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     )}
                     <div className="flex justify-between">
                         <span className="text-gray-400">Slippage</span>
-                        <span>{slippage}%</span>
+                        <span>{manualSlippage === null ? `Auto (${slippage.toFixed(1)}%)` : `${slippage}%`}</span>
                     </div>
                     {bestRoute && (
                         <div className="flex justify-between">

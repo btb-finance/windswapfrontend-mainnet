@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { parseUnits, formatUnits } from 'viem';
 import { Token, WETH, USDC, WIND } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
-import { batchRpcCall } from '@/utils/rpc';
+import { rpcCall } from '@/utils/rpc';
 import { TICK_SPACINGS, resolveToken, encodeV3Path } from '@/utils/contracts';
 
 // Common intermediate tokens for routing
@@ -51,6 +51,94 @@ interface BatchQuoteRequest {
     tickSpacing2?: number;
 }
 
+/**
+ * Encode CLInterfaceMulticall.multicall(Call[]) calldata.
+ * Call = (address target, uint256 gasLimit, bytes callData)
+ * Selector: keccak256("multicall((address,uint256,bytes)[])") = 0x1749e1e3
+ */
+function encodeMulticallData(calls: { target: string; data: string }[]): string {
+    const fnSelector = '1749e1e3';
+    const n = calls.length;
+
+    // ABI encoding: offset to array (0x20) + array length + tuple offsets + tuple data
+    // Each tuple is dynamic because of `bytes callData`
+
+    // Calculate tuple encodings first
+    const tupleBlobs: string[] = [];
+    for (const call of calls) {
+        const addr = call.target.slice(2).toLowerCase().padStart(64, '0');
+        const gasLimit = (500000).toString(16).padStart(64, '0');
+        // Dynamic bytes offset: first 3 words are addr + gasLimit + bytesOffset, so offset = 0x60 = 96
+        const bytesOffset = '0000000000000000000000000000000000000000000000000000000000000060';
+        const dataHex = call.data.startsWith('0x') ? call.data.slice(2) : call.data;
+        const dataByteLen = dataHex.length / 2;
+        const dataLenHex = dataByteLen.toString(16).padStart(64, '0');
+        const dataPadded = dataHex + '0'.repeat((Math.ceil(dataHex.length / 64) * 64) - dataHex.length);
+        tupleBlobs.push(addr + gasLimit + bytesOffset + dataLenHex + dataPadded);
+    }
+
+    // Array of tuple offsets
+    let offsetAccum = n * 32; // after all offset words
+    const offsets: string[] = [];
+    for (const blob of tupleBlobs) {
+        offsets.push(offsetAccum.toString(16).padStart(64, '0'));
+        offsetAccum += blob.length / 2;
+    }
+
+    const arrayOffset = '0000000000000000000000000000000000000000000000000000000000000020';
+    const arrayLen = n.toString(16).padStart(64, '0');
+
+    return '0x' + fnSelector + arrayOffset + arrayLen + offsets.join('') + tupleBlobs.join('');
+}
+
+/**
+ * Decode CLInterfaceMulticall.multicall return: (uint256 blockNumber, Result[] returnData)
+ * Result = (bool success, uint256 gasUsed, bytes returnData)
+ */
+function decodeMulticallResult(raw: string): { success: boolean; returnData: string }[] {
+    const hex = raw.startsWith('0x') ? raw.slice(2) : raw;
+
+    // First 32 bytes: blockNumber (skip)
+    // Next 32 bytes: offset to Result[] array
+    const arrayOffset = parseInt(hex.slice(64, 128), 16) * 2; // in hex chars
+
+    // At arrayOffset: array length
+    const arrayLen = parseInt(hex.slice(arrayOffset, arrayOffset + 64), 16);
+
+    const results: { success: boolean; returnData: string }[] = [];
+
+    // Read tuple offsets
+    const offsetsStart = arrayOffset + 64;
+    const tupleOffsets: number[] = [];
+    for (let i = 0; i < arrayLen; i++) {
+        const off = parseInt(hex.slice(offsetsStart + i * 64, offsetsStart + (i + 1) * 64), 16) * 2;
+        tupleOffsets.push(arrayOffset + 64 + off); // relative to array data start? No — offsets are relative to array start
+    }
+
+    // Actually, offsets in dynamic arrays are relative to the start of the array data
+    // The array data starts at arrayOffset + 64 (after the length word)
+    // But the offsets themselves are relative to the start of the array... let me re-check
+    // In Solidity ABI encoding, dynamic array element offsets are relative to the start of the array content
+    // which is arrayOffset + 64
+
+    for (let i = 0; i < arrayLen; i++) {
+        const tupleOff = parseInt(hex.slice(offsetsStart + i * 64, offsetsStart + (i + 1) * 64), 16) * 2;
+        const tupleStart = arrayOffset + 64 + tupleOff; // relative to array data start
+
+        // Tuple: bool success (32 bytes) + uint256 gasUsed (32 bytes) + offset to bytes (32 bytes)
+        const success = parseInt(hex.slice(tupleStart, tupleStart + 64), 16) !== 0;
+        // gasUsed at tupleStart + 64 (skip)
+        const bytesOffset = parseInt(hex.slice(tupleStart + 128, tupleStart + 192), 16) * 2;
+        const bytesStart = tupleStart + bytesOffset;
+        const bytesLen = parseInt(hex.slice(bytesStart, bytesStart + 64), 16);
+        const returnData = '0x' + hex.slice(bytesStart + 64, bytesStart + 64 + bytesLen * 2);
+
+        results.push({ success, returnData });
+    }
+
+    return results;
+}
+
 export function useMixedRouteQuoter() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -66,27 +154,47 @@ export function useMixedRouteQuoter() {
         return `0x${selector}${pathOffset}${amountInHex}${pathLength}${pathPadded}`;
     };
 
-    // BATCH all quotes in a SINGLE HTTP request
+    // BATCH all quotes via on-chain CLInterfaceMulticall — 1 RPC call instead of 80+
     const batchQuote = useCallback(async (requests: BatchQuoteRequest[]): Promise<(RouteQuote | null)[]> => {
         if (requests.length === 0) return [];
 
-        const batchCalls = requests.map((req) => ({
-            method: 'eth_call',
-            params: [{ to: CL_CONTRACTS.MixedRouteQuoterV1, data: encodeQuoteData(req.path, req.amountIn) }, 'latest'],
+        const quoterAddress = CL_CONTRACTS.MixedRouteQuoterV1;
+        const multicallAddress = CL_CONTRACTS.CLInterfaceMulticall;
+
+        // Encode each quoteExactInput call
+        const innerCalls = requests.map((req) => ({
+            target: quoterAddress,
+            data: encodeQuoteData(req.path, req.amountIn),
         }));
 
+        // Build multicall calldata
+        // multicall((address,uint256,bytes)[]) — we need the correct function selector
+        // keccak256("multicall((address,uint256,bytes)[])") first 4 bytes
+        // Let's use a simpler approach: encode with viem-style ABI manually
+        const multicallData = encodeMulticallData(innerCalls);
+
         try {
-            const results = await batchRpcCall(batchCalls);
+            const rawResult = await rpcCall<string>('eth_call', [
+                { to: multicallAddress, data: multicallData },
+                'latest',
+            ]);
+
+            if (!rawResult || rawResult === '0x' || rawResult.length < 66) {
+                return requests.map(() => null);
+            }
+
+            // Decode multicall response: (uint256 blockNumber, Result[] returnData)
+            // Result = (bool success, uint256 gasUsed, bytes returnData)
+            const results = decodeMulticallResult(rawResult);
 
             return requests.map((req, i) => {
-                const rawResult = results[i] as string | null | undefined;
-
-                if (!rawResult || rawResult === '0x' || rawResult.length < 66) {
+                const result = results[i];
+                if (!result || !result.success || !result.returnData || result.returnData === '0x' || result.returnData.length < 66) {
                     return null;
                 }
 
                 try {
-                    const hex = rawResult.slice(2);
+                    const hex = result.returnData.slice(2);
                     const amountOut = BigInt('0x' + hex.slice(0, 64));
 
                     if (amountOut <= BigInt(0)) return null;
@@ -106,7 +214,8 @@ export function useMixedRouteQuoter() {
                     return null;
                 }
             });
-        } catch {
+        } catch (err) {
+            console.warn('[batchQuote] multicall failed, quotes unavailable:', err);
             return requests.map(() => null);
         }
     }, []);
