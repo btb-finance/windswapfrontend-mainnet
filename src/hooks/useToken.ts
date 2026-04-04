@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useBalance, useReadContract } from 'wagmi';
 import { formatUnits, Address } from 'viem';
 import { ERC20_ABI } from '@/config/abis';
@@ -20,8 +21,21 @@ export function bigIntPercentage(amount: bigint | undefined, percentage: number)
 export function useTokenBalance(token: Token | undefined) {
     const { address } = useAccount();
 
+    // Track token address to detect switches and clear stale balance
+    const prevTokenAddr = useRef<string | undefined>(undefined);
+    const [tokenSwitching, setTokenSwitching] = useState(false);
+
+    useEffect(() => {
+        const currentAddr = token?.address?.toLowerCase();
+        if (prevTokenAddr.current !== undefined && prevTokenAddr.current !== currentAddr) {
+            // Token changed — mark as switching until new data arrives
+            setTokenSwitching(true);
+        }
+        prevTokenAddr.current = currentAddr;
+    }, [token?.address]);
+
     // For native SEI
-    const { data: nativeBalance, refetch: refetchNative } = useBalance({
+    const { data: nativeBalance, refetch: refetchNative, isFetching: isFetchingNative } = useBalance({
         address: address,
         query: {
             enabled: !!address && !!token?.isNative,
@@ -29,7 +43,7 @@ export function useTokenBalance(token: Token | undefined) {
     });
 
     // For ERC20 tokens
-    const { data: tokenBalance, refetch: refetchToken } = useReadContract({
+    const { data: tokenBalance, refetch: refetchToken, isFetching: isFetchingErc20 } = useReadContract({
         address: token?.address as Address,
         abi: ERC20_ABI,
         functionName: 'balanceOf',
@@ -38,6 +52,14 @@ export function useTokenBalance(token: Token | undefined) {
             enabled: !!address && !!token && !token.isNative,
         },
     });
+
+    // Clear switching flag once new data arrives
+    const isFetching = token?.isNative ? isFetchingNative : isFetchingErc20;
+    useEffect(() => {
+        if (tokenSwitching && !isFetching) {
+            setTokenSwitching(false);
+        }
+    }, [tokenSwitching, isFetching]);
 
     // Get the raw bigint value
     const rawBigInt = token?.isNative
@@ -57,11 +79,14 @@ export function useTokenBalance(token: Token | undefined) {
         }
     };
 
+    // While token is switching, show '--' to avoid displaying stale balance
+    const isStale = tokenSwitching || isFetching;
+
     return {
-        balance,
-        rawBigInt, // Actual bigint for precise calculations
-        raw: balance || '0', // Full precision string for MAX button
-        formatted: balance ? truncateToDecimals(balance, 4) : '--',
+        balance: isStale ? undefined : balance,
+        rawBigInt: isStale ? undefined : rawBigInt,
+        raw: isStale ? '0' : (balance || '0'), // Full precision string for MAX button
+        formatted: isStale ? '--' : (balance ? truncateToDecimals(balance, 4) : '--'),
         refetch,
     };
 }
