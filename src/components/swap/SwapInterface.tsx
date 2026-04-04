@@ -478,6 +478,20 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     return;
                 }
 
+                // Kick off aggregator requests immediately in parallel with local route building.
+                // WowMax gets a 2s timeout so a slow response never holds up the UI.
+                // KyberSwap is fast (~13ms) so no timeout needed there.
+                const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
+                    Promise.race([p, new Promise<null>(res => setTimeout(() => res(null), ms))]);
+
+                const aggregatorPromise = independentField === 'INPUT' && actualTokenIn && actualTokenOut
+                    ? Promise.allSettled([
+                        withTimeout(getWowMaxQuote(actualTokenIn.address, actualTokenOut.address, amountIn), 1000),
+                        getKyberQuote(actualTokenIn.address, actualTokenOut.address,
+                            parseUnits(amountIn, actualTokenIn.decimals).toString()),
+                    ])
+                    : null;
+
                 if (independentField === 'INPUT') {
                     // === EXACT INPUT: unified V3 route finder (single + split in 2 RPC batches) ===
                     const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
@@ -596,18 +610,9 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                     }
                 }
 
-                // Check WowMax + KyberSwap aggregators in parallel alongside local routes
-                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenIn && actualTokenOut) {
-                    // WowMax takes human-readable amount, KyberSwap takes wei
-                    const amountInWeiStr = parseUnits(amountIn, actualTokenIn.decimals).toString();
-                    // Proxy always wraps native ETH → WETH before calling router,
-                    // so KyberSwap must receive WETH (not native ETH)
-                    const kyberTokenIn = actualTokenIn.address;
-                    const kyberTokenOut = actualTokenOut.address;
-                    const [wmQuote, kyberQuote] = await Promise.allSettled([
-                        getWowMaxQuote(actualTokenIn.address, actualTokenOut.address, amountIn),
-                        getKyberQuote(kyberTokenIn, kyberTokenOut, amountInWeiStr),
-                    ]);
+                // Check WowMax + KyberSwap — already started in parallel above, just await now
+                if (independentField === 'INPUT' && tokenIn && tokenOut && actualTokenIn && actualTokenOut && aggregatorPromise) {
+                    const [wmQuote, kyberQuote] = await aggregatorPromise;
 
                     if (wmQuote.status === 'fulfilled' && wmQuote.value && parseFloat(wmQuote.value.amountOut) > 0) {
                         const outDecimals = wmQuote.value.to?.decimals ?? actualTokenOut.decimals;

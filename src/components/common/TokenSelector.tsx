@@ -140,106 +140,99 @@ export function TokenSelector({
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
 
-    // Fetch Base tokens from Uniswap + Aerodrome (superchain) token lists and merge
+    // Fetch Base tokens from multiple lists — progressive: each list shows tokens as it arrives.
+    // sessionStorage cache means reopening the modal is instant.
     useEffect(() => {
         let cancelled = false;
-        const TOKEN_LISTS = [
-            'https://tokens.uniswap.org',
-            'https://static.optimism.io/optimism.tokenlist.json',
+        const CACHE_KEY = 'wind_token_list_v1';
+        const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+        // Shared dedup set (starts with default list addresses)
+        const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
+        // Accumulated token array — mutated as lists arrive, flushed to state progressively
+        let accumulated: Token[] = [];
+
+        const flush = () => {
+            if (!cancelled) setCgTokens([...accumulated]);
+        };
+
+        const addTokens = (raw: { address: string; name: string; symbol: string; decimals: number; logoURI?: string; chainId?: number }[], chainId?: number) => {
+            let added = false;
+            for (const t of raw) {
+                if (chainId && t.chainId !== chainId) continue;
+                const key = t.address.toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                let addr = t.address;
+                try { addr = getAddress(addr); } catch {}
+                accumulated.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
+                added = true;
+            }
+            return added;
+        };
+
+        // Load from sessionStorage cache immediately (instant display)
+        try {
+            const raw = sessionStorage.getItem(CACHE_KEY);
+            if (raw) {
+                const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
+                if (Date.now() - ts < CACHE_TTL) {
+                    accumulated = tokens.filter(t => !seen.has(t.address.toLowerCase()));
+                    accumulated.forEach(t => seen.add(t.address.toLowerCase()));
+                    flush();
+                    return () => { cancelled = true; };  // cache is fresh — skip fetching
+                }
+            }
+        } catch {}
+
+        // Ordered by expected speed: PancakeSwap & Hydrex CDN are fast, Uniswap moderate, WowMax slow
+        const sources: Array<{ url: string; parse: (d: unknown) => { address: string; name: string; symbol: string; decimals: number; logoURI?: string; chainId?: number }[]; chainId?: number }> = [
+            {
+                url: 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json',
+                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
+                chainId: 8453,
+            },
+            {
+                url: 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json',
+                parse: (d: unknown) => Array.isArray(d) ? d : [],
+            },
+            {
+                url: 'https://tokens.uniswap.org',
+                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
+                chainId: 8453,
+            },
+            {
+                url: 'https://static.optimism.io/optimism.tokenlist.json',
+                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
+                chainId: 8453,
+            },
+            {
+                // WowMax is slow — fetch last, don't block others
+                url: 'https://api-gateway.wowmax.exchange/chains/8453/tokens',
+                parse: (d: unknown) => Array.isArray(d) ? d : [],
+            },
         ];
-        const WOWMAX_URL = 'https://api-gateway.wowmax.exchange/chains/8453/tokens';
-        const HYDREX_URL = 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json';
-        const PANCAKE_URL = 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json';
 
-        Promise.allSettled([
-            ...TOKEN_LISTS.map(url => fetch(url).then(r => r.json())),
-            fetch(WOWMAX_URL).then(r => r.json()),
-            fetch(HYDREX_URL).then(r => r.json()),
-            fetch(PANCAKE_URL).then(r => r.json()),
-        ]).then(results => {
-                if (cancelled) return;
-                const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
-                const tokens: Token[] = [];
+        // Fire all fetches simultaneously — reuse same promises for both progressive UI + cache save
+        const fetchPromises = sources.map(({ url, parse, chainId }) =>
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (cancelled) return;
+                    const added = addTokens(parse(data), chainId);
+                    if (added) flush();
+                })
+                .catch(() => {}) // silent — one list failing never blocks others
+        );
 
-                // Build logo map from all lists
-                const logoMap = new Map<string, string>();
-                for (let i = 0; i < 2; i++) {
-                    const result = results[i];
-                    if (result.status !== 'fulfilled') continue;
-                    for (const t of result.value?.tokens || []) {
-                        if (t.chainId !== 8453 || !t.logoURI) continue;
-                        logoMap.set(t.address.toLowerCase(), t.logoURI);
-                    }
-                }
-                const hydrexResult = results[3];
-                if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
-                    for (const t of hydrexResult.value) {
-                        if (t.logoURI) logoMap.set(t.address.toLowerCase(), t.logoURI);
-                    }
-                }
-                const pancakeResult = results[4];
-                if (pancakeResult.status === 'fulfilled') {
-                    for (const t of pancakeResult.value?.tokens || []) {
-                        if (t.chainId !== 8453 || !t.logoURI) continue;
-                        logoMap.set(t.address.toLowerCase(), t.logoURI);
-                    }
-                }
+        // After all settle, save the fully merged list to sessionStorage once
+        Promise.allSettled(fetchPromises).then(() => {
+            if (cancelled) return;
+            try {
+                sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: accumulated }));
+            } catch {}
+        });
 
-                // Process Uniswap + Superchain
-                for (let i = 0; i < 2; i++) {
-                    const result = results[i];
-                    if (result.status !== 'fulfilled') continue;
-                    for (const t of result.value?.tokens || []) {
-                        if (t.chainId !== 8453) continue;
-                        const key = t.address.toLowerCase();
-                        if (seen.has(key)) continue;
-                        seen.add(key);
-                        let addr = t.address;
-                        try { addr = getAddress(addr); } catch {}
-                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-                    }
-                }
-
-                // Process WowMax
-                const wmResult = results[2];
-                if (wmResult.status === 'fulfilled' && Array.isArray(wmResult.value)) {
-                    for (const t of wmResult.value) {
-                        const key = t.address.toLowerCase();
-                        if (seen.has(key)) continue;
-                        seen.add(key);
-                        let addr = t.address;
-                        try { addr = getAddress(addr); } catch {}
-                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: logoMap.get(key) });
-                    }
-                }
-
-                // Process Hydrex
-                if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
-                    for (const t of hydrexResult.value) {
-                        const key = t.address.toLowerCase();
-                        if (seen.has(key)) continue;
-                        seen.add(key);
-                        let addr = t.address;
-                        try { addr = getAddress(addr); } catch {}
-                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-                    }
-                }
-
-                // Process PancakeSwap
-                if (pancakeResult.status === 'fulfilled') {
-                    for (const t of pancakeResult.value?.tokens || []) {
-                        if (t.chainId !== 8453) continue;
-                        const key = t.address.toLowerCase();
-                        if (seen.has(key)) continue;
-                        seen.add(key);
-                        let addr = t.address;
-                        try { addr = getAddress(addr); } catch {}
-                        tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-                    }
-                }
-
-                setCgTokens(tokens);
-            });
         return () => { cancelled = true; };
     }, []);
 
