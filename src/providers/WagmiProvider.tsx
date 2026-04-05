@@ -15,12 +15,8 @@ import {
     coinbaseWallet,
     walletConnectWallet,
     trustWallet,
-    okxWallet,
-    bitgetWallet,
-    rainbowWallet,
     rabbyWallet,
     phantomWallet,
-    braveWallet,
     safeWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { sei } from '@/config/chains';
@@ -57,16 +53,7 @@ const config = getDefaultConfig({
                 coinbaseWallet,
                 trustWallet,
                 phantomWallet,
-            ],
-        },
-        {
-            groupName: 'More',
-            wallets: [
-                okxWallet,
-                braveWallet,
                 walletConnectWallet,
-                rainbowWallet,
-                bitgetWallet,
                 safeWallet,
             ],
         },

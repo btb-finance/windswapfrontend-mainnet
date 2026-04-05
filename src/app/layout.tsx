@@ -85,8 +85,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="apple-touch-icon" href="/logo.png" />
         
-        {/* Preload critical assets */}
-        <link rel="preload" href="/logo.png" as="image" type="image/png" />
+        {/* Logo is 83kB — no preload to save bandwidth on slow connections */}
         
         {/* DNS prefetch for Base RPC endpoints */}
         <link rel="dns-prefetch" href="https://base-rpc.publicnode.com" />
