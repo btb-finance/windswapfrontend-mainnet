@@ -242,13 +242,19 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
 
     const allTokensRef = useRef<Token[]>(DEFAULT_TOKEN_LIST);
 
-    // Fetch extended token list once on mount, then trigger a balance refresh
+    // Defer extended token list — fetch after 3s idle so it doesn't block initial load on 3G
+    const extendedFetched = useRef(false);
     useEffect(() => {
-        fetchExtendedTokenList().then(extended => {
-            const full = [...DEFAULT_TOKEN_LIST, ...extended];
-            allTokensRef.current = full;
-            setAllTokens(full);
-        }).catch(() => {});
+        const timer = setTimeout(() => {
+            if (extendedFetched.current) return;
+            extendedFetched.current = true;
+            fetchExtendedTokenList().then(extended => {
+                const full = [...DEFAULT_TOKEN_LIST, ...extended];
+                allTokensRef.current = full;
+                setAllTokens(full);
+            }).catch(() => {});
+        }, 3000);
+        return () => clearTimeout(timer);
     }, []);
 
     const fetchBalances = useCallback(async (tokenOverride?: Token[]) => {
