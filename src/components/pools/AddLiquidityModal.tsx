@@ -352,12 +352,33 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
 
         if (!calcAtoB && !calcBtoA) return;
 
-        if (!clPoolAddress || pLower <= 0 || pUpper <= 0 || pLower >= pUpper) {
-            // Invalid range or no pool - use simple ratio for default case
+        if (pLower <= 0 || pUpper <= 0 || pLower >= pUpper) {
+            // Invalid range - use simple ratio for default case
             if (pLower <= 0 && pUpper === Infinity && calcAtoB) {
                 const amtA = parseFloat(amountA);
                 const amtB = amtA * currentPrice;
                 setAmountB(amtB.toFixed(6));
+            }
+            return;
+        }
+
+        // Compute token0/token1 decimals based on pool order (needed for fallback calc)
+        const token0Dec = isAToken0 ? (actualTokenA?.decimals || 18) : (actualTokenB?.decimals || 18);
+        const token1Dec = isAToken0 ? (actualTokenB?.decimals || 18) : (actualTokenA?.decimals || 18);
+
+        // No pool yet (first-time LP) — use frontend math since SugarHelper needs a pool
+        if (!clPoolAddress) {
+            const position = { currentPrice, priceLower: pLower, priceUpper: pUpper, token0Decimals: token0Dec, token1Decimals: token1Dec, tickSpacing, isToken0Base: isAToken0 };
+            if (calcAtoB) {
+                const r = calculateOptimalAmounts(parseFloat(amountA), isAToken0, position);
+                const out = isAToken0 ? r.amount1 : r.amount0;
+                const dec = isAToken0 ? token1Dec : token0Dec;
+                setAmountB(out > 0 && isFinite(out) ? out.toFixed(dec).replace(/\.?0+$/, '') : '0');
+            } else {
+                const r = calculateOptimalAmounts(parseFloat(amountB), !isAToken0, position);
+                const out = isAToken0 ? r.amount0 : r.amount1;
+                const dec = isAToken0 ? token0Dec : token1Dec;
+                setAmountA(out > 0 && isFinite(out) ? out.toFixed(dec).replace(/\.?0+$/, '') : '0');
             }
             return;
         }
@@ -376,9 +397,8 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
             if (!required.needsToken0) { setAmountB('0'); return; }
         }
 
-        // Compute token0/token1 decimals based on pool order (needed for fallbacks too)
-        const token0Decimals = isAToken0 ? (actualTokenA?.decimals || 18) : (actualTokenB?.decimals || 18);
-        const token1Decimals = isAToken0 ? (actualTokenB?.decimals || 18) : (actualTokenA?.decimals || 18);
+        const token0Decimals = token0Dec;
+        const token1Decimals = token1Dec;
 
         // Call on-chain SugarHelper for accurate calculation.
         // Supports A→B (calcAtoB) and B→A (calcBtoA) directions.
