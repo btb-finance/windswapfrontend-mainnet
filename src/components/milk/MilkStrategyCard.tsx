@@ -17,8 +17,8 @@ function AlertBadge({ level, discountPct, premiumPct }: {
     premiumPct: number | null;
 }) {
     if (premiumPct !== null && premiumPct > 0) return (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-400/20 text-blue-300 border border-blue-400/30 animate-pulse">
-            Mint Arb +{fmt(premiumPct, 2)}%
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-400/20 text-orange-300 border border-orange-400/30 animate-pulse">
+            Sell Now
         </span>
     );
     if (level === 'active' && discountPct !== null && discountPct > 0) return (
@@ -28,7 +28,7 @@ function AlertBadge({ level, discountPct, premiumPct }: {
     );
     return (
         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-white/5 text-gray-400 border border-white/10">
-            At fair value
+            Neutral
         </span>
     );
 }
@@ -86,43 +86,72 @@ function ZoneBar({ discountPct }: { discountPct: number | null }) {
             </div>
             <p className="text-[10px] text-gray-500 mt-1">
                 {inBuyZone
-                    ? `DEX is ${fmt(pct, 2)}% below contract fair value — entire gap is buy zone`
+                    ? `DEX is ${fmt(pct, 2)}% below fair value — likely profitable buy`
                     : discountPct !== null && discountPct < 0
-                        ? `DEX is ${fmt(Math.abs(pct), 2)}% above fair value — mint arb may be active`
-                        : 'DEX price is at contract fair value'}
+                        ? `DEX is ${fmt(Math.abs(pct), 2)}% above fair value — sell now, wait for price to come back`
+                        : 'Neutral — no day trade opportunity right now'}
             </p>
         </div>
     );
 }
 
 function LiveBuyZone({ data }: { data: ReturnType<typeof useMilkStrategy> }) {
-    const { dexPrice, fairValue, discountPct, expectedGainOnRecovery, contractRedeemPrice } = data;
+    const { dexPrice, fairValue, discountPct, expectedGainOnRecovery, contractRedeemPrice, contractMintPrice } = data;
     if (dexPrice === null || fairValue === null || discountPct === null || discountPct <= 0) return null;
 
     const instantArb = contractRedeemPrice !== null && dexPrice < contractRedeemPrice;
 
+    // $100 example
+    const milkFor100 = 100 / dexPrice;
+    const sellProceeds = contractMintPrice !== null ? milkFor100 * contractMintPrice : null;
+    const profitOn100 = sellProceeds !== null ? sellProceeds - 100 : null;
+
     return (
         <div className="mt-4 rounded-xl p-4 border bg-green-500/10 border-green-500/30">
-            <p className="font-semibold text-sm text-green-300 mb-1">Buy Zone Active</p>
-            <p className="text-xs text-gray-300 mb-3">
-                DEX price is <strong className="text-white">{fmt(discountPct, 2)}% below contract fair value</strong>.
-                Every buy from the contract increases the fair value — the floor under your position keeps rising.
-                {instantArb && ' DEX is also below the redeem price — instant arbitrage is available right now.'}
+            <p className="font-semibold text-sm text-green-300 mb-1">
+                Buy Zone — Most Likely Profitable
             </p>
+            <p className="text-xs text-gray-300 mb-3">
+                DEX price is <strong className="text-white">{fmt(discountPct, 2)}% below fair value</strong>.
+                Buy on DEX now and sell when price reaches the mint ceiling — that is where arbers push it back down, making it the realistic top.
+                {instantArb && ' Price is also below the contract redeem floor — instant profit by buying here and redeeming on contract right now.'}
+            </p>
+
+            {/* $100 example */}
+            {profitOn100 !== null && contractMintPrice !== null && (
+                <div className="rounded-lg bg-white/5 p-3 mb-3">
+                    <p className="text-[10px] text-gray-500 mb-2 uppercase tracking-wider">If you buy $100 now</p>
+                    <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">You get</span>
+                            <span className="text-white font-medium">{fmt(milkFor100, 2)} MILK</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">Sell target (mint ceiling)</span>
+                            <span className="text-white font-medium">${fmt(contractMintPrice)} USDC</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-400">Sell proceeds</span>
+                            <span className="text-white font-medium">${fmt(sellProceeds!, 2)} USDC</span>
+                        </div>
+                        <div className="flex justify-between border-t border-white/10 pt-1.5">
+                            <span className="text-gray-300 font-medium">Profit</span>
+                            <span className="text-green-400 font-bold">
+                                +${fmt(profitOn100, 2)} ({expectedGainOnRecovery !== null ? fmtPct(expectedGainOnRecovery) : '—'})
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-1.5 text-xs mb-3">
                 <div className="flex justify-between">
-                    <span className="text-gray-400">DEX price</span>
+                    <span className="text-gray-400">Buy at (DEX now)</span>
                     <span className="text-white font-medium">${fmt(dexPrice)} USDC</span>
                 </div>
                 <div className="flex justify-between">
-                    <span className="text-gray-400">Contract fair value</span>
-                    <span className="text-white font-medium">${fmt(fairValue)} USDC</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-400">Gain if DEX recovers to fair value</span>
-                    <span className="text-green-400 font-medium">
-                        {expectedGainOnRecovery !== null ? fmtPct(expectedGainOnRecovery) : '—'}
-                    </span>
+                    <span className="text-gray-400">Sell target (mint ceiling)</span>
+                    <span className="text-white font-medium">{contractMintPrice !== null ? `$${fmt(contractMintPrice)} USDC` : '—'}</span>
                 </div>
                 <div className="flex justify-between">
                     <span className="text-gray-400">Exit anytime</span>
@@ -135,6 +164,11 @@ function LiveBuyZone({ data }: { data: ReturnType<typeof useMilkStrategy> }) {
             >
                 Buy MILK on DEX
             </a>
+            <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">
+                Price is sourced across all available liquidity pairs to find the best route.
+                Slippage can be significant depending on pool depth — avoid buying large amounts in a single transaction.
+                Split into smaller trades to reduce price impact.
+            </p>
         </div>
     );
 }
@@ -147,12 +181,14 @@ function MintArbitrage({ data }: { data: ReturnType<typeof useMilkStrategy> }) {
     const premiumPct = ((dexPrice - contractMintPrice) / contractMintPrice) * 100;
 
     return (
-        <div className="mt-4 rounded-xl p-4 border bg-blue-500/10 border-blue-500/30">
-            <p className="font-semibold text-sm text-blue-300 mb-1">Mint Arbitrage Active</p>
+        <div className="mt-4 rounded-xl p-4 border bg-orange-500/10 border-orange-500/30">
+            <p className="font-semibold text-sm text-orange-300 mb-1">
+                Price High — Sell Now, Wait for It to Come Back
+            </p>
             <p className="text-xs text-gray-300 mb-3">
-                DEX price is <strong className="text-white">{fmt(premiumPct, 2)}% above</strong> the contract mint price.
-                Mint MILK from the contract and sell on DEX for instant profit.
-                Every mint also pushes the contract fair value higher.
+                DEX price is <strong className="text-white">{fmt(premiumPct, 2)}% above</strong> the contract fair value.
+                If you are holding MILK, this is the time to sell on DEX at the premium.
+                Price will come back down — wait and buy again at fair value or below for the next cycle.
             </p>
             <div className="space-y-1.5 text-xs mb-3">
                 <div className="flex justify-between">
@@ -168,20 +204,30 @@ function MintArbitrage({ data }: { data: ReturnType<typeof useMilkStrategy> }) {
                     <span className="text-green-400 font-medium">{fmtPct(premiumPct)}</span>
                 </div>
             </div>
-            <div className="flex gap-2">
-                <a
-                    href={`/swap?tokenIn=${USDC.address}&tokenOut=${MILK.address}`}
-                    className="flex-1 text-center py-2.5 rounded-lg text-xs font-semibold bg-blue-500/20 border border-blue-500/40 text-blue-300 hover:bg-blue-500/30 transition-all"
-                >
-                    1. Mint from Contract
-                </a>
-                <a
-                    href={`/swap?tokenIn=${MILK.address}&tokenOut=${USDC.address}`}
-                    className="flex-1 text-center py-2.5 rounded-lg text-xs font-semibold bg-blue-500/20 border border-blue-500/40 text-blue-300 hover:bg-blue-500/30 transition-all"
-                >
-                    2. Sell on DEX
-                </a>
-            </div>
+            <a
+                href={`/swap?tokenIn=${MILK.address}&tokenOut=${USDC.address}`}
+                className="block w-full text-center py-2.5 rounded-lg text-sm font-semibold bg-orange-500/20 border border-orange-500/40 text-orange-300 hover:bg-orange-500/30 transition-all"
+            >
+                Sell MILK on DEX
+            </a>
+        </div>
+    );
+}
+
+function NeutralPanel({ data }: { data: ReturnType<typeof useMilkStrategy> }) {
+    const { dexPrice, fairValue, discountPct, premiumPct } = data;
+    // Only show when price data is loaded and neither buy zone nor sell zone is active
+    if (dexPrice === null || fairValue === null) return null;
+    if ((discountPct !== null && discountPct > 0) || (premiumPct !== null && premiumPct > 0)) return null;
+
+    return (
+        <div className="mt-4 rounded-xl p-4 border border-white/10 bg-white/5">
+            <p className="font-semibold text-sm text-gray-300 mb-1">Neutral — No Day Trade Right Now</p>
+            <p className="text-xs text-gray-400">
+                DEX price is at contract fair value. There is no discount to buy or premium to sell.
+                Wait for the DEX price to drop below fair value before entering a day trade position.
+                The LP strategy below still earns fees passively while you wait.
+            </p>
         </div>
     );
 }
@@ -346,6 +392,7 @@ export function MilkStrategyCard() {
             {/* Live opportunity panels */}
             <LiveBuyZone data={data} />
             <MintArbitrage data={data} />
+            <NeutralPanel data={data} />
 
             {/* Strategy explainers */}
             <StrategyBuyZone />

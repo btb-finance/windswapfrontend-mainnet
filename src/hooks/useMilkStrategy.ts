@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useReadContracts } from 'wagmi';
-import { useMixedRouteQuoter } from '@/hooks/useMixedRouteQuoter';
-import { MILK, USDC } from '@/config/tokens';
 import { MILK_CONTRACTS } from '@/config/contracts';
 import { MILK_ABI } from '@/config/abis';
 
 const MILK_ADDRESS = MILK_CONTRACTS.MILK as `0x${string}`;
+const DEXSCREENER_URL = `https://api.dexscreener.com/latest/dex/tokens/${MILK_ADDRESS}`;
 
 // FEE_BASE_1000 = 1000 (from contract)
 const FEE_BASE = 1000;
@@ -43,8 +42,6 @@ export interface MilkStrategyData {
 }
 
 export function useMilkStrategy(): MilkStrategyData {
-    const { getSpotRate } = useMixedRouteQuoter();
-
     // ── Contract reads (all in one multicall) ────────────────────────────────
     const { data: contractData, isLoading: contractLoading } = useReadContracts({
         contracts: [
@@ -83,10 +80,21 @@ export function useMilkStrategy(): MilkStrategyData {
     const fetchDexPrice = useCallback(async () => {
         setDexPriceLoading(true);
         try {
-            // getSpotRate(MILK, USDC) → USDC per 1 MILK on the DEX
-            const rate = await getSpotRate(MILK, USDC);
-            if (rate !== null && rate > 0) {
-                setDexPrice(rate);
+            const res = await fetch(DEXSCREENER_URL);
+            if (!res.ok) return;
+            const data = await res.json() as {
+                pairs?: Array<{ priceUsd?: string; liquidity?: { usd?: number } }>;
+            };
+            // Pick the pair with the highest liquidity for the most accurate price
+            const pairs = data.pairs ?? [];
+            if (pairs.length === 0) return;
+            const best = pairs
+                .filter(p => p.priceUsd && parseFloat(p.priceUsd) > 0)
+                .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+            if (!best?.priceUsd) return;
+            const price = parseFloat(best.priceUsd);
+            if (price > 0) {
+                setDexPrice(price);
                 setLastUpdated(Date.now());
             }
         } catch {
@@ -94,7 +102,7 @@ export function useMilkStrategy(): MilkStrategyData {
         } finally {
             setDexPriceLoading(false);
         }
-    }, [getSpotRate]);
+    }, []);
 
     useEffect(() => {
         fetchDexPrice();
@@ -122,8 +130,9 @@ export function useMilkStrategy(): MilkStrategyData {
     // Instant arb: DEX price is below the contract redeem floor
     const instantArb = dexPrice !== null && contractRedeemPrice !== null && dexPrice < contractRedeemPrice;
 
-    const expectedGainOnRecovery = (dexPrice !== null && fairValue !== null && dexPrice > 0)
-        ? ((fairValue - dexPrice) / dexPrice) * 100
+    // Target = mint ceiling — above that arbers mint from contract and sell, pushing price back down
+    const expectedGainOnRecovery = (dexPrice !== null && contractMintPrice !== null && dexPrice > 0)
+        ? ((contractMintPrice - dexPrice) / dexPrice) * 100
         : null;
 
     return {
