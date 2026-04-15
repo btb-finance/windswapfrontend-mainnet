@@ -6,6 +6,7 @@ import { ToastProvider } from '@/providers/ToastProvider';
 import { WalletModalProvider } from '@/providers/WalletModalContext';
 import { ReferralProvider } from '@/providers/ReferralProvider';
 import { FarcasterProvider } from '@/providers/FarcasterProvider';
+import { TelegramProvider } from '@/providers/TelegramProvider';
 
 // Dynamic import with SSR disabled to prevent WalletConnect's idb-keyval
 // from accessing indexedDB during server-side rendering in serverless environments
@@ -25,6 +26,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     return (
         <Providers>
             <FarcasterProvider>
+            <TelegramProvider>
                 <WalletModalProvider>
                     <ToastProvider>
                         <Suspense>
@@ -34,6 +36,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                         </Suspense>
                     </ToastProvider>
                 </WalletModalProvider>
+            </TelegramProvider>
             </FarcasterProvider>
         </Providers>
     );
