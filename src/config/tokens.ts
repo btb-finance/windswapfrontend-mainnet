@@ -73,6 +73,7 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
     WETH,
     WIND,
     USDC,
+    MILK,
     SKI,
     VIRTUAL,
     BRETT,
