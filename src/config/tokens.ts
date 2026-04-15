@@ -58,12 +58,22 @@ export const BRETT: Token = { address: '0x532f27101965dd16442E59d40670FaF5eBB142
 export const BOOMER: Token = { address: '0xcdE172dc5ffC46D228838446c57C1227e0B82049', symbol: 'BOOMER', name: 'BOOMER', decimals: 18, logoURI: '/logo/boomer.webp' };
 export const VVV: Token = { address: '0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf', symbol: 'VVV', name: 'VVV', decimals: 18, logoURI: '/logo/vvv.webp' };
 
+// MILK — USDC-backed bonding curve token
+export const MILK: Token = {
+    address: '0x6E0090dBecF3b4F0F9429637756CaDD8Fc468C54',
+    symbol: 'MILK',
+    name: 'Milk',
+    decimals: 18,
+    logoURI: '/logo/milk.jpg',
+};
+
 // Default token list - only core tokens
 export const DEFAULT_TOKEN_LIST: Token[] = [
     ETH,
     WETH,
     WIND,
     USDC,
+    MILK,
     SKI,
     VIRTUAL,
     BRETT,
