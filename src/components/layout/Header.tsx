@@ -10,6 +10,7 @@ const navLinks = [
     { href: '/pools', label: 'Pools' },
     { href: '/portfolio', label: 'Portfolio' },
     { href: '/vote', label: 'Vote' },
+    { href: '/milk', label: '🥛 MILK' },
 ];
 
 export function Header() {

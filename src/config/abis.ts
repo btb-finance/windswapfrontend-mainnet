@@ -2,6 +2,102 @@
 // Minimal ABIs for WindSwap contracts
 // These contain only the functions needed for the frontend
 
+// MILK contract — USDC-backed bonding curve (0x6E0090dBecF3b4F0F9429637756CaDD8Fc468C54)
+export const MILK_ABI = [
+    {
+        name: 'getBacking',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'totalSupply',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'lastPrice',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'sell_fee',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint16' }],
+    },
+    {
+        name: 'getBuyFee',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'MILKtoUSDC',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'value', type: 'uint256' }],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'USDCtoMILK',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'value', type: 'uint256' }],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'getBuyAmount',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'amount', type: 'uint256' }],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        name: 'start',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'bool' }],
+    },
+    {
+        name: 'buy',
+        type: 'function',
+        stateMutability: 'nonpayable',
+        inputs: [
+            { name: 'receiver', type: 'address' },
+            { name: 'amount', type: 'uint256' },
+        ],
+        outputs: [],
+    },
+    {
+        name: 'sell',
+        type: 'function',
+        stateMutability: 'nonpayable',
+        inputs: [{ name: 'milk', type: 'uint256' }],
+        outputs: [],
+    },
+    {
+        name: 'Loans',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: '', type: 'address' }],
+        outputs: [
+            { name: 'collateral', type: 'uint256' },
+            { name: 'borrowed', type: 'uint256' },
+            { name: 'endDate', type: 'uint256' },
+            { name: 'numberOfDays', type: 'uint256' },
+        ],
+    },
+] as const;
+
 export const ERC20_ABI = [
     {
         inputs: [{ name: 'owner', type: 'address' }],
