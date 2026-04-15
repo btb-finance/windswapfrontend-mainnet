@@ -115,8 +115,8 @@ export function MobileBottomNav() {
             )}
 
             {/* More sheet */}
-            <div className={`md:hidden fixed bottom-[60px] left-0 right-0 z-40 transition-transform duration-300 ${moreOpen ? 'translate-y-0' : 'translate-y-full'}`}>
-                <div className="mx-3 mb-2 rounded-2xl overflow-hidden bg-[var(--bg-primary)] border border-white/10 shadow-2xl">
+            <div className={`md:hidden fixed bottom-0 left-0 right-0 z-40 pb-[60px] pointer-events-none transition-transform duration-300 ${moreOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+                <div className="mx-3 mb-2 rounded-2xl overflow-y-auto overscroll-contain bg-[var(--bg-primary)] border border-white/10 shadow-2xl max-h-[calc(100vh-80px)] pointer-events-auto">
                     <div className="px-4 py-3 border-b border-white/5">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Products</p>
                     </div>
