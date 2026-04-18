@@ -44,3 +44,39 @@
   for = "/logo.png"
   [headers.values]
     Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+# Social/embed preview images — served to crawlers (Twitter, Farcaster, etc.)
+[[headers]]
+  for = "/og.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/EmbedPreview.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/splash.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/logowithbackground.png"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/screenshot1.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/screenshot2.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/screenshot3.png"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"

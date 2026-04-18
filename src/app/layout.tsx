@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
 import { ClientProviders } from "@/providers/ClientProviders";
 import { Header } from "@/components/layout/Header";
@@ -14,11 +14,7 @@ import { NavigationProgress } from "@/components/common/NavigationProgress";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -96,7 +92,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://base.meowrpc.com" crossOrigin="anonymous" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        className={`${geistSans.variable} antialiased min-h-screen flex flex-col`}
       >
         <script
           dangerouslySetInnerHTML={{

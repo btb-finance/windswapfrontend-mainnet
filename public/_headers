@@ -4,3 +4,33 @@
 
 /*
   Access-Control-Allow-Origin: *
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/logo/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/logo.png
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/logowithbackground.png
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/og.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+/EmbedPreview.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+/splash.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+/screenshot1.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+/screenshot2.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+/screenshot3.png
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
