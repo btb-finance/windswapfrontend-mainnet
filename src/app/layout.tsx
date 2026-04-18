@@ -96,6 +96,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://base.meowrpc.com" crossOrigin="anonymous" />
       </head>
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <script

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { getAddress } from 'viem';
@@ -127,7 +127,6 @@ export function TokenSelector({
     const [multiSelected, setMultiSelected] = useState<Token[]>([]);
     const router = useRouter();
     const [search, setSearch] = useState('');
-    const [filteredTokens, setFilteredTokens] = useState(DEFAULT_TOKEN_LIST);
     const [customToken, setCustomToken] = useState<Token | null>(null);
     const [loadingCustom, setLoadingCustom] = useState(false);
     const [customError, setCustomError] = useState<string | null>(null);
@@ -139,15 +138,18 @@ export function TokenSelector({
     const [loadingTabs, setLoadingTabs] = useState(false);
     // Pre-computed token list from Convex DB — no external fetching on client
     const convexTokens = useQuery(api.tokens.listAll);
-    const cgTokens: Token[] = convexTokens
-        ? convexTokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string }) => ({
-            address: t.address,
-            symbol: t.symbol,
-            name: t.name,
-            decimals: t.decimals,
-            logoURI: t.logoURI,
-        }))
-        : DEFAULT_TOKEN_LIST;
+    const cgTokens: Token[] = useMemo(
+        () => convexTokens
+            ? convexTokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string }) => ({
+                address: t.address,
+                symbol: t.symbol,
+                name: t.name,
+                decimals: t.decimals,
+                logoURI: t.logoURI,
+            }))
+            : DEFAULT_TOKEN_LIST,
+        [convexTokens]
+    );
 
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
@@ -259,18 +261,17 @@ export function TokenSelector({
         }
     }, [activeTab]);
 
-    useEffect(() => {
-        let baseList: Token[] = activeTab === 'All'
+    const filteredTokens = useMemo(() => {
+        const baseList: Token[] = activeTab === 'All'
             ? [...sortedTokens, ...cgTokens.filter(t => !sortedTokens.some(s => s.address.toLowerCase() === t.address.toLowerCase()))]
-            : activeTab === 'Trending' ? trendingTokens : liquidityTokens;
+            : activeTab === 'Trending'
+                ? trendingTokens
+                : liquidityTokens;
 
-        // Use baseList (tokens with balance first or from external APIs)
-        const filtered = baseList.filter((token) => {
-            // Exclude the already selected token in the other input
+        return baseList.filter((token) => {
             if (excludeToken && token.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
             if (excludeTokens?.some(e => e.address.toLowerCase() === token.address.toLowerCase())) return false;
 
-            // Filter by search
             if (search) {
                 const searchLower = search.toLowerCase();
                 return (
@@ -281,16 +282,16 @@ export function TokenSelector({
             }
             return true;
         });
-        setFilteredTokens(filtered);
+    }, [search, excludeToken, excludeTokens, sortedTokens, activeTab, trendingTokens, liquidityTokens, cgTokens]);
 
-        // Try to fetch custom token if search looks like an address
+    useEffect(() => {
         if (isValidAddress(search)) {
             fetchCustomToken(search);
         } else {
             setCustomToken(null);
             setCustomError(null);
         }
-    }, [search, excludeToken, fetchCustomToken, sortedTokens, activeTab, trendingTokens, liquidityTokens, cgTokens]);
+    }, [search, fetchCustomToken]);
 
     const handleSelect = (token: Token) => {
         if (multiSelect) {
@@ -585,4 +586,3 @@ export function TokenSelector({
         document.body
     );
 }
-
