@@ -141,11 +141,12 @@ export function TokenSelector({
     const { sortedTokens, getBalance } = useUserBalances();
 
     // Fetch Base tokens from multiple lists — progressive: each list shows tokens as it arrives.
-    // sessionStorage cache means reopening the modal is instant.
+    // localStorage cache (7-day TTL) means repeat visits are instant and avoid re-downloading lists.
     useEffect(() => {
         let cancelled = false;
-        const CACHE_KEY = 'wind_token_list_v1';
-        const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+        const CACHE_KEY = 'wind_token_list_v2';
+        const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const SWR_THRESHOLD = 24 * 60 * 60 * 1000; // refresh in background if older than 1 day
 
         // Shared dedup set (starts with default list addresses)
         const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
@@ -171,16 +172,21 @@ export function TokenSelector({
             return added;
         };
 
-        // Load from sessionStorage cache immediately (instant display)
+        // Load from localStorage cache immediately (instant display)
+        let cacheAge = Infinity;
         try {
-            const raw = sessionStorage.getItem(CACHE_KEY);
+            const raw = localStorage.getItem(CACHE_KEY);
             if (raw) {
                 const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
-                if (Date.now() - ts < CACHE_TTL) {
+                cacheAge = Date.now() - ts;
+                if (cacheAge < CACHE_TTL) {
                     accumulated = tokens.filter(t => !seen.has(t.address.toLowerCase()));
                     accumulated.forEach(t => seen.add(t.address.toLowerCase()));
                     flush();
-                    return () => { cancelled = true; };  // cache is fresh — skip fetching
+                    // Fresh (<1 day): skip network entirely. Stale (1–7 days): continue to refresh in background.
+                    if (cacheAge < SWR_THRESHOLD) {
+                        return () => { cancelled = true; };
+                    }
                 }
             }
         } catch {}
@@ -225,11 +231,11 @@ export function TokenSelector({
                 .catch(() => {}) // silent — one list failing never blocks others
         );
 
-        // After all settle, save the fully merged list to sessionStorage once
+        // After all settle, save the fully merged list to localStorage once
         Promise.allSettled(fetchPromises).then(() => {
             if (cancelled) return;
             try {
-                sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: accumulated }));
+                localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: accumulated }));
             } catch {}
         });
 

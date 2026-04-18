@@ -242,18 +242,49 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
 
     const allTokensRef = useRef<Token[]>(DEFAULT_TOKEN_LIST);
 
-    // Defer extended token list — fetch after 3s idle so it doesn't block initial load on 3G
+    // Defer extended token list — fetch after 3s idle so it doesn't block initial load on 3G.
+    // Cached in localStorage for 7 days (SWR: refresh in background after 1 day).
     const extendedFetched = useRef(false);
     useEffect(() => {
-        const timer = setTimeout(() => {
+        const CACHE_KEY = 'wind_extended_token_list_v1';
+        const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+        const SWR_THRESHOLD = 24 * 60 * 60 * 1000; // refresh in background if older than 1 day
+
+        const applyExtended = (extended: Token[]) => {
+            const full = [...DEFAULT_TOKEN_LIST, ...extended];
+            allTokensRef.current = full;
+            setAllTokens(full);
+        };
+
+        const refresh = () => {
             if (extendedFetched.current) return;
             extendedFetched.current = true;
             fetchExtendedTokenList().then(extended => {
-                const full = [...DEFAULT_TOKEN_LIST, ...extended];
-                allTokensRef.current = full;
-                setAllTokens(full);
+                applyExtended(extended);
+                try {
+                    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: extended }));
+                } catch {}
             }).catch(() => {});
-        }, 3000);
+        };
+
+        // Instant path: serve from cache if fresh, skip network entirely.
+        let cacheAge = Infinity;
+        try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if (raw) {
+                const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
+                cacheAge = Date.now() - ts;
+                if (cacheAge < CACHE_TTL && Array.isArray(tokens)) {
+                    applyExtended(tokens);
+                    if (cacheAge < SWR_THRESHOLD) {
+                        extendedFetched.current = true; // fully fresh — no background refresh
+                        return;
+                    }
+                }
+            }
+        } catch {}
+
+        const timer = setTimeout(refresh, 3000);
         return () => clearTimeout(timer);
     }, []);
 
