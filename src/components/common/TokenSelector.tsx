@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { getAddress } from 'viem';
+import { useQuery } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { Token, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
@@ -135,106 +137,20 @@ export function TokenSelector({
     const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
     const [liquidityTokens, setLiquidityTokens] = useState<Token[]>([]);
     const [loadingTabs, setLoadingTabs] = useState(false);
-    const [cgTokens, setCgTokens] = useState<Token[]>([]);
+    // Pre-computed token list from Convex DB — no external fetching on client
+    const convexTokens = useQuery(api.tokens.listAll);
+    const cgTokens: Token[] = convexTokens
+        ? convexTokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string }) => ({
+            address: t.address,
+            symbol: t.symbol,
+            name: t.name,
+            decimals: t.decimals,
+            logoURI: t.logoURI,
+        }))
+        : DEFAULT_TOKEN_LIST;
 
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
-
-    // Fetch Base tokens from multiple lists — progressive: each list shows tokens as it arrives.
-    // sessionStorage cache means reopening the modal is instant.
-    useEffect(() => {
-        let cancelled = false;
-        const CACHE_KEY = 'wind_token_list_v1';
-        const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
-        // Shared dedup set (starts with default list addresses)
-        const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
-        // Accumulated token array — mutated as lists arrive, flushed to state progressively
-        let accumulated: Token[] = [];
-
-        const flush = () => {
-            if (!cancelled) setCgTokens([...accumulated]);
-        };
-
-        const addTokens = (raw: { address: string; name: string; symbol: string; decimals: number; logoURI?: string; chainId?: number }[], chainId?: number) => {
-            let added = false;
-            for (const t of raw) {
-                if (chainId && t.chainId !== chainId) continue;
-                const key = t.address.toLowerCase();
-                if (seen.has(key)) continue;
-                seen.add(key);
-                let addr = t.address;
-                try { addr = getAddress(addr); } catch {}
-                accumulated.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-                added = true;
-            }
-            return added;
-        };
-
-        // Load from sessionStorage cache immediately (instant display)
-        try {
-            const raw = sessionStorage.getItem(CACHE_KEY);
-            if (raw) {
-                const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
-                if (Date.now() - ts < CACHE_TTL) {
-                    accumulated = tokens.filter(t => !seen.has(t.address.toLowerCase()));
-                    accumulated.forEach(t => seen.add(t.address.toLowerCase()));
-                    flush();
-                    return () => { cancelled = true; };  // cache is fresh — skip fetching
-                }
-            }
-        } catch {}
-
-        // Ordered by expected speed: PancakeSwap & Hydrex CDN are fast, Uniswap moderate, WowMax slow
-        const sources: Array<{ url: string; parse: (d: unknown) => { address: string; name: string; symbol: string; decimals: number; logoURI?: string; chainId?: number }[]; chainId?: number }> = [
-            {
-                url: 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json',
-                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
-                chainId: 8453,
-            },
-            {
-                url: 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json',
-                parse: (d: unknown) => Array.isArray(d) ? d : [],
-            },
-            {
-                url: 'https://tokens.uniswap.org',
-                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
-                chainId: 8453,
-            },
-            {
-                url: 'https://static.optimism.io/optimism.tokenlist.json',
-                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
-                chainId: 8453,
-            },
-            {
-                // WowMax is slow — fetch last, don't block others
-                url: 'https://api-gateway.wowmax.exchange/chains/8453/tokens',
-                parse: (d: unknown) => Array.isArray(d) ? d : [],
-            },
-        ];
-
-        // Fire all fetches simultaneously — reuse same promises for both progressive UI + cache save
-        const fetchPromises = sources.map(({ url, parse, chainId }) =>
-            fetch(url)
-                .then(r => r.json())
-                .then(data => {
-                    if (cancelled) return;
-                    const added = addTokens(parse(data), chainId);
-                    if (added) flush();
-                })
-                .catch(() => {}) // silent — one list failing never blocks others
-        );
-
-        // After all settle, save the fully merged list to sessionStorage once
-        Promise.allSettled(fetchPromises).then(() => {
-            if (cancelled) return;
-            try {
-                sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: accumulated }));
-            } catch {}
-        });
-
-        return () => { cancelled = true; };
-    }, []);
 
     // Open token page in new context
     const openTokenPage = (e: React.MouseEvent, token: Token) => {

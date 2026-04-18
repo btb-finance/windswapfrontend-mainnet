@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  reactCompiler: true,
+  reactCompiler: false,
   compress: true,
   experimental: {
     optimizePackageImports: [
@@ -12,7 +12,6 @@ const nextConfig: NextConfig = {
       '@coinbase/wallet-sdk',
       '@safe-global/safe-apps-sdk',
     ],
-    optimizeCss: true,
   },
 
   // Headers for Safe Apps iframe support

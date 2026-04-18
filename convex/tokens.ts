@@ -5,6 +5,7 @@
 
 import { internalAction, internalMutation, internalQuery, query } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { v } from "convex/values";
 
 const CORE_TOKENS = [
   { address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", symbol: "ETH", name: "Ethereum", decimals: 18, logoURI: "/logo/eth.svg", source: "core" },

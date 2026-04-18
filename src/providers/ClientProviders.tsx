@@ -2,11 +2,14 @@
 
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { ToastProvider } from '@/providers/ToastProvider';
 import { WalletModalProvider } from '@/providers/WalletModalContext';
 import { ReferralProvider } from '@/providers/ReferralProvider';
 import { FarcasterProvider } from '@/providers/FarcasterProvider';
 import { TelegramProvider } from '@/providers/TelegramProvider';
+
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Dynamic import with SSR disabled to prevent WalletConnect's idb-keyval
 // from accessing indexedDB during server-side rendering in serverless environments
@@ -24,6 +27,7 @@ const Providers = dynamic(
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
     return (
+        <ConvexProvider client={convex}>
         <Providers>
             <FarcasterProvider>
             <TelegramProvider>
@@ -39,6 +43,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             </TelegramProvider>
             </FarcasterProvider>
         </Providers>
+        </ConvexProvider>
     );
 }
 

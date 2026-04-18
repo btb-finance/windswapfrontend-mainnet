@@ -880,7 +880,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
 
                 // minAmountOut: amountOut[0] is already in wei — use BigInt to avoid double-scaling
                 const expectedOutWei = BigInt(swapData.amountOut[0] ?? '0');
-                const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100)); // e.g. 5% → 500
+                const slippageBps = BigInt(Math.floor(slippage * 100));
                 const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n; // subtract slippage + 1% fee
 
                 // Build swap call for proxy.swap()
@@ -921,8 +921,8 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 const tokenInAddr = isNativeIn ? '0x0000000000000000000000000000000000000000' as Address : actualTokenIn.address as Address;
                 const tokenOutAddr = tokenOut?.isNative ? '0x0000000000000000000000000000000000000000' as Address : actualTokenOut.address as Address;
 
-                // KyberSwap slippage in bps (50 = 0.5%)
-                const kyberSlippage = Math.floor(Math.max(slippage, 0.5) * 100);
+                // KyberSwap slippage in bps — user's setting + 100 bps buffer for quote→exec latency
+                const kyberSlippage = Math.floor(slippage * 100) + 100;
 
                 // Build swap data with proxy as recipient so it can deduct fee
                 const swapData = await getKyberSwapData(
@@ -939,7 +939,7 @@ function SwapInterfaceInner({ initialTokenIn, initialTokenOut, onTokenInChange, 
                 }
 
                 const expectedOutWei = BigInt(swapData.amountOut ?? '0');
-                const slippageBps = BigInt(Math.floor(Math.max(slippage, 5) * 100));
+                const slippageBps = BigInt(Math.floor(slippage * 100));
                 const minOut = expectedOutWei * (10000n - slippageBps - 100n) / 10000n;
 
                 // Build swap call for proxy.swap()
