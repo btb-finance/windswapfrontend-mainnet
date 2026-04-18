@@ -1,11 +1,12 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { formatUnits, Address, encodeFunctionData, decodeFunctionResult, getAddress } from 'viem';
+import { formatUnits, Address, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { useAccount } from 'wagmi';
 import { DEFAULT_TOKEN_LIST, Token, WETH } from '@/config/tokens';
 import { CL_CONTRACTS } from '@/config/contracts';
 import { getRpcForUserData, rpcCall, FALLBACK_RPCS } from '@/utils/rpc';
+import { loadExtendedTokenList, readCachedTokens, SWR_THRESHOLD } from '@/utils/tokenListCache';
 
 // ============================================
 // CLInterfaceMulticall ABI (minimal)
@@ -104,112 +105,6 @@ async function fetchTokenPricesUsd(tokenAddresses: string[]): Promise<Map<string
 }
 
 // ============================================
-// Fetch extended token list (WowMax + Uniswap + Superchain)
-// ============================================
-async function fetchExtendedTokenList(): Promise<Token[]> {
-    const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
-    const tokens: Token[] = [];
-
-    const TOKEN_LISTS = [
-        'https://tokens.uniswap.org',
-        'https://static.optimism.io/optimism.tokenlist.json',
-    ];
-    const WOWMAX_URL = 'https://api-gateway.wowmax.exchange/chains/8453/tokens';
-    const HYDREX_URL = 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json';
-    const PANCAKE_URL = 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json';
-
-    const results = await Promise.allSettled([
-        ...TOKEN_LISTS.map(url => fetch(url).then(r => r.json())),
-        fetch(WOWMAX_URL).then(r => r.json()),
-        fetch(HYDREX_URL).then(r => r.json()),
-        fetch(PANCAKE_URL).then(r => r.json()),
-    ]);
-
-    // results indices: 0=uniswap, 1=superchain, 2=wowmax, 3=hydrex, 4=pancake
-
-    // Build logo map from all lists with chainId-filtered logos
-    const logoMap = new Map<string, string>();
-    for (let i = 0; i < 2; i++) {
-        const r = results[i];
-        if (r.status !== 'fulfilled') continue;
-        for (const t of r.value?.tokens || []) {
-            if (t.chainId !== 8453 || !t.logoURI) continue;
-            logoMap.set(t.address.toLowerCase(), t.logoURI);
-        }
-    }
-    // Hydrex logos
-    const hydrexResult = results[3];
-    if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
-        for (const t of hydrexResult.value) {
-            if (t.logoURI) logoMap.set(t.address.toLowerCase(), t.logoURI);
-        }
-    }
-    // PancakeSwap logos (chainId=8453)
-    const pancakeResult = results[4];
-    if (pancakeResult.status === 'fulfilled') {
-        for (const t of pancakeResult.value?.tokens || []) {
-            if (t.chainId !== 8453 || !t.logoURI) continue;
-            logoMap.set(t.address.toLowerCase(), t.logoURI);
-        }
-    }
-
-    // Add Uniswap + Superchain tokens (chainId=8453, have logos)
-    for (let i = 0; i < 2; i++) {
-        const r = results[i];
-        if (r.status !== 'fulfilled') continue;
-        for (const t of r.value?.tokens || []) {
-            if (t.chainId !== 8453) continue;
-            const key = t.address.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            let addr = t.address;
-            try { addr = getAddress(addr); } catch {}
-            tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-        }
-    }
-
-    // Add WowMax-only tokens
-    const wmResult = results[2];
-    if (wmResult.status === 'fulfilled' && Array.isArray(wmResult.value)) {
-        for (const t of wmResult.value) {
-            const key = t.address.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            let addr = t.address;
-            try { addr = getAddress(addr); } catch {}
-            tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: logoMap.get(key) });
-        }
-    }
-
-    // Add Hydrex-only tokens
-    if (hydrexResult.status === 'fulfilled' && Array.isArray(hydrexResult.value)) {
-        for (const t of hydrexResult.value) {
-            const key = t.address.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            let addr = t.address;
-            try { addr = getAddress(addr); } catch {}
-            tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-        }
-    }
-
-    // Add PancakeSwap-only tokens (chainId=8453)
-    if (pancakeResult.status === 'fulfilled') {
-        for (const t of pancakeResult.value?.tokens || []) {
-            if (t.chainId !== 8453) continue;
-            const key = t.address.toLowerCase();
-            if (seen.has(key)) continue;
-            seen.add(key);
-            let addr = t.address;
-            try { addr = getAddress(addr); } catch {}
-            tokens.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-        }
-    }
-
-    return tokens;
-}
-
-// ============================================
 // Types
 // ============================================
 interface TokenBalance {
@@ -242,49 +137,25 @@ export function UserBalanceProvider({ children }: { children: ReactNode }) {
 
     const allTokensRef = useRef<Token[]>(DEFAULT_TOKEN_LIST);
 
-    // Defer extended token list — fetch after 3s idle so it doesn't block initial load on 3G.
-    // Cached in localStorage for 7 days (SWR: refresh in background after 1 day).
-    const extendedFetched = useRef(false);
+    // Extended token list: served via shared localStorage cache (7d TTL, SWR after 1d).
+    // Defer the network miss path by 3s so a cold visit doesn't compete with first paint.
     useEffect(() => {
-        const CACHE_KEY = 'wind_extended_token_list_v1';
-        const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
-        const SWR_THRESHOLD = 24 * 60 * 60 * 1000; // refresh in background if older than 1 day
-
         const applyExtended = (extended: Token[]) => {
             const full = [...DEFAULT_TOKEN_LIST, ...extended];
             allTokensRef.current = full;
             setAllTokens(full);
         };
 
-        const refresh = () => {
-            if (extendedFetched.current) return;
-            extendedFetched.current = true;
-            fetchExtendedTokenList().then(extended => {
-                applyExtended(extended);
-                try {
-                    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: extended }));
-                } catch {}
-            }).catch(() => {});
-        };
+        // Instant path: if shared cache is populated, use it now.
+        const cached = readCachedTokens();
+        if (cached) {
+            applyExtended(cached.tokens);
+            if (cached.ageMs < SWR_THRESHOLD) return; // fully fresh — no refresh
+        }
 
-        // Instant path: serve from cache if fresh, skip network entirely.
-        let cacheAge = Infinity;
-        try {
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (raw) {
-                const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
-                cacheAge = Date.now() - ts;
-                if (cacheAge < CACHE_TTL && Array.isArray(tokens)) {
-                    applyExtended(tokens);
-                    if (cacheAge < SWR_THRESHOLD) {
-                        extendedFetched.current = true; // fully fresh — no background refresh
-                        return;
-                    }
-                }
-            }
-        } catch {}
-
-        const timer = setTimeout(refresh, 3000);
+        const timer = setTimeout(() => {
+            loadExtendedTokenList().then(applyExtended).catch(() => {});
+        }, 3000);
         return () => clearTimeout(timer);
     }, []);
 

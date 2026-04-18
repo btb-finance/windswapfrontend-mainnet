@@ -8,6 +8,7 @@ import { Token, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
 import { getTokenMetadataFromCache, setTokenMetadataCache } from '@/utils/cache';
+import { loadExtendedTokenList, readCachedTokens } from '@/utils/tokenListCache';
 import { useSwipeToDismiss } from '@/hooks/useSwipeToDismiss';
 
 interface TokenSelectorProps {
@@ -140,104 +141,18 @@ export function TokenSelector({
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
 
-    // Fetch Base tokens from multiple lists — progressive: each list shows tokens as it arrives.
-    // localStorage cache (7-day TTL) means repeat visits are instant and avoid re-downloading lists.
+    // Base token list served via the shared cache (localStorage, 7-day TTL, SWR).
+    // The provider already warms the cache at startup, so by the time the modal opens this is
+    // typically an in-memory read with zero network cost.
     useEffect(() => {
         let cancelled = false;
-        const CACHE_KEY = 'wind_token_list_v2';
-        const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
-        const SWR_THRESHOLD = 24 * 60 * 60 * 1000; // refresh in background if older than 1 day
 
-        // Shared dedup set (starts with default list addresses)
-        const seen = new Set<string>(DEFAULT_TOKEN_LIST.map(t => t.address.toLowerCase()));
-        // Accumulated token array — mutated as lists arrive, flushed to state progressively
-        let accumulated: Token[] = [];
+        const cached = readCachedTokens();
+        if (cached) setCgTokens(cached.tokens);
 
-        const flush = () => {
-            if (!cancelled) setCgTokens([...accumulated]);
-        };
-
-        const addTokens = (raw: { address: string; name: string; symbol: string; decimals: number; logoURI?: string; chainId?: number }[], chainId?: number) => {
-            let added = false;
-            for (const t of raw) {
-                if (chainId && t.chainId !== chainId) continue;
-                const key = t.address.toLowerCase();
-                if (seen.has(key)) continue;
-                seen.add(key);
-                let addr = t.address;
-                try { addr = getAddress(addr); } catch {}
-                accumulated.push({ address: addr, name: t.name, symbol: t.symbol, decimals: t.decimals, logoURI: t.logoURI || undefined });
-                added = true;
-            }
-            return added;
-        };
-
-        // Load from localStorage cache immediately (instant display)
-        let cacheAge = Infinity;
-        try {
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (raw) {
-                const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
-                cacheAge = Date.now() - ts;
-                if (cacheAge < CACHE_TTL) {
-                    accumulated = tokens.filter(t => !seen.has(t.address.toLowerCase()));
-                    accumulated.forEach(t => seen.add(t.address.toLowerCase()));
-                    flush();
-                    // Fresh (<1 day): skip network entirely. Stale (1–7 days): continue to refresh in background.
-                    if (cacheAge < SWR_THRESHOLD) {
-                        return () => { cancelled = true; };
-                    }
-                }
-            }
-        } catch {}
-
-        // Ordered by expected speed: PancakeSwap & Hydrex CDN are fast, Uniswap moderate, WowMax slow
-        const sources: Array<{ url: string; parse: (d: unknown) => { address: string; name: string; symbol: string; decimals: number; logoURI?: string; chainId?: number }[]; chainId?: number }> = [
-            {
-                url: 'https://tokens.pancakeswap.finance/pancakeswap-base-default.json',
-                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
-                chainId: 8453,
-            },
-            {
-                url: 'https://raw.githubusercontent.com/hydrexfi/hydrex-lists/main/tokens/8453.json',
-                parse: (d: unknown) => Array.isArray(d) ? d : [],
-            },
-            {
-                url: 'https://tokens.uniswap.org',
-                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
-                chainId: 8453,
-            },
-            {
-                url: 'https://static.optimism.io/optimism.tokenlist.json',
-                parse: (d: unknown) => (d as { tokens?: [] })?.tokens ?? [],
-                chainId: 8453,
-            },
-            {
-                // WowMax is slow — fetch last, don't block others
-                url: 'https://api-gateway.wowmax.exchange/chains/8453/tokens',
-                parse: (d: unknown) => Array.isArray(d) ? d : [],
-            },
-        ];
-
-        // Fire all fetches simultaneously — reuse same promises for both progressive UI + cache save
-        const fetchPromises = sources.map(({ url, parse, chainId }) =>
-            fetch(url)
-                .then(r => r.json())
-                .then(data => {
-                    if (cancelled) return;
-                    const added = addTokens(parse(data), chainId);
-                    if (added) flush();
-                })
-                .catch(() => {}) // silent — one list failing never blocks others
-        );
-
-        // After all settle, save the fully merged list to localStorage once
-        Promise.allSettled(fetchPromises).then(() => {
-            if (cancelled) return;
-            try {
-                localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), tokens: accumulated }));
-            } catch {}
-        });
+        loadExtendedTokenList()
+            .then(tokens => { if (!cancelled) setCgTokens(tokens); })
+            .catch(() => {});
 
         return () => { cancelled = true; };
     }, []);
@@ -281,73 +196,75 @@ export function TokenSelector({
         setLoadingCustom(false);
     }, [cgTokens]);
 
-    // Fetch external tokens for tabs
+    // Fetch external tokens for tabs — cached in localStorage for 1 hour to avoid
+    // hitting GeckoTerminal every time the user opens the modal or switches tabs.
     useEffect(() => {
-        if (activeTab === 'Trending' && trendingTokens.length === 0) {
-            setLoadingTabs(true);
-            fetch('https://api.geckoterminal.com/api/v2/networks/base/trending_pools?include=base_token')
-                .then(r => r.json())
-                .then(data => {
-                    if (data?.included) {
-                        const seen = new Set<string>();
-                        const tokens = data.included
-                            .filter((item: any) => item.type === 'token')
-                            .map((token: any) => {
-                                let validAddress = token.attributes.address;
-                                try { validAddress = getAddress(validAddress); } catch (e) {}
-                                return {
-                                    address: validAddress,
-                                    name: token.attributes.name,
-                                    symbol: token.attributes.symbol,
-                                    decimals: token.attributes.decimals || 18,
-                                    logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
-                                };
-                            })
-                            .filter((t: any) => {
-                                const key = t.address.toLowerCase();
-                                if (seen.has(key)) return false;
-                                seen.add(key);
-                                return true;
-                            });
-                        setTrendingTokens(tokens);
-                    }
+        const GECKO_TTL = 60 * 60 * 1000; // 1 hour
+
+        const parseIncluded = (data: any): Token[] => {
+            if (!data?.included) return [];
+            const seen = new Set<string>();
+            return data.included
+                .filter((item: any) => item.type === 'token')
+                .map((token: any) => {
+                    let validAddress = token.attributes.address;
+                    try { validAddress = getAddress(validAddress); } catch {}
+                    return {
+                        address: validAddress,
+                        name: token.attributes.name,
+                        symbol: token.attributes.symbol,
+                        decimals: token.attributes.decimals || 18,
+                        logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
+                    };
                 })
-                .catch(console.error)
-                .finally(() => setLoadingTabs(false));
-        }
-        if (activeTab === 'Top Liquidity' && liquidityTokens.length === 0) {
+                .filter((t: Token) => {
+                    const key = t.address.toLowerCase();
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+        };
+
+        const loadCached = (key: string, url: string, setter: (t: Token[]) => void) => {
+            try {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const { ts, tokens } = JSON.parse(raw) as { ts: number; tokens: Token[] };
+                    if (Date.now() - ts < GECKO_TTL && Array.isArray(tokens) && tokens.length) {
+                        setter(tokens);
+                        return;
+                    }
+                }
+            } catch {}
+
             setLoadingTabs(true);
-            fetch('https://api.geckoterminal.com/api/v2/networks/base/pools?include=base_token')
+            fetch(url)
                 .then(r => r.json())
                 .then(data => {
-                    if (data?.included) {
-                        const seen = new Set<string>();
-                        const tokens = data.included
-                            .filter((item: any) => item.type === 'token')
-                            .map((token: any) => {
-                                let validAddress = token.attributes.address;
-                                try { validAddress = getAddress(validAddress); } catch (e) {}
-                                return {
-                                    address: validAddress,
-                                    name: token.attributes.name,
-                                    symbol: token.attributes.symbol,
-                                    decimals: token.attributes.decimals || 18,
-                                    logoURI: token.attributes.image_url?.replace('thumb', 'large') || undefined,
-                                };
-                            })
-                            .filter((t: any) => {
-                                const key = t.address.toLowerCase();
-                                if (seen.has(key)) return false;
-                                seen.add(key);
-                                return true;
-                            });
-                        setLiquidityTokens(tokens);
-                    }
+                    const tokens = parseIncluded(data);
+                    if (!tokens.length) return;
+                    setter(tokens);
+                    try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), tokens })); } catch {}
                 })
                 .catch(() => {})
                 .finally(() => setLoadingTabs(false));
+        };
+
+        if (activeTab === 'Trending' && trendingTokens.length === 0) {
+            loadCached(
+                'wind_gecko_trending_v1',
+                'https://api.geckoterminal.com/api/v2/networks/base/trending_pools?include=base_token',
+                setTrendingTokens,
+            );
         }
-    }, [activeTab]);
+        if (activeTab === 'Top Liquidity' && liquidityTokens.length === 0) {
+            loadCached(
+                'wind_gecko_liquidity_v1',
+                'https://api.geckoterminal.com/api/v2/networks/base/pools?include=base_token',
+                setLiquidityTokens,
+            );
+        }
+    }, [activeTab, trendingTokens.length, liquidityTokens.length]);
 
     useEffect(() => {
         let baseList: Token[] = activeTab === 'All'
