@@ -19,7 +19,7 @@ import {
     phantomWallet,
     safeWallet,
 } from '@rainbow-me/rainbowkit/wallets';
-import { sei } from '@/config/chains';
+import { sei, ethereum } from '@/config/chains';
 import { PoolDataProvider } from '@/providers/PoolDataProvider';
 import { UserBalanceProvider } from '@/providers/UserBalanceProvider';
 import { SafeAutoConnect } from '@/components/SafeAutoConnect';
@@ -33,12 +33,16 @@ const DATA_SUFFIX = Attribution.toDataSuffix({ codes: ['bc_rco9r2hr'] });
 const config = getDefaultConfig({
     appName: 'Wind Swap',
     projectId,
-    chains: [sei],
+    chains: [sei, ethereum],
     transports: {
         [sei.id]: fallback([
             http('https://base-rpc.publicnode.com'),
             http('https://base.meowrpc.com'),
             http('https://rpc.ankr.com/base'),
+        ]),
+        [ethereum.id]: fallback([
+            http('https://eth.llamarpc.com'),
+            http('https://rpc.ankr.com/eth'),
         ]),
     },
     ssr: false,
