@@ -48,6 +48,7 @@ async function fetchPoolsFromSubgraph(): Promise<{
         totalValueLockedToken1: string;
         liquidity: string;
         volumeUSD: string;
+        feesUSD: string;
         poolDayData: Array<{
             date: number;
             volumeUSD: string;
@@ -72,6 +73,7 @@ async function fetchPoolsFromSubgraph(): Promise<{
                         totalValueLockedToken1
                         liquidity
                         volumeUSD
+                        feesUSD
                         poolDayData(first: 1, orderBy: date, orderDirection: desc) {
                             date
                             volumeUSD
@@ -117,6 +119,7 @@ interface PoolData {
     reserve1: string;
     tvl: string;
     volume24h?: string;
+    feeAPR?: number;
     liquidity?: string;
     rewardRate?: bigint;
 }
@@ -670,6 +673,15 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                         ? 0
                         : rawVolume24h;
 
+                    // Fee APR = (24h volume × effective fee rate × 365) / TVL × 100
+                    // Effective fee rate derived from all-time feesUSD / volumeUSD
+                    const allTimeVolume = parseFloat(p.volumeUSD || '0');
+                    const allTimeFees = parseFloat(p.feesUSD || '0');
+                    const effectiveFeeRate = allTimeVolume > 0 ? allTimeFees / allTimeVolume : 0;
+                    const feeAPR = (tvl > 0 && volume24h > 0 && effectiveFeeRate > 0)
+                        ? (volume24h * effectiveFeeRate * 365 / tvl) * 100
+                        : undefined;
+
                     const sym0 = (known0?.symbol || p.token0.symbol).toUpperCase();
                     const sym1 = (known1?.symbol || p.token1.symbol).toUpperCase();
                     const STABLES = ['USDC', 'USDT', 'USDT0', 'USDC.N', 'DAI', 'FRAX', 'BUSD', 'LUSD', 'TUSD', 'CUSD', 'IUSDC'];
@@ -697,6 +709,7 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
                         tvl: tvl > 0 ? tvl.toFixed(2) : '0',
                         liquidity: p.liquidity || '0',
                         volume24h: volume24h > 0 ? volume24h.toFixed(2) : undefined,
+                        feeAPR,
                     };
                 });
 

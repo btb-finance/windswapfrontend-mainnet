@@ -299,6 +299,7 @@ export default function PortfolioPage() {
         getTokenInfo: getGlobalTokenInfo,
         isLoading: globalLoading,
         windPrice,
+        allPools,
         stakedPositions: prefetchedStakedPositions,
         stakedLoading: loadingStaked,
         refetchStaked,
@@ -1527,6 +1528,10 @@ export default function PortfolioPage() {
                                             ? parseFloat(formatUnits(pos.tokensOwed1, t1.decimals)) * pos.token1PriceUSD : 0;
                                         const totalFeesUsd = uncollectedFees0Usd + uncollectedFees1Usd;
 
+                                        // Fee APR from pool data (24h volume × fee rate × 365 / TVL)
+                                        const poolData = allPools.find(p => p.address.toLowerCase() === pos.poolId.toLowerCase());
+                                        const poolFeeAPR = poolData?.feeAPR;
+
                                         const isEmpty = pos.liquidity <= BigInt(0);
 
                                         return (
@@ -1728,6 +1733,17 @@ export default function PortfolioPage() {
                                                                 )}
                                                             </div>
                                                         </div>
+
+                                                        {/* Unstaked fee APR */}
+                                                        {poolFeeAPR !== undefined && poolFeeAPR > 0 && (
+                                                            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                                                                <div>
+                                                                    <div className="text-xs font-medium text-blue-300">Unstaked APR</div>
+                                                                    <div className="text-[10px] text-gray-500">Earning fees · stake for WIND rewards</div>
+                                                                </div>
+                                                                <span className="text-sm font-bold text-blue-400">{poolFeeAPR < 0.01 ? '<0.01' : poolFeeAPR.toFixed(2)}%</span>
+                                                            </div>
+                                                        )}
 
                                                         {/* Price Range */}
                                                         {!isExtremeTickRange(pos.tickLower, pos.tickUpper) ? (

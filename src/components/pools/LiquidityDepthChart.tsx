@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { LiquidityBar } from '@/hooks/useTickLensData';
-import { tickToPrice } from '@/utils/liquidityMath';
 
 interface Props {
     bars: LiquidityBar[];

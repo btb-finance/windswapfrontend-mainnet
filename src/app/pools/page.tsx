@@ -441,10 +441,20 @@ export default function PoolsPage() {
                                     </div>
 
                                     {/* APR */}
-                                    <div className="col-span-2 flex items-center justify-center">
+                                    <div className="col-span-2 flex flex-col items-center justify-center gap-1">
                                         {apr !== null && apr > 0 ? (
-                                            <span className="text-sm font-semibold text-green-400">{formatAPR(apr)}</span>
-                                        ) : (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-[10px] text-gray-500 leading-none mb-0.5">Staked</span>
+                                                <span className="text-sm font-bold text-green-400">{formatAPR(apr)}</span>
+                                            </div>
+                                        ) : null}
+                                        {pool.feeAPR !== undefined && pool.feeAPR > 0 ? (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-[10px] text-gray-500 leading-none mb-0.5">Unstaked</span>
+                                                <span className="text-xs font-semibold text-blue-400">{pool.feeAPR < 0.01 ? '<0.01' : pool.feeAPR.toFixed(2)}%</span>
+                                            </div>
+                                        ) : null}
+                                        {(apr === null || apr === 0) && (!pool.feeAPR || pool.feeAPR === 0) && (
                                             <span className="text-sm font-medium text-gray-500">&mdash;</span>
                                         )}
                                     </div>
@@ -578,13 +588,26 @@ export default function PoolsPage() {
 
                                     {/* Bottom row: APR + Add LP button */}
                                     <div className="flex items-center justify-between">
-                                        {apr !== null && apr > 0 ? (
-                                            <span className="text-base font-bold text-green-400">
-                                                APR {formatAPR(apr)}
-                                            </span>
-                                        ) : (
-                                            <span className="text-sm text-gray-500">&mdash;</span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {apr !== null && apr > 0 ? (
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-gray-500">Staked</span>
+                                                    <span className="text-sm font-bold text-green-400">{formatAPR(apr)}</span>
+                                                </div>
+                                            ) : null}
+                                            {apr !== null && apr > 0 && pool.feeAPR !== undefined && pool.feeAPR > 0 && (
+                                                <span className="text-gray-600 text-xs">|</span>
+                                            )}
+                                            {pool.feeAPR !== undefined && pool.feeAPR > 0 ? (
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] text-gray-500">Unstaked</span>
+                                                    <span className="text-sm font-semibold text-blue-400">{pool.feeAPR < 0.01 ? '<0.01' : pool.feeAPR.toFixed(2)}%</span>
+                                                </div>
+                                            ) : null}
+                                            {(apr === null || apr === 0) && (!pool.feeAPR || pool.feeAPR === 0) && (
+                                                <span className="text-sm text-gray-500">&mdash;</span>
+                                            )}
+                                        </div>
 
                                         <button
                                             onClick={(e) => {
