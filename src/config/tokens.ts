@@ -51,7 +51,7 @@ export const USDT: Token = { address: '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb
 export const DAI: Token = { address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', symbol: 'DAI', name: 'Dai Stablecoin', decimals: 18 };
 export const WBTC: Token = { address: '0x0555E30da8f98308EdB960aa94C0Db47230d2B9c', symbol: 'cbBTC', name: 'Coinbase Wrapped BTC', decimals: 8 };
 export const LINK: Token = { address: '0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196', symbol: 'LINK', name: 'ChainLink Token', decimals: 18 };
-export const LORE: Token = { address: '0x0000000000000000000000000000000000000000', symbol: 'LORE', name: 'LORE', decimals: 18 };
+export const LORE: Token = { address: '0x888886c43b4B4A15833Be49e7F08242e26e9A6f0', symbol: 'LORE', name: 'LORE', decimals: 18, logoURI: '/logo/LORE.svg' };
 export const SKI: Token = { address: '0x768BE13e1680b5ebE0024C42c896E3dB59ec0149', symbol: 'SKI', name: 'SKI', decimals: 18, logoURI: '/logo/ski.webp' };
 export const VIRTUAL: Token = { address: '0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b', symbol: 'VIRTUAL', name: 'VIRTUAL', decimals: 18, logoURI: '/logo/Virtuals.webp' };
 export const BRETT: Token = { address: '0x532f27101965dd16442E59d40670FaF5eBB142E4', symbol: 'BRETT', name: 'BRETT', decimals: 18, logoURI: '/logo/brett.webp' };
@@ -73,6 +73,7 @@ export const DEFAULT_TOKEN_LIST: Token[] = [
     WETH,
     WIND,
     USDC,
+    LORE,
     MILK,
     SKI,
     VIRTUAL,
