@@ -43,6 +43,17 @@ export function useWindBuyInfo(amount: bigint | undefined) {
     });
 }
 
+export function useWindMaxBuyForBudget(windBudget: bigint | undefined) {
+    return useReadContract({
+        address: BC,
+        abi: WIND_BONDING_CURVE_ABI,
+        functionName: 'getMaxBuyForBudget',
+        args: windBudget && windBudget > 0n ? [windBudget] : undefined,
+        chainId: sei.id,
+        query: { enabled: !!windBudget && windBudget > 0n, refetchInterval: 5000 },
+    });
+}
+
 export function useWindSellInfo(amount: bigint | undefined) {
     return useReadContract({
         address: BC,

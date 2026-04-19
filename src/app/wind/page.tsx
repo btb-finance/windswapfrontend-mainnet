@@ -9,6 +9,7 @@ import { useToast } from '@/providers/ToastProvider';
 import {
     useWindMarketInfo,
     useWindBuyInfo,
+    useWindMaxBuyForBudget,
     useWindSellInfo,
     useWindReserveHealth,
     useWindUserInfo,
@@ -85,11 +86,12 @@ export default function WindPage() {
     const { data: stakingUser, refetch: refetchStakingUser } = useStakingUserInfo(address);
 
     // ── buy tab state ──
-    // buy(amount) takes whole token count (e.g. 10 = 10 WINDC). Contract mints amount*1e18.
-    const [buyTokenAmount, setBuyTokenAmount] = useState('');
-    const buyAmount = buyTokenAmount && Number(buyTokenAmount) > 0
-        ? BigInt(Math.floor(Number(buyTokenAmount))) : undefined;
-    const { data: buyInfo } = useWindBuyInfo(buyAmount);
+    // User inputs WIND to spend → contract tells us max WINDC mintable
+    const [buyWindAmount, setBuyWindAmount] = useState('');
+    const buyWindWei = buyWindAmount && Number(buyWindAmount) > 0
+        ? parseEther(buyWindAmount) : undefined;
+    const { data: maxBuyData } = useWindMaxBuyForBudget(buyWindWei);
+    const maxBuyResult = maxBuyData as unknown as [bigint, bigint, bigint, bigint] | undefined;
     const { approve: approveBTB, isPending: approvingBTB } = useApproveBTBForCurve();
     const { buy, isPending: buying } = useWindBuy();
 
@@ -120,20 +122,21 @@ export default function WindPage() {
 
     // ── buy handler ──
     const handleBuy = async () => {
-        if (!buyAmount || !buyInfo) return;
-        const cost = (buyInfo as [bigint, bigint, bigint])[0];
+        if (!maxBuyResult || maxBuyResult[0] === 0n) return;
+        const tokensToMint = maxBuyResult[0]; // whole token count for buy()
+        const cost = maxBuyResult[1];          // exact WIND cost
         try {
             if (!btbAllowance || btbAllowance < cost) {
                 toast.info('Approving WIND token...');
-                const approveTx = await approveBTB(cost * 2n);
+                const approveTx = await approveBTB(cost);
                 await publicClient!.waitForTransactionReceipt({ hash: approveTx });
                 await refetchBtbAllow();
                 toast.success('Approved!');
             }
             toast.info('Buying WINDC...');
-            await buy(buyAmount);
-            toast.success(`Bought ${buyTokenAmount} WINDC tokens!`);
-            setBuyTokenAmount('');
+            await buy(tokensToMint);
+            toast.success(`Bought ${fmt(maxBuyResult[2])} WINDC!`);
+            setBuyWindAmount('');
             setTimeout(refetchAll, 2000);
         } catch (e: unknown) {
             toast.error((e as Error)?.message?.slice(0, 80) || 'Transaction failed');
@@ -307,21 +310,29 @@ export default function WindPage() {
                             className="glass-card p-5 space-y-4"
                         >
                             <h2 className="font-bold text-lg">Buy WINDC</h2>
-                            <p className="text-gray-400 text-xs">Pay WIND → receive 60% of minted tokens. The other 40% go to stakers as rewards — the faster the price rises, the more staking rewards accumulate.</p>
+                            <p className="text-gray-400 text-xs">Enter how much WIND you want to spend — we'll show you exactly how many WINDC you'll receive.</p>
 
                             <div>
-                                <label className="text-xs text-gray-400 mb-1 block">Number of WINDC tokens to mint</label>
+                                <label className="text-xs text-gray-400 mb-1 flex items-center justify-between">
+                                    <span>WIND to spend</span>
+                                    {btbBal && btbBal > 0n && (
+                                        <button onClick={() => setBuyWindAmount(formatEther(btbBal))}
+                                            className="text-primary hover:underline">
+                                            Max ({fmt(btbBal)} WIND)
+                                        </button>
+                                    )}
+                                </label>
                                 <input
                                     type="number"
                                     min="0"
-                                    placeholder="e.g. 100"
-                                    value={buyTokenAmount}
-                                    onChange={(e) => setBuyTokenAmount(e.target.value)}
+                                    placeholder="0.0"
+                                    value={buyWindAmount}
+                                    onChange={(e) => setBuyWindAmount(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 transition-colors"
                                 />
                                 <div className="flex gap-2 mt-2">
-                                    {['10', '50', '100', '500'].map((v) => (
-                                        <button key={v} onClick={() => setBuyTokenAmount(v)}
+                                    {['100', '500', '1000', '5000'].map((v) => (
+                                        <button key={v} onClick={() => setBuyWindAmount(v)}
                                             className="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-primary/20 text-gray-400 hover:text-primary transition-all">
                                             {v}
                                         </button>
@@ -329,26 +340,26 @@ export default function WindPage() {
                                 </div>
                             </div>
 
-                            {buyInfo && buyAmount && buyAmount > 0n && (
+                            {maxBuyResult && maxBuyResult[0] > 0n && (
                                 <div className="bg-white/5 rounded-xl p-3 space-y-1 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-400">Total WIND cost</span>
-                                        <span className="font-semibold text-primary">{fmt((buyInfo as [bigint, bigint, bigint])[0])} WIND</span>
-                                    </div>
-                                    <div className="flex justify-between">
                                         <span className="text-gray-400">You receive</span>
-                                        <span className="font-semibold text-green-400">{((buyInfo as [bigint, bigint, bigint])[1]).toString()} WINDC</span>
+                                        <span className="font-semibold text-green-400">{maxBuyResult[2].toString()} WINDC</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">To stakers (40%)</span>
-                                        <span className="text-gray-500">{((buyInfo as [bigint, bigint, bigint])[2]).toString()} WINDC</span>
+                                        <span className="text-gray-500">{maxBuyResult[3].toString()} WINDC</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Actual WIND cost</span>
+                                        <span className="text-gray-400">{fmt(maxBuyResult[1])} WIND</span>
                                     </div>
                                 </div>
                             )}
 
                             <button
                                 onClick={handleBuy}
-                                disabled={!address || !buyAmount || buying || approvingBTB}
+                                disabled={!address || !maxBuyResult || maxBuyResult[0] === 0n || buying || approvingBTB}
                                 className="w-full py-3 rounded-xl font-bold btn-gradient disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                             >
                                 {!address ? 'Connect Wallet' : approvingBTB ? 'Approving...' : buying ? 'Buying...' : 'Buy WINDC'}
