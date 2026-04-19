@@ -131,7 +131,7 @@ export async function batchRpcCall(
     if (calls.length === 0) return [];
 
     // Assign globally unique IDs so we can reassemble after chunking
-    const tagged = calls.map((call, i) => ({ ...call, id: i + 1 }));
+    const tagged = calls.map((call, i) => ({ jsonrpc: '2.0', ...call, id: i + 1 }));
 
     // Split into chunks
     const chunks: typeof tagged[] = [];
