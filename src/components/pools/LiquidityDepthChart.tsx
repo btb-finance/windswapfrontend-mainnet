@@ -79,8 +79,8 @@ export function LiquidityDepthChart({
 
     if (loading) {
         return (
-            <div className="h-24 mb-3 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="h-10 mb-2 flex items-center justify-center">
+                <div className="w-3 h-3 border border-primary border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
@@ -89,7 +89,6 @@ export function LiquidityDepthChart({
 
     const { buckets, maxLiq, viewMin, viewMax } = chartData;
 
-    // Convert range prices to ticks for highlighting
     const lowerTick = priceLower && priceLower > 0
         ? Math.log(
             (isToken0Base ? priceLower : 1 / priceLower) *
@@ -103,7 +102,6 @@ export function LiquidityDepthChart({
         ) / Math.log(1.0001)
         : null;
 
-    // Ensure lower < upper
     let rangeLow = lowerTick;
     let rangeHigh = upperTick;
     if (rangeLow !== null && rangeHigh !== null && rangeLow > rangeHigh) {
@@ -111,14 +109,8 @@ export function LiquidityDepthChart({
     }
 
     return (
-        <div className="mb-3">
-            <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-gray-500">Liquidity Distribution</span>
-                <span className="text-[10px] text-gray-500">
-                    {tickToPrice(currentTick, token0Decimals, token1Decimals, isToken0Base).toPrecision(5)} current
-                </span>
-            </div>
-            <div className="flex items-end gap-1 h-40 relative px-1">
+        <div className="mb-2">
+            <div className="flex items-end gap-px h-10 relative px-1 rounded overflow-hidden">
                 {buckets.map((b, i) => {
                     const height = maxLiq > BigInt(0)
                         ? Number((b.liquidity * BigInt(100)) / maxLiq)
@@ -132,23 +124,16 @@ export function LiquidityDepthChart({
                     if (isCurrentTick) {
                         barColor = 'bg-white';
                     } else if (inRange) {
-                        barColor = 'bg-primary';
+                        barColor = 'bg-primary/70';
                     } else {
-                        barColor = 'bg-white/20';
+                        barColor = 'bg-white/15';
                     }
 
                     return (
-                        <div
-                            key={i}
-                            className="flex-1 flex items-end"
-                            title={`Tick ${b.tick}`}
-                        >
+                        <div key={i} className="flex-1 flex items-end" title={`Tick ${b.tick}`}>
                             <div
-                                className={`w-full rounded-t ${barColor} transition-colors`}
-                                style={{
-                                    height: `${Math.max(height, 2)}%`,
-                                    minHeight: height > 0 ? '6px' : '2px',
-                                }}
+                                className={`w-full rounded-sm ${barColor} transition-colors`}
+                                style={{ height: `${Math.max(height, 3)}%`, minHeight: height > 0 ? '3px' : '1px' }}
                             />
                         </div>
                     );
@@ -157,12 +142,7 @@ export function LiquidityDepthChart({
                 {(() => {
                     const pct = ((currentTick - viewMin) / (viewMax - viewMin)) * 100;
                     if (pct < 0 || pct > 100) return null;
-                    return (
-                        <div
-                            className="absolute top-0 bottom-0 w-px bg-white/60"
-                            style={{ left: `${pct}%` }}
-                        />
-                    );
+                    return <div className="absolute top-0 bottom-0 w-px bg-white/50" style={{ left: `${pct}%` }} />;
                 })()}
             </div>
         </div>

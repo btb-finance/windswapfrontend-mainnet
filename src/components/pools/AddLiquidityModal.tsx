@@ -1501,7 +1501,23 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                             )}
                                         </div>
 
-
+                                        {/* Swap token order button */}
+                                        <div className="flex justify-center">
+                                            <button
+                                                onClick={() => {
+                                                    setTokenA(tokenB);
+                                                    setTokenB(tokenA);
+                                                    setAmountA(amountB);
+                                                    setAmountB(amountA);
+                                                    setPriceLower('');
+                                                    setPriceUpper('');
+                                                }}
+                                                className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-colors"
+                                                title="Swap token order"
+                                            >
+                                                ⇅
+                                            </button>
+                                        </div>
 
                                         {/* Token B */}
                                         <div className={`p-3 rounded-lg border ${depositTokenBForOneSided ? 'bg-green-500/5 border-green-500/30' : 'bg-white/5 border-white/10'}`}>
