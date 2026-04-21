@@ -730,7 +730,7 @@ export default function MiningPage() {
 
             {/* ── STICKY DEPLOY PANEL (bottom) ── */}
             {activeTab === 'game' && !round?.finalized && (
-                <div className="fixed left-0 right-0 z-40 bg-[var(--bg-primary)]/95 backdrop-blur-xl border-t border-white/10 px-3 pt-3 pb-3 bottom-[64px] md:bottom-0">
+                <div className="fixed left-0 right-0 z-40 bg-[var(--bg-primary)]/95 backdrop-blur-xl border-t border-white/10 px-3 pt-3 pb-3 md:bottom-0" style={{ bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))' }}>
                     <div className="max-w-2xl mx-auto space-y-2.5">
                         {/* Quick amounts */}
                         <div className="flex items-center gap-2">
