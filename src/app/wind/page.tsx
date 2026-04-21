@@ -247,6 +247,10 @@ export default function WindPage() {
                     className="glass-card p-4 grid grid-cols-2 md:grid-cols-4 gap-4"
                 >
                     <div className="text-center">
+                        <p className="text-gray-400 text-xs mb-1">Staking APR</p>
+                        <p className="font-bold text-green-400">{aprPct > 0 ? aprPct.toFixed(2) + '%' : '—'}</p>
+                    </div>
+                    <div className="text-center">
                         <p className="text-gray-400 text-xs mb-1">Current Price</p>
                         <p className="font-bold text-primary">{fmt(currentPrice)} WIND</p>
                     </div>
