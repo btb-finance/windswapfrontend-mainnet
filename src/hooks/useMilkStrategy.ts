@@ -6,7 +6,7 @@ import { MILK_CONTRACTS } from '@/config/contracts';
 import { MILK_ABI } from '@/config/abis';
 
 const MILK_ADDRESS = MILK_CONTRACTS.MILK as `0x${string}`;
-const DEXSCREENER_URL = `https://api.dexscreener.com/latest/dex/tokens/${MILK_ADDRESS}`;
+const DEXSCREENER_URL = `https://api.dexscreener.com/tokens/v1/base/${MILK_ADDRESS}`;
 
 // FEE_BASE_1000 = 1000 (from contract)
 const FEE_BASE = 1000;
@@ -82,12 +82,9 @@ export function useMilkStrategy(): MilkStrategyData {
         try {
             const res = await fetch(DEXSCREENER_URL);
             if (!res.ok) return;
-            const data = await res.json() as {
-                pairs?: Array<{ priceUsd?: string; liquidity?: { usd?: number } }>;
-            };
-            // Pick the pair with the highest liquidity for the most accurate price
-            const pairs = data.pairs ?? [];
-            if (pairs.length === 0) return;
+            // New DexScreener API returns a top-level array of pairs
+            const pairs = await res.json() as Array<{ priceUsd?: string; liquidity?: { usd?: number } }>;
+            if (!Array.isArray(pairs) || pairs.length === 0) return;
             const best = pairs
                 .filter(p => p.priceUsd && parseFloat(p.priceUsd) > 0)
                 .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
