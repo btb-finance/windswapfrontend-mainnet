@@ -78,13 +78,12 @@ async function fetchTokenPricesUsd(tokenAddresses: string[]): Promise<Map<string
     }
     await Promise.allSettled(batches.map(async batch => {
         try {
-            const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${batch.join(',')}`);
+            const res = await fetch(`https://api.dexscreener.com/tokens/v1/base/${batch.join(',')}`);
             if (!res.ok) return;
-            const data = await res.json();
-            // Pick highest-liquidity Base pair per token
+            // New DexScreener API returns a top-level array (already filtered to Base chain)
+            const pairs = await res.json();
             const liquidityByToken = new Map<string, { price: number; liquidity: number }>();
-            for (const pair of data?.pairs || []) {
-                if (pair?.chainId !== 'base') continue;
+            for (const pair of Array.isArray(pairs) ? pairs : []) {
                 if (!pair?.baseToken?.address || !pair?.priceUsd) continue;
                 const key = pair.baseToken.address.toLowerCase();
                 const price = parseFloat(pair.priceUsd);
