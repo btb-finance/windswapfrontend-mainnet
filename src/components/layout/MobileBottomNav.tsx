@@ -48,6 +48,7 @@ const moreItems = [
     { href: '/wind',    label: 'WINDC',  sub: 'Wind bonding curve' },
     { href: '/btb',     label: 'BTB',    sub: 'Bear the bull' },
     { href: '/mining',  label: 'LORE',   sub: 'Mining & bonding curve' },
+    { href: '/lottery', label: 'Lottery', sub: 'Daily USDC jackpot' },
     { href: 'https://discord.gg/q5nENswbg5', label: 'Discord', sub: 'Join the community', isExternal: true },
 ];
 
