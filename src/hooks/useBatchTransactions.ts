@@ -83,17 +83,24 @@ export function useBatchTransactions() {
         }
 
         if (!walletClient) throw new Error('Wallet not connected');
+        if (!publicClient) throw new Error('Public client not available');
 
         let lastHash = '';
         for (const call of calls) {
-            lastHash = await walletClient.sendTransaction({
+            const hash = await walletClient.sendTransaction({
                 to: call.to,
                 data: call.data,
                 value: call.value,
             });
+            // Wait for mining before sending the next tx — otherwise the wallet
+            // may reuse the same nonce or the next tx may revert because state
+            // (e.g. allowance) hasn't been committed on-chain yet.
+            // Base blocks land in ~2s (or 200ms with flashblocks); poll fast.
+            await publicClient.waitForTransactionReceipt({ hash, pollingInterval: 500 });
+            lastHash = hash;
         }
         return lastHash;
-    }, [executeBatch, walletClient]);
+    }, [executeBatch, walletClient, publicClient]);
 
     /**
      * Check allowance and approve if insufficient. No-op if allowance is already enough.
@@ -114,12 +121,16 @@ export function useBatchTransactions() {
 
         if (allowance >= amount) return;
 
-        await walletClient.writeContract({
+        const hash = await walletClient.writeContract({
             address: tokenAddress,
             abi: ERC20_ABI,
             functionName: 'approve',
             args: [spender, amount],
         });
+        // Wait for the approve to mine before returning — callers immediately
+        // submit the next tx (e.g. swap) and will hit a nonce/allowance race
+        // on non-EIP-5792 wallets without this wait.
+        await publicClient.waitForTransactionReceipt({ hash, pollingInterval: 500 });
     }, [walletClient, publicClient, address]);
 
     /**
