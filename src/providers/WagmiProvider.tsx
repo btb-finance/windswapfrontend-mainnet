@@ -13,6 +13,19 @@ import {
     baseAccount,
     walletConnectWallet,
     safeWallet,
+    metaMaskWallet,
+    coinbaseWallet,
+    trustWallet,
+    safepalWallet,
+    rabbyWallet,
+    phantomWallet,
+    okxWallet,
+    bitgetWallet,
+    imTokenWallet,
+    tokenPocketWallet,
+    ledgerWallet,
+    uniswapWallet,
+    zerionWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { sei, ethereum } from '@/config/chains';
 import { PoolDataProvider } from '@/providers/PoolDataProvider';
@@ -42,14 +55,29 @@ const config = getDefaultConfig({
     },
     ssr: false,
     dataSuffix: DATA_SUFFIX,
-    // Other injected wallets (MetaMask, Rabby, Coinbase Wallet ext, Trust, Phantom, etc.)
-    // are auto-discovered via EIP-6963 and shown in the modal without bundling their SDKs.
+    // Wallet entries are ~3–7 KB metadata each (deeplinks + icons). Heavy SDKs
+    // (@coinbase/wallet-sdk, @walletconnect/ethereum-provider) are dynamic-
+    // imported by wagmi only when the user actually picks that wallet.
+    // Desktop browser-extension wallets are also auto-discovered via EIP-6963.
     wallets: [
         {
             groupName: 'Popular',
             wallets: [
                 baseAccount,
+                metaMaskWallet,
+                coinbaseWallet,
                 walletConnectWallet,
+                trustWallet,
+                safepalWallet,
+                rabbyWallet,
+                phantomWallet,
+                okxWallet,
+                bitgetWallet,
+                imTokenWallet,
+                tokenPocketWallet,
+                ledgerWallet,
+                uniswapWallet,
+                zerionWallet,
                 safeWallet,
             ],
         },
