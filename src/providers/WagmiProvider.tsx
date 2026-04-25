@@ -11,12 +11,7 @@ import {
 } from '@rainbow-me/rainbowkit';
 import {
     baseAccount,
-    metaMaskWallet,
-    coinbaseWallet,
     walletConnectWallet,
-    trustWallet,
-    rabbyWallet,
-    phantomWallet,
     safeWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import { sei, ethereum } from '@/config/chains';
@@ -47,16 +42,13 @@ const config = getDefaultConfig({
     },
     ssr: false,
     dataSuffix: DATA_SUFFIX,
+    // Other injected wallets (MetaMask, Rabby, Coinbase Wallet ext, Trust, Phantom, etc.)
+    // are auto-discovered via EIP-6963 and shown in the modal without bundling their SDKs.
     wallets: [
         {
             groupName: 'Popular',
             wallets: [
                 baseAccount,
-                rabbyWallet,
-                metaMaskWallet,
-                coinbaseWallet,
-                trustWallet,
-                phantomWallet,
                 walletConnectWallet,
                 safeWallet,
             ],
