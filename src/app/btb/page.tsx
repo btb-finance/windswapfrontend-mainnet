@@ -6,7 +6,6 @@ import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { formatUnits } from 'viem';
 import { BTBWrapper, BearNFTMint, BearStaking } from '@/components/btb';
 import { BTB_CONTRACTS } from '@/config/contracts';
-import { useAutoSwitchToEthereum } from '@/hooks/useAutoSwitchToEthereum';
 import { ethereum } from '@/config/chains';
 import {
     useStakingStats,
@@ -18,9 +17,6 @@ import {
 } from '@/hooks/useBTBContracts';
 
 export default function BTBPage() {
-    // Auto-switch to Ethereum when visiting this page
-    useAutoSwitchToEthereum();
-
     const { address, isConnected } = useAccount();
     const chainId = useChainId();
     const { switchChain } = useSwitchChain();

@@ -3,11 +3,12 @@
 import { useEffect } from 'react';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { usePathname } from 'next/navigation';
-import { ethereum } from '@/config/chains';
+import { base, ethereum } from '@/config/chains';
 
 /**
- * Hook to auto-switch to Ethereum network when on the BTB page.
- * BTB Finance contracts are deployed on Ethereum Mainnet.
+ * Global chain guard:
+ * - /btb  → Ethereum (contracts live on mainnet)
+ * - everywhere else → Base
  */
 export function useAutoSwitchToEthereum() {
     const { chainId, isConnected } = useAccount();
@@ -15,20 +16,13 @@ export function useAutoSwitchToEthereum() {
     const pathname = usePathname();
 
     useEffect(() => {
-        const isBTBPage = pathname === '/btb';
-        const isOnEthereum = chainId === ethereum.id;
+        if (!isConnected || chainId === undefined) return;
 
-        // Only auto-switch if:
-        // 1. User is connected
-        // 2. On the BTB page
-        // 3. Not already on Ethereum
-        if (isConnected && isBTBPage && !isOnEthereum && chainId !== undefined) {
-            console.log('[useAutoSwitchToEthereum] Switching to Ethereum from chain', chainId);
-            try {
-                switchChain({ chainId: ethereum.id });
-            } catch (err) {
-                console.warn('[useAutoSwitchToEthereum] Failed to auto-switch:', err);
-            }
+        const isBTBPage = pathname === '/btb';
+        const targetChainId = isBTBPage ? ethereum.id : base.id;
+
+        if (chainId !== targetChainId) {
+            switchChain({ chainId: targetChainId });
         }
     }, [pathname, chainId, isConnected, switchChain]);
 }

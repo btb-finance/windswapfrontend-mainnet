@@ -6,6 +6,7 @@ import { ConvexProvider, ConvexReactClient } from 'convex/react';
 import { ToastProvider } from '@/providers/ToastProvider';
 import { WalletModalProvider } from '@/providers/WalletModalContext';
 import { ReferralProvider } from '@/providers/ReferralProvider';
+import { ChainGuard } from '@/components/ChainGuard';
 import { FarcasterProvider } from '@/providers/FarcasterProvider';
 import { TelegramProvider } from '@/providers/TelegramProvider';
 
@@ -29,6 +30,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     return (
         <ConvexProvider client={convex}>
         <Providers>
+            <ChainGuard />
             <FarcasterProvider>
             <TelegramProvider>
                 <WalletModalProvider>
