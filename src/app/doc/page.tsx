@@ -1,24 +1,23 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
 
 export default function DocPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 lg:py-12">
         {/* Header */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold mb-3 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
             Wind Swap Protocol Documentation
           </h1>
-          <p className="text-xl text-gray-400">
+          <p className="text-sm sm:text-base lg:text-xl text-gray-400">
             Complete guide to V2 (Stable/Volatile AMM) and V3 (Concentrated Liquidity) protocols on Base
           </p>
         </div>
 
         {/* Quick Navigation */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 sm:mb-12">
           <QuickNavCard
             title="Getting Started"
             description="New to Wind Swap? Start here"
@@ -50,14 +49,14 @@ export default function DocPage() {
         </div>
 
         {/* Main Documentation */}
-        <div className="space-y-16">
+        <div className="space-y-8 sm:space-y-14">
           {/* Protocol Overview */}
           <Section id="overview" title="Protocol Overview">
             <ContentBlock>
               <p className="text-gray-300 mb-4">
                 Wind Swap is a decentralized exchange (DEX) protocol on Base, featuring two distinct AMM implementations:
               </p>
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
                 <FeatureCard
                   title="Wind V2"
                   description="Stable and volatile AMM pools with vote-escrowed tokenomics"
@@ -89,30 +88,30 @@ export default function DocPage() {
           {/* WIND Token */}
           <Section id="wind-token" title="WIND Token & veNFT System">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">WIND Token</h3>
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">WIND Token</h3>
               <p className="text-gray-300 mb-4">
-                WIND is the native governance and utility token of the Wind Swap protocol. It's emitted through weekly 
+                WIND is the native governance and utility token of the Wind Swap protocol. It's emitted through weekly
                 emissions that decay over time, with distribution controlled by veNFT holders.
               </p>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-purple-400">veNFT (Vote-Escrowed NFT)</h3>
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-purple-400">veNFT (Vote-Escrowed NFT)</h3>
               <p className="text-gray-300 mb-4">
-                Lock WIND tokens in a VotingEscrow NFT to receive veWIND, which decays linearly over time. The longer 
+                Lock WIND tokens in a VotingEscrow NFT to receive veWIND, which decays linearly over time. The longer
                 you lock, the more voting power you receive.
               </p>
 
-              <div className="bg-gray-800 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3 text-yellow-400">Lock Mechanics</h4>
-                <ul className="space-y-2 text-gray-300">
+              <div className="bg-gray-800 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3 text-yellow-400">Lock Mechanics</h4>
+                <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
                   <li>• <strong>Maximum Lock:</strong> 4 years</li>
-                  <li>• <strong>Voting Power:</strong> Amount × Lock Time (up to 4 years)</li>
+                  <li>• <strong>Voting Power:</strong> Amount x Lock Time (up to 4 years)</li>
                   <li>• <strong>Decay:</strong> Voting power decays linearly as lock time approaches</li>
                   <li>• <strong>Early Withdrawal:</strong> Possible but you lose all remaining voting power</li>
                 </ul>
               </div>
 
-              <h4 className="text-xl font-bold mb-3 text-green-400">veNFT States & Operations</h4>
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3 text-green-400">veNFT States & Operations</h4>
+              <div className="grid sm:grid-cols-2 gap-4 mb-6">
                 <StateCard
                   title="Normal State"
                   description="Standard veNFT with time-decaying voting power"
@@ -137,14 +136,14 @@ export default function DocPage() {
                 />
               </div>
 
-              <h4 className="text-xl font-bold mb-3 text-pink-400">Managed NFTs (mveNFT)</h4>
+              <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3 text-pink-400">Managed NFTs (mveNFT)</h4>
               <p className="text-gray-300 mb-4">
-                Managed NFTs allow users to deposit their veNFTs into a permanent lock managed by a protocol or service. 
+                Managed NFTs allow users to deposit their veNFTs into a permanent lock managed by a protocol or service.
                 The manager can compound rewards and optimize voting on behalf of depositors.
               </p>
               <div className="bg-pink-900/20 border border-pink-500/30 rounded-lg p-4">
-                <p className="text-pink-300">
-                  <strong>Note:</strong> When you deposit into a managed NFT, your NFT enters a "locked" state and 
+                <p className="text-pink-300 text-sm sm:text-base">
+                  <strong>Note:</strong> When you deposit into a managed NFT, your NFT enters a "locked" state and
                   cannot be used for voting. The managed NFT aggregates all voting power and distributes rewards proportionally.
                 </p>
               </div>
@@ -154,18 +153,18 @@ export default function DocPage() {
           {/* Voting & Governance */}
           <Section id="voting" title="Voting, Emissions & Rewards">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">veNFT as Long-Term Passive Income</h3>
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">veNFT as Long-Term Passive Income</h3>
               <p className="text-gray-300 mb-4">
-                Think of veNFT as a pension fund or long-term investment vehicle. By locking your WIND tokens 
+                Think of veNFT as a pension fund or long-term investment vehicle. By locking your WIND tokens
                 for 4-5 years, you create a sustainable passive income stream that pays out weekly rewards indefinitely.
               </p>
 
-              <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3">How Passive Income Works</h4>
-                <p className="text-gray-300 mb-3">
+              <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3">How Passive Income Works</h4>
+                <p className="text-gray-300 mb-3 text-sm sm:text-base">
                   Once you lock WIND in a veNFT, you earn weekly income from two sources without active trading:
                 </p>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   <RewardType
                     title="Protocol Emissions (Rebases)"
                     description="Weekly WIND token distribution proportional to your locked amount. Longer locks = larger share of the emission pool"
@@ -179,9 +178,9 @@ export default function DocPage() {
                 </div>
               </div>
 
-              <div className="bg-gray-700 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3 text-purple-400">Long-Term Strategy Example</h4>
-                <div className="space-y-3 text-gray-300">
+              <div className="bg-gray-700 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3 text-purple-400">Long-Term Strategy Example</h4>
+                <div className="space-y-2 text-gray-300 text-sm sm:text-base">
                   <p><strong>Initial Lock:</strong> Lock 10,000 WIND for 4 years</p>
                   <p><strong>Voting Power:</strong> Maximum boost (40,000 veWIND)</p>
                   <p><strong>Weekly Action:</strong> Vote for pools with highest bribes</p>
@@ -191,14 +190,14 @@ export default function DocPage() {
                 </div>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-purple-400">Voting Rights & Emissions Control</h3>
-              <p className="text-gray-300 mb-4">
-                Your veNFT gives you governance rights to direct protocol emissions. Each week (Thursday to Thursday 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-purple-400">Voting Rights & Emissions Control</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                Your veNFT gives you governance rights to direct protocol emissions. Each week (Thursday to Thursday
                 epoch), you vote for which pools receive WIND emissions.
               </p>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-blue-400">Emission Schedule</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-blue-400">Emission Schedule</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 WIND emissions follow a decaying schedule with two phases:
               </p>
               <div className="space-y-4">
@@ -216,19 +215,19 @@ export default function DocPage() {
                 />
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-green-400">Rebase Mechanics</h3>
-              <p className="text-gray-300 mb-4">
-                veNFT holders earn rebases - additional WIND tokens distributed weekly. The rebase amount is 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-green-400">Rebase Mechanics</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                veNFT holders earn rebases - additional WIND tokens distributed weekly. The rebase amount is
                 calculated based on:
               </p>
-              <ul className="space-y-2 text-gray-300">
+              <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
                 <li>• Your locked WIND amount relative to total locked WIND</li>
                 <li>• Your lock time (longer locks earn proportionally more)</li>
                 <li>• Total weekly emission amount (decays over time)</li>
               </ul>
               <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 mt-4">
-                <p className="text-green-200">
-                  <strong>Key Benefit:</strong> Rebases are automatic - you don't need to vote or claim. They 
+                <p className="text-green-200 text-sm sm:text-base">
+                  <strong>Key Benefit:</strong> Rebases are automatic - you don't need to vote or claim. They
                   accumulate in your veNFT and can be claimed when you withdraw or merge.
                 </p>
               </div>
@@ -238,12 +237,12 @@ export default function DocPage() {
           {/* V2 AMM */}
           <Section id="v2-amm" title="V2 Protocol - Stable & Volatile AMM">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">Pool Types</h3>
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">Pool Types</h3>
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
                 <PoolTypeCard
                   title="Stable Pools"
                   description="Optimized for pegged assets (stablecoins, wrapped tokens)"
-                  formula="x³y + y³x = k"
+                  formula="x3y + y3x = k"
                   features={[
                     'Very low slippage on similar-valued assets',
                     'Ideal for stable-to-stable swaps',
@@ -254,7 +253,7 @@ export default function DocPage() {
                 <PoolTypeCard
                   title="Volatile Pools"
                   description="Standard AMM for general token pairs"
-                  formula="x × y = k"
+                  formula="x * y = k"
                   features={[
                     'Uniswap V2-style constant product',
                     'Works for any token pair',
@@ -264,11 +263,11 @@ export default function DocPage() {
                 />
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-yellow-400">Router Features</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-yellow-400">Router Features</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 The V2 router supports advanced trading and liquidity management:
               </p>
-              <ul className="space-y-2 text-gray-300">
+              <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
                 <li>• <strong>Multi-hop Swaps:</strong> Route through multiple pools for best prices</li>
                 <li>• <strong>Fee-on-Transfer Support:</strong> Compatible with tokens that have transfer fees</li>
               </ul>
@@ -278,15 +277,15 @@ export default function DocPage() {
           {/* V2 LP */}
           <Section id="v2-lp" title="V2 Liquidity Provision">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-green-400">Adding Liquidity</h3>
-              <p className="text-gray-300 mb-4">
-                Provide liquidity to V2 pools by depositing both tokens in a 50/50 ratio based on current value. 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-green-400">Adding Liquidity</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                Provide liquidity to V2 pools by depositing both tokens in a 50/50 ratio based on current value.
                 You'll receive LP tokens representing your share of the pool.
               </p>
 
-              <div className="bg-gray-800 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3">Liquidity Provider Options</h4>
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="bg-gray-800 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg font-bold mb-3">Liquidity Provider Options</h4>
+                <div className="grid sm:grid-cols-2 gap-4">
                   <OptionCard
                     title="Unstaked LP"
                     description="Hold LP tokens in your wallet"
@@ -302,8 +301,8 @@ export default function DocPage() {
                 </div>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-blue-400">Risks & Considerations</h3>
-              <ul className="space-y-2 text-gray-300">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-blue-400">Risks & Considerations</h3>
+              <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
                 <li>• <strong>Impermanent Loss:</strong> Value divergence vs holding tokens</li>
                 <li>• <strong>Pool Selection:</strong> Choose pools with voting for emissions</li>
                 <li>• <strong>Fee Structure:</strong> Stable pools may have lower fee revenue</li>
@@ -314,40 +313,40 @@ export default function DocPage() {
           {/* V2 Gauges */}
           <Section id="v2-gauges" title="V2 Gauges, Emissions & Fee Structure">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-purple-400">What are Gauges?</h3>
-              <p className="text-gray-300 mb-4">
-                Gauges are reward contracts that distribute WIND emissions to liquidity providers. The amount of 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-purple-400">What are Gauges?</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                Gauges are reward contracts that distribute WIND emissions to liquidity providers. The amount of
                 emissions a gauge receives is proportional to the voting weight it attracts from veNFT holders.
               </p>
 
-              <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3">How Gauges Work</h4>
-                <ol className="space-y-3 text-gray-300">
+              <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3">How Gauges Work</h4>
+                <ol className="space-y-3 text-gray-300 text-sm sm:text-base">
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold">1</span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-sm">1</span>
                     <span>veNFT holders vote for their preferred pools</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold">2</span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-sm">2</span>
                     <span>Voting weights determine emission distribution</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold">3</span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-sm">3</span>
                     <span>Staked LPs earn WIND proportional to their share</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold">4</span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-purple-600 flex items-center justify-center font-bold text-sm">4</span>
                     <span>Voters earn bribes + fees from voted pools</span>
                   </li>
                 </ol>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-yellow-400">LP Fee Structure: Staked vs Unstaked</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-yellow-400">LP Fee Structure: Staked vs Unstaked</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 Liquidity providers have two options with different fee structures:
               </p>
 
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
                 <FeeOptionCard
                   title="Unstaked LP"
                   description="Hold LP tokens in your wallet"
@@ -359,7 +358,7 @@ export default function DocPage() {
                 <FeeOptionCard
                   title="Staked LP (in Gauge)"
                   description="Deposit LP tokens into gauge"
-                  feeType="Reduced Trading Fees + WIND Emissions"
+                  feeType="Reduced Fees + WIND Emissions"
                   feeAmount="Portion of fees goes to voters, you earn WIND emissions"
                   emission="Weekly WIND emissions proportional to your stake"
                   bestFor="Long-term liquidity providers maximizing yield"
@@ -367,28 +366,30 @@ export default function DocPage() {
               </div>
 
               <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6">
-                <h4 className="font-bold mb-2 text-blue-300">Why Staked LPs Give Up Some Fees</h4>
-                <p className="text-gray-300">
-                  When you stake in a gauge, you forfeit a portion of trading fees to veNFT voters who directed 
-                  emissions to your pool. In exchange, you receive valuable WIND emissions. This creates a 
-                  symbiotic relationship: voters direct emissions to pools with high fee potential, and LPs 
+                <h4 className="font-bold mb-2 text-blue-300 text-sm sm:text-base">Why Staked LPs Give Up Some Fees</h4>
+                <p className="text-gray-300 text-sm sm:text-base">
+                  When you stake in a gauge, you forfeit a portion of trading fees to veNFT voters who directed
+                  emissions to your pool. In exchange, you receive valuable WIND emissions. This creates a
+                  symbiotic relationship: voters direct emissions to pools with high fee potential, and LPs
                   share their fee revenue to attract those emissions.
                 </p>
               </div>
 
               <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 mb-6">
-                <h4 className="font-bold mb-2 text-green-300">Higher Yields for Staked LPs</h4>
-                <p className="text-gray-300">
-                  Despite giving up some trading fees, staked LPs typically earn HIGHER overall returns because:
-                  <br />• WIND emissions have significant value (especially early in protocol)
-                  <br />• Voted pools attract more liquidity and volume
-                  <br />• Emissions compound when restaked
-                  <br />• You can still claim your portion of fees via bribes if you vote
+                <h4 className="font-bold mb-2 text-green-300 text-sm sm:text-base">Higher Yields for Staked LPs</h4>
+                <p className="text-gray-300 text-sm sm:text-base">
+                  Despite giving up some trading fees, staked LPs typically earn higher overall returns because:
                 </p>
+                <ul className="mt-2 space-y-1 text-gray-300 text-sm sm:text-base">
+                  <li>• WIND emissions have significant value (especially early in protocol)</li>
+                  <li>• Voted pools attract more liquidity and volume</li>
+                  <li>• Emissions compound when restaked</li>
+                  <li>• You can still claim your portion of fees via bribes if you vote</li>
+                </ul>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-blue-400">Reward Contracts</h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-blue-400">Reward Contracts</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
                 <RewardContractCard
                   title="BribeVotingReward"
                   description="External incentives for voters"
@@ -416,77 +417,72 @@ export default function DocPage() {
           {/* V3 Overview */}
           <Section id="v3-overview" title="V3 Protocol - Concentrated Liquidity">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">What is Concentrated Liquidity?</h3>
-              <p className="text-gray-300 mb-4">
-                Unlike V2 where liquidity is distributed across all prices, V3 allows liquidity providers to 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">What is Concentrated Liquidity?</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                Unlike V2 where liquidity is distributed across all prices, V3 allows liquidity providers to
                 concentrate their capital in specific price ranges. This provides:
               </p>
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <BenefitCard
                   title="Capital Efficiency"
                   description="Earn more fees with less capital"
-                  icon="💰"
                 />
                 <BenefitCard
                   title="Flexible Ranges"
                   description="Choose your price range"
-                  icon="📊"
                 />
                 <BenefitCard
                   title="Multiple Positions"
                   description="Create many positions per pool"
-                  icon="🎯"
                 />
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-purple-400">Fee Tiers</h3>
-              <p className="text-gray-300 mb-4">
-                Each V3 pool has a specific fee tier that determines the trading fee. The fee tier is assigned 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-purple-400">Fee Tiers</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                Each V3 pool has a specific fee tier that determines the trading fee. The fee tier is assigned
                 when the pool is created and cannot be changed:
               </p>
-              <div className="bg-gray-800 rounded-lg p-6 mb-6">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-gray-300">
-                    <thead>
-                      <tr className="border-b border-gray-700">
-                        <th className="py-2 text-left">Fee Tier</th>
-                        <th className="py-2 text-left">Use Case</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-700/50">
-                        <td className="py-2">0.005%</td>
-                        <td className="py-2">Stable pairs (pegged assets like stablecoins)</td>
-                      </tr>
-                      <tr className="border-b border-gray-700/50">
-                        <td className="py-2">0.03%</td>
-                        <td className="py-2">Standard pairs</td>
-                      </tr>
-                      <tr className="border-b border-gray-700/50">
-                        <td className="py-2">0.05%</td>
-                        <td className="py-2">Medium volatility pairs</td>
-                      </tr>
-                      <tr className="border-b border-gray-700/50">
-                        <td className="py-2">0.26%</td>
-                        <td className="py-2">Volatile pairs</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">1%</td>
-                        <td className="py-2">Exotic pairs</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              <div className="bg-gray-800 rounded-lg p-4 sm:p-6 mb-6 overflow-x-auto">
+                <table className="w-full text-gray-300 text-sm sm:text-base min-w-[280px]">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="py-2 text-left font-semibold">Fee Tier</th>
+                      <th className="py-2 text-left font-semibold">Use Case</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 pr-4 whitespace-nowrap">0.005%</td>
+                      <td className="py-2">Stable pairs (pegged assets like stablecoins)</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 pr-4 whitespace-nowrap">0.03%</td>
+                      <td className="py-2">Standard pairs</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 pr-4 whitespace-nowrap">0.05%</td>
+                      <td className="py-2">Medium volatility pairs</td>
+                    </tr>
+                    <tr className="border-b border-gray-700/50">
+                      <td className="py-2 pr-4 whitespace-nowrap">0.26%</td>
+                      <td className="py-2">Volatile pairs</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 pr-4 whitespace-nowrap">1%</td>
+                      <td className="py-2">Exotic pairs</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-green-400">Active Tick Rewards</h3>
-              <p className="text-gray-300 mb-4">
-                V3 gauges only distribute emissions to liquidity in the active tick (current price). This maximizes 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-green-400">Active Tick Rewards</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                V3 gauges only distribute emissions to liquidity in the active tick (current price). This maximizes
                 capital efficiency by rewarding useful liquidity that's actually facilitating trades.
               </p>
               <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
-                <p className="text-green-300">
-                  <strong>Key Difference from V2:</strong> In V2, all LPs earn emissions proportionally. 
+                <p className="text-green-300 text-sm sm:text-base">
+                  <strong>Key Difference from V2:</strong> In V2, all LPs earn emissions proportionally.
                   In V3, only LPs whose ranges include the current price earn emissions.
                 </p>
               </div>
@@ -496,13 +492,13 @@ export default function DocPage() {
           {/* User Guides */}
           <Section id="how-it-works" title="How to Use Wind Swap">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">The ve(3,3) System: Lock, Vote, Earn</h3>
-              <p className="text-gray-300 mb-6">
-                Wind Swap uses a vote-escrow system that aligns incentives between liquidity providers, voters, 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">The ve(3,3) System: Lock, Vote, Earn</h3>
+              <p className="text-gray-300 mb-6 text-sm sm:text-base">
+                Wind Swap uses a vote-escrow system that aligns incentives between liquidity providers, voters,
                 and the protocol. Here's how it works:
               </p>
 
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
                 <FlowCard
                   step={1}
                   title="Lock WIND"
@@ -526,10 +522,10 @@ export default function DocPage() {
                 />
               </div>
 
-              <div className="bg-gradient-to-r from-purple-900/30 to-green-900/30 rounded-lg p-6 border border-purple-500/30">
-                <h4 className="text-xl font-bold mb-3">The Flywheel Effect</h4>
-                <p className="text-gray-300">
-                  Good pools earn more votes → more emissions → attract more liquidity → better trading → more fees → 
+              <div className="bg-gradient-to-r from-purple-900/30 to-green-900/30 rounded-lg p-4 sm:p-6 border border-purple-500/30">
+                <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3">The Flywheel Effect</h4>
+                <p className="text-gray-300 text-sm sm:text-base">
+                  Good pools earn more votes → more emissions → attract more liquidity → better trading → more fees →
                   more voters → cycle repeats. This creates a self-reinforcing cycle that rewards the best pools.
                 </p>
               </div>
@@ -538,8 +534,8 @@ export default function DocPage() {
 
           <Section id="how-to-lock" title="How to Lock WIND">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-purple-400">Creating Your veNFT</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-purple-400">Creating Your veNFT</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 Navigate to the Vote page and follow these steps:
               </p>
 
@@ -571,7 +567,7 @@ export default function DocPage() {
               </div>
 
               <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mt-6">
-                <h4 className="font-bold mb-2 text-purple-300">Lock Management Options</h4>
+                <h4 className="font-bold mb-2 text-purple-300 text-sm sm:text-base">Lock Management Options</h4>
                 <ul className="space-y-1 text-gray-300 text-sm">
                   <li>• <strong>Increase Amount:</strong> Add more WIND to your existing lock</li>
                   <li>• <strong>Extend Lock:</strong> Increase your lock time (up to 4 years total)</li>
@@ -585,8 +581,8 @@ export default function DocPage() {
 
           <Section id="how-to-vote" title="How to Vote">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-green-400">Voting with Your veNFT</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-green-400">Voting with Your veNFT</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 Go to the Vote page and use your veNFT to direct emissions:
               </p>
 
@@ -618,65 +614,64 @@ export default function DocPage() {
               </div>
 
               <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-4 mt-6">
-                <h4 className="font-bold mb-2 text-green-300">Voting Mechanics</h4>
+                <h4 className="font-bold mb-2 text-green-300 text-sm sm:text-base">Voting Mechanics</h4>
                 <ul className="space-y-1 text-gray-300 text-sm">
                   <li>• <strong>Weekly Epochs:</strong> Voting runs from Thursday to Thursday UTC</li>
                   <li>• <strong>Voting Window:</strong> Cannot vote in first or last hour of epoch</li>
-                  <li>• <strong>Vote Weight:</strong> Your veNFT's voting power = Amount × Lock Time</li>
+                  <li>• <strong>Vote Weight:</strong> Your veNFT's voting power = Amount x Lock Time</li>
                   <li>• <strong>Pending Rewards:</strong> See bribes and fees you'll earn if you vote for each pool</li>
                   <li>• <strong>Reset Votes:</strong> You can reset your votes anytime after voting</li>
                 </ul>
               </div>
 
               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mt-4">
-                <h4 className="font-bold mb-2 text-yellow-300">Earning from Voting</h4>
-                <p className="text-gray-300 text-sm">
-                  When you vote for a pool, you earn:
-                  <br />• <strong>Trading Fees:</strong> Portion of fees from staked LPs in that pool
-                  <br />• <strong>Bribes:</strong> External incentives deposited by protocols
-                  <br />• Claim rewards weekly from the Vote page
-                </p>
+                <h4 className="font-bold mb-2 text-yellow-300 text-sm sm:text-base">Earning from Voting</h4>
+                <ul className="space-y-1 text-gray-300 text-sm">
+                  <li>• <strong>Trading Fees:</strong> Portion of fees from staked LPs in that pool</li>
+                  <li>• <strong>Bribes:</strong> External incentives deposited by protocols</li>
+                  <li>• Claim rewards weekly from the Vote page</li>
+                </ul>
               </div>
             </ContentBlock>
           </Section>
 
           <Section id="how-to-add-liquidity" title="How to Add Liquidity">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">Providing Liquidity to Pools</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">Providing Liquidity to Pools</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 Go to the Pools page to add liquidity and earn rewards:
               </p>
 
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
-                <div className="bg-gray-700 rounded-lg p-5">
-                  <h4 className="font-bold text-lg mb-3 text-purple-400">V2 Classic Pools</h4>
+              <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
+                <div className="bg-gray-700 rounded-lg p-4 sm:p-5">
+                  <h4 className="font-bold text-base mb-3 text-purple-400">V2 Classic Pools</h4>
                   <p className="text-sm text-gray-400 mb-3">Simple, set-and-forget liquidity</p>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>1. Select V2 pool type</li>
-                    <li>2. Choose two tokens</li>
-                    <li>3. Select Stable or Volatile</li>
-                    <li>4. Enter amounts (50/50 value ratio)</li>
-                    <li>5. Add liquidity</li>
-                    <li>6. Stake LP tokens in gauge to earn emissions</li>
-                  </ul>
+                  <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
+                    <li>Select V2 pool type</li>
+                    <li>Choose two tokens</li>
+                    <li>Select Stable or Volatile</li>
+                    <li>Enter amounts (50/50 value ratio)</li>
+                    <li>Add liquidity</li>
+                    <li>Stake LP tokens in gauge to earn emissions</li>
+                  </ol>
                 </div>
-                <div className="bg-green-900/20 rounded-lg p-5 border border-green-500/30">
-                  <h4 className="font-bold text-lg mb-3 text-green-400">V3 Concentrated Pools</h4>
+                <div className="bg-green-900/20 rounded-lg p-4 sm:p-5 border border-green-500/30">
+                  <h4 className="font-bold text-base mb-3 text-green-400">V3 Concentrated Pools</h4>
                   <p className="text-sm text-gray-400 mb-3">Capital-efficient, requires management</p>
-                  <ul className="space-y-2 text-sm text-gray-300">
-                    <li>1. Select V3 pool type</li>
-                    <li>2. Choose two tokens</li>
-                    <li>3. Select fee tier</li>
-                    <li>4. Set your price range</li>
-                    <li>5. Enter amounts</li>
-                    <li>6. Create NFT position</li>
-                    <li>7. Stake NFT in gauge to earn emissions</li>
-                  </ul>
+                  <ol className="space-y-2 text-sm text-gray-300 list-decimal list-inside">
+                    <li>Select V3 pool type</li>
+                    <li>Choose two tokens</li>
+                    <li>Select fee tier</li>
+                    <li>Set your price range</li>
+                    <li>Enter amounts</li>
+                    <li>Create NFT position</li>
+                    <li>Stake NFT in gauge to earn emissions</li>
+                  </ol>
                 </div>
               </div>
 
               <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mt-6">
-                <h4 className="font-bold mb-2 text-blue-300">After Adding Liquidity</h4>
+                <h4 className="font-bold mb-2 text-blue-300 text-sm sm:text-base">After Adding Liquidity</h4>
                 <ul className="space-y-1 text-gray-300 text-sm">
                   <li>• <strong>Stake in Gauge:</strong> Deposit LP tokens/NFT into gauge to earn WIND emissions</li>
                   <li>• <strong>Higher Yields:</strong> Staked LPs earn emissions (typically higher than unstaked fees)</li>
@@ -686,14 +681,13 @@ export default function DocPage() {
               </div>
 
               <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mt-4">
-                <h4 className="font-bold mb-2 text-purple-300">Understanding V3 Price Ranges</h4>
-                <p className="text-gray-300 text-sm">
-                  When creating a V3 position, you choose a price range where your liquidity will be active:
-                  <br />• <strong>Narrow Range:</strong> Higher capital efficiency but inactive if price moves out
-                  <br />• <strong>Wide Range:</strong> Lower efficiency but more tolerant to price movements
-                  <br />• <strong>Active Tick:</strong> You only earn fees and emissions when current price is in your range
-                  <br />• <strong>Management Required:</strong> Monitor and adjust your position as price moves
-                </p>
+                <h4 className="font-bold mb-2 text-purple-300 text-sm sm:text-base">Understanding V3 Price Ranges</h4>
+                <ul className="space-y-1 text-gray-300 text-sm">
+                  <li>• <strong>Narrow Range:</strong> Higher capital efficiency but inactive if price moves out</li>
+                  <li>• <strong>Wide Range:</strong> Lower efficiency but more tolerant to price movements</li>
+                  <li>• <strong>Active Tick:</strong> You only earn fees and emissions when current price is in your range</li>
+                  <li>• <strong>Management Required:</strong> Monitor and adjust your position as price moves</li>
+                </ul>
               </div>
             </ContentBlock>
           </Section>
@@ -701,15 +695,15 @@ export default function DocPage() {
           {/* V3 Positions */}
           <Section id="v3-positions" title="V3 Position Management">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">NFT Positions</h3>
-              <p className="text-gray-300 mb-4">
-                V3 liquidity positions are represented as NFTs, containing all position information. This allows for 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">NFT Positions</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                V3 liquidity positions are represented as NFTs, containing all position information. This allows for
                 advanced position management and transfers.
               </p>
 
-              <div className="bg-gray-800 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3">Position Data</h4>
-                <ul className="space-y-2 text-gray-300">
+              <div className="bg-gray-800 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg font-bold mb-3">Position Data</h4>
+                <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
                   <li>• <strong>Token Pair:</strong> Which pool the position is in</li>
                   <li>• <strong>Tick Range:</strong> Lower and upper price bounds</li>
                   <li>• <strong>Liquidity:</strong> Amount of liquidity provided</li>
@@ -718,8 +712,8 @@ export default function DocPage() {
                 </ul>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-purple-400">Position Operations</h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-purple-400">Position Operations</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
                 <OperationCard
                   title="Create Position"
                   description="Add liquidity to a price range"
@@ -742,12 +736,12 @@ export default function DocPage() {
                 />
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-yellow-400">Staking in V3 Gauges</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-yellow-400">Staking in V3 Gauges</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 To earn WIND emissions on your V3 position, stake the NFT in the corresponding gauge:
               </p>
               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-                <ul className="space-y-2 text-yellow-100">
+                <ul className="space-y-2 text-yellow-100 text-sm sm:text-base">
                   <li>• <strong>Deposit:</strong> Transfer NFT to gauge (stop earning fees, start earning emissions)</li>
                   <li>• <strong>Withdraw:</strong> Remove NFT from gauge (collect rewards, resume fee earning)</li>
                   <li>• <strong>Note:</strong> All rewards are collected when withdrawing from gauge</li>
@@ -759,66 +753,55 @@ export default function DocPage() {
           {/* V3 Gauges */}
           <Section id="v3-gauges" title="V3 Gauges & Active Tick Rewards">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-green-400">How V3 Gauges Differ</h3>
-              <p className="text-gray-300 mb-4">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-green-400">How V3 Gauges Differ</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
                 V3 gauges implement a sophisticated reward system that only incentivizes liquidity in the active tick:
               </p>
 
-              <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-lg p-6 mb-6">
-                <h4 className="text-xl font-bold mb-3">Active Tick Mechanics</h4>
-                <ol className="space-y-3 text-gray-300">
+              <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-lg p-4 sm:p-6 mb-6">
+                <h4 className="text-base sm:text-lg lg:text-xl font-bold mb-3">Active Tick Mechanics</h4>
+                <ol className="space-y-3 text-gray-300 text-sm sm:text-base">
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center font-bold">1</span>
-                    <span>
-                      <strong>Track Active Tick:</strong> Gauge monitors which tick has current price
-                    </span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-green-600 flex items-center justify-center font-bold text-sm">1</span>
+                    <span><strong>Track Active Tick:</strong> Gauge monitors which tick has current price</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center font-bold">2</span>
-                    <span>
-                      <strong>Accrue Rewards:</strong> Emissions accumulate for active tick liquidity
-                    </span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-green-600 flex items-center justify-center font-bold text-sm">2</span>
+                    <span><strong>Accrue Rewards:</strong> Emissions accumulate for active tick liquidity</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center font-bold">3</span>
-                    <span>
-                      <strong>Distribute:</strong> When price moves, rewards distribute to affected positions
-                    </span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-green-600 flex items-center justify-center font-bold text-sm">3</span>
+                    <span><strong>Distribute:</strong> When price moves, rewards distribute to affected positions</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center font-bold">4</span>
-                    <span>
-                      <strong>Collect Fees:</strong> Weekly fee collection to FeeVotingReward contracts
-                    </span>
+                    <span className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-green-600 flex items-center justify-center font-bold text-sm">4</span>
+                    <span><strong>Collect Fees:</strong> Weekly fee collection to FeeVotingReward contracts</span>
                   </li>
                 </ol>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-purple-400">Reward Rolling</h3>
-              <p className="text-gray-300 mb-4">
-                If the active tick moves to a range with no staked liquidity, rewards don't disappear - they roll 
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-purple-400">Reward Rolling</h3>
+              <p className="text-gray-300 mb-4 text-sm sm:text-base">
+                If the active tick moves to a range with no staked liquidity, rewards don't disappear - they roll
                 forward to be distributed when liquidity returns:
               </p>
               <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
-                <p className="text-purple-200">
-                  <strong>Reward Rolling Rules:</strong> Rewards roll based on seconds spent in empty tick ranges. 
+                <p className="text-purple-200 text-sm sm:text-base">
+                  <strong>Reward Rolling Rules:</strong> Rewards roll based on seconds spent in empty tick ranges.
                   Rolling occurs on next notification. If not called within an epoch, rewards remain stuck until next notification.
                 </p>
               </div>
 
-              <h3 className="text-2xl font-bold mb-4 mt-8 text-blue-400">Advanced Operations</h3>
-              <p className="text-gray-300 mb-4">
-                V3 gauges support advanced liquidity management for staked positions:
-              </p>
-              <ul className="space-y-2 text-gray-300">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 mt-8 text-blue-400">Advanced Operations</h3>
+              <ul className="space-y-2 text-gray-300 text-sm sm:text-base">
                 <li>• <strong>Increase Staked Liquidity:</strong> Add to staked position without withdrawing</li>
                 <li>• <strong>Decrease Staked Liquidity:</strong> Remove from staked position and collect tokens</li>
                 <li>• <strong>Notify Rewards:</strong> Add external rewards (admin only)</li>
               </ul>
 
               <div className="mt-6 bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
-                <p className="text-blue-200">
-                  <strong>Important:</strong> Unlike V2, V3 rewards must be claimed before withdrawing a position. 
+                <p className="text-blue-200 text-sm sm:text-base">
+                  <strong>Important:</strong> Unlike V2, V3 rewards must be claimed before withdrawing a position.
                   There's no "getReward" after unstaking - all rewards are distributed on withdrawal.
                 </p>
               </div>
@@ -828,10 +811,10 @@ export default function DocPage() {
           {/* Contract Addresses */}
           <Section id="contracts" title="Contract Addresses">
             <ContentBlock>
-              <h3 className="text-2xl font-bold mb-4 text-blue-400">Base Mainnet Deployments</h3>
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-4 text-blue-400">Base Mainnet Deployments</h3>
 
               <div className="mb-8">
-                <h4 className="text-xl font-bold mb-3 text-purple-400">V2 Core Contracts</h4>
+                <h4 className="text-base sm:text-lg font-bold mb-3 text-purple-400">V2 Core Contracts</h4>
                 <ContractTable contracts={[
                   { name: 'WIND', address: '0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888', link: 'https://basescan.org/address/0x888a4F89aF7dD0Be836cA367C9FF5490c0F6e888' },
                   { name: 'VotingEscrow', address: '0x88889C4Be508cA88eba6ad802340C0563891D426', link: 'https://basescan.org/address/0x88889C4Be508cA88eba6ad802340C0563891D426' },
@@ -846,7 +829,7 @@ export default function DocPage() {
               </div>
 
               <div className="mb-8">
-                <h4 className="text-xl font-bold mb-3 text-green-400">V3 Core Contracts</h4>
+                <h4 className="text-base sm:text-lg font-bold mb-3 text-green-400">V3 Core Contracts</h4>
                 <ContractTable contracts={[
                   { name: 'CLFactory', address: '0x8888A3D87EF6aBC5F50572661E4729A45b255cF6', link: 'https://basescan.org/address/0x8888A3D87EF6aBC5F50572661E4729A45b255cF6' },
                   { name: 'CLGaugeFactory', address: '0x8888B7b5731EBB4E7962cC20b186C92C94bCAFbd', link: 'https://basescan.org/address/0x8888B7b5731EBB4E7962cC20b186C92C94bCAFbd' },
@@ -858,7 +841,7 @@ export default function DocPage() {
               </div>
 
               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
-                <p className="text-yellow-200">
+                <p className="text-yellow-200 text-sm sm:text-base">
                   <strong>Verify on BaseScan:</strong> All contracts are verified. Click addresses to view source code and transaction history.
                 </p>
               </div>
@@ -868,7 +851,7 @@ export default function DocPage() {
         </div>
 
         {/* Footer */}
-        <div className="mt-16 pt-8 border-t border-gray-700 text-center text-gray-400">
+        <div className="mt-10 sm:mt-16 pt-8 border-t border-gray-700 text-center text-gray-400 text-sm sm:text-base">
           <p>Wind Swap Protocol - Built on Base</p>
           <p className="mt-2">Documentation updated as of protocol deployment</p>
         </div>
@@ -880,14 +863,14 @@ export default function DocPage() {
 // Helper Components
 function QuickNavCard({ title, description, items }: { title: string; description: string; items: Array<{ label: string; href: string }> }) {
   return (
-    <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-      <h3 className="text-lg font-bold mb-2 text-blue-400">{title}</h3>
-      <p className="text-sm text-gray-400 mb-4">{description}</p>
+    <div className="bg-gray-800 rounded-lg p-4 sm:p-6 border border-gray-700">
+      <h3 className="text-base sm:text-lg font-bold mb-2 text-blue-400">{title}</h3>
+      <p className="text-xs sm:text-sm text-gray-400 mb-4">{description}</p>
       <ul className="space-y-2">
         {items.map((item, i) => (
           <li key={i}>
             <a href={item.href} className="text-gray-300 hover:text-blue-400 transition text-sm">
-              → {item.label}
+              - {item.label}
             </a>
           </li>
         ))}
@@ -899,7 +882,7 @@ function QuickNavCard({ title, description, items }: { title: string; descriptio
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-20">
-      <h2 className="text-3xl font-bold mb-6 text-white">{title}</h2>
+      <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 text-white">{title}</h2>
       {children}
     </section>
   );
@@ -907,7 +890,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 function ContentBlock({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-gray-800/50 rounded-lg p-8 border border-gray-700">
+    <div className="bg-gray-800/50 rounded-lg p-4 sm:p-6 lg:p-8 border border-gray-700">
       {children}
     </div>
   );
@@ -915,12 +898,12 @@ function ContentBlock({ children }: { children: React.ReactNode }) {
 
 function FeatureCard({ title, description, features }: { title: string; description: string; features: string[] }) {
   return (
-    <div className="bg-gray-700 rounded-lg p-6">
-      <h3 className="text-xl font-bold mb-2 text-blue-400">{title}</h3>
-      <p className="text-gray-400 mb-4">{description}</p>
+    <div className="bg-gray-700 rounded-lg p-4 sm:p-6">
+      <h3 className="text-base sm:text-lg lg:text-xl font-bold mb-2 text-blue-400">{title}</h3>
+      <p className="text-gray-400 mb-4 text-sm sm:text-base">{description}</p>
       <ul className="space-y-1">
         {features.map((f, i) => (
-          <li key={i} className="text-sm text-gray-300">• {f}</li>
+          <li key={i} className="text-xs sm:text-sm text-gray-300">• {f}</li>
         ))}
       </ul>
     </div>
@@ -929,21 +912,21 @@ function FeatureCard({ title, description, features }: { title: string; descript
 
 function KeyConcept({ title, description }: { title: string; description: string }) {
   return (
-    <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 rounded-lg p-6 border border-blue-500/30">
-      <h3 className="text-lg font-bold mb-2 text-yellow-400">{title}</h3>
-      <p className="text-gray-200">{description}</p>
+    <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 rounded-lg p-4 sm:p-6 border border-blue-500/30">
+      <h3 className="text-base sm:text-lg font-bold mb-2 text-yellow-400">{title}</h3>
+      <p className="text-gray-200 text-sm sm:text-base">{description}</p>
     </div>
   );
 }
 
 function StateCard({ title, description, operations }: { title: string; description: string; operations: string[] }) {
   return (
-    <div className="bg-gray-700 rounded-lg p-5">
-      <h4 className="text-lg font-bold mb-2">{title}</h4>
-      <p className="text-sm text-gray-400 mb-3">{description}</p>
+    <div className="bg-gray-700 rounded-lg p-4 sm:p-5">
+      <h4 className="text-base sm:text-lg font-bold mb-2">{title}</h4>
+      <p className="text-xs sm:text-sm text-gray-400 mb-3">{description}</p>
       <ul className="space-y-1">
         {operations.map((op, i) => (
-          <li key={i} className="text-xs text-gray-300">✓ {op}</li>
+          <li key={i} className="text-xs text-gray-300">+ {op}</li>
         ))}
       </ul>
     </div>
@@ -956,9 +939,9 @@ function RewardType({ title, description, color }: { title: string; description:
     yellow: 'border-yellow-500/30 bg-yellow-900/20',
   };
   return (
-    <div className={`rounded-lg p-4 border ${colorClasses[color as keyof typeof colorClasses]}`}>
-      <h5 className="font-bold mb-1">{title}</h5>
-      <p className="text-sm text-gray-300">{description}</p>
+    <div className={`rounded-lg p-3 sm:p-4 border ${colorClasses[color as keyof typeof colorClasses]}`}>
+      <h5 className="font-bold mb-1 text-sm sm:text-base">{title}</h5>
+      <p className="text-xs sm:text-sm text-gray-300">{description}</p>
     </div>
   );
 }
@@ -969,10 +952,10 @@ function EmissionPhase({ title, description, details, color }: { title: string; 
     purple: 'border-purple-500/30 bg-purple-900/20',
   };
   return (
-    <div className={`rounded-lg p-5 border ${colorClasses[color as keyof typeof colorClasses]}`}>
-      <h4 className="font-bold text-lg mb-2">{title}</h4>
-      <p className="text-gray-300 mb-2">{description}</p>
-      <p className="text-sm text-gray-400">{details}</p>
+    <div className={`rounded-lg p-4 sm:p-5 border ${colorClasses[color as keyof typeof colorClasses]}`}>
+      <h4 className="font-bold text-base sm:text-lg mb-2">{title}</h4>
+      <p className="text-gray-300 mb-2 text-sm sm:text-base">{description}</p>
+      <p className="text-xs sm:text-sm text-gray-400">{details}</p>
     </div>
   );
 }
@@ -983,15 +966,15 @@ function PoolTypeCard({ title, description, formula, features, color }: { title:
     purple: 'from-purple-900/40 to-purple-800/40 border-purple-500/30',
   };
   return (
-    <div className={`rounded-lg p-5 border bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]}`}>
-      <h4 className="font-bold text-xl mb-2">{title}</h4>
-      <p className="text-gray-300 mb-3">{description}</p>
+    <div className={`rounded-lg p-4 sm:p-5 border bg-gradient-to-br ${colorClasses[color as keyof typeof colorClasses]}`}>
+      <h4 className="font-bold text-base sm:text-xl mb-2">{title}</h4>
+      <p className="text-gray-300 mb-3 text-sm sm:text-base">{description}</p>
       <div className="bg-black/30 rounded px-3 py-2 mb-3">
-        <code className="text-sm text-yellow-400">{formula}</code>
+        <code className="text-xs sm:text-sm text-yellow-400">{formula}</code>
       </div>
       <ul className="space-y-1">
         {features.map((f, i) => (
-          <li key={i} className="text-sm text-gray-300">• {f}</li>
+          <li key={i} className="text-xs sm:text-sm text-gray-300">• {f}</li>
         ))}
       </ul>
     </div>
@@ -1001,21 +984,19 @@ function PoolTypeCard({ title, description, formula, features, color }: { title:
 function OptionCard({ title, description, benefits, tradeoffs }: { title: string; description: string; benefits: string; tradeoffs: string }) {
   return (
     <div className="bg-gray-700 rounded-lg p-4">
-      <h4 className="font-bold mb-1">{title}</h4>
-      <p className="text-sm text-gray-400 mb-2">{description}</p>
-      <p className="text-xs text-green-400 mb-1">✓ {benefits}</p>
-      <p className="text-xs text-red-400">✗ {tradeoffs}</p>
+      <h4 className="font-bold mb-1 text-sm sm:text-base">{title}</h4>
+      <p className="text-xs sm:text-sm text-gray-400 mb-2">{description}</p>
+      <p className="text-xs text-green-400 mb-1">+ {benefits}</p>
+      <p className="text-xs text-red-400">- {tradeoffs}</p>
     </div>
   );
 }
 
-function BenefitCard({ title, description, icon }: { title: string; description: string; icon: string }) {
-  const iconDisplay = icon === '💰' ? 'Capital' : icon === '📊' ? 'Flexible' : 'Multiple';
+function BenefitCard({ title, description }: { title: string; description: string }) {
   return (
     <div className="bg-gray-700 rounded-lg p-4 text-center">
-      <div className="text-xl font-bold text-blue-400 mb-2">{iconDisplay}</div>
-      <h4 className="font-bold mb-1">{title}</h4>
-      <p className="text-sm text-gray-400">{description}</p>
+      <h4 className="font-bold mb-1 text-sm sm:text-base">{title}</h4>
+      <p className="text-xs sm:text-sm text-gray-400">{description}</p>
     </div>
   );
 }
@@ -1023,8 +1004,8 @@ function BenefitCard({ title, description, icon }: { title: string; description:
 function RewardContractCard({ title, description, examples }: { title: string; description: string; examples: string }) {
   return (
     <div className="bg-gray-700 rounded-lg p-4">
-      <h4 className="font-bold mb-1">{title}</h4>
-      <p className="text-sm text-gray-400 mb-2">{description}</p>
+      <h4 className="font-bold mb-1 text-sm sm:text-base">{title}</h4>
+      <p className="text-xs sm:text-sm text-gray-400 mb-2">{description}</p>
       <p className="text-xs text-gray-500">Ex: {examples}</p>
     </div>
   );
@@ -1032,21 +1013,21 @@ function RewardContractCard({ title, description, examples }: { title: string; d
 
 function FeeOptionCard({ title, description, feeType, feeAmount, emission, bestFor }: { title: string; description: string; feeType: string; feeAmount: string; emission?: string; bestFor: string }) {
   return (
-    <div className="bg-gray-700 rounded-lg p-5">
-      <h4 className="font-bold text-lg mb-2">{title}</h4>
-      <p className="text-sm text-gray-400 mb-3">{description}</p>
-      <div className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-400">Fee Type:</span>
+    <div className="bg-gray-700 rounded-lg p-4 sm:p-5">
+      <h4 className="font-bold text-base sm:text-lg mb-2">{title}</h4>
+      <p className="text-xs sm:text-sm text-gray-400 mb-3">{description}</p>
+      <div className="space-y-2 text-xs sm:text-sm">
+        <div>
+          <span className="text-gray-400">Fee Type: </span>
           <span className="text-blue-400">{feeType}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Fee Amount:</span>
+        <div>
+          <span className="text-gray-400">Fee Amount: </span>
           <span className="text-green-400">{feeAmount}</span>
         </div>
         {emission && (
-          <div className="flex justify-between">
-            <span className="text-gray-400">Emissions:</span>
+          <div>
+            <span className="text-gray-400">Emissions: </span>
             <span className="text-purple-400">{emission}</span>
           </div>
         )}
@@ -1059,8 +1040,8 @@ function FeeOptionCard({ title, description, feeType, feeAmount, emission, bestF
 function OperationCard({ title, description, steps }: { title: string; description: string; steps: string[] }) {
   return (
     <div className="bg-gray-700 rounded-lg p-4">
-      <h4 className="font-bold mb-1">{title}</h4>
-      <p className="text-sm text-gray-400 mb-2">{description}</p>
+      <h4 className="font-bold mb-1 text-sm sm:text-base">{title}</h4>
+      <p className="text-xs sm:text-sm text-gray-400 mb-2">{description}</p>
       <ol className="text-xs text-gray-500 space-y-1">
         {steps.map((s, i) => (
           <li key={i}>{i + 1}. {s}</li>
@@ -1070,24 +1051,45 @@ function OperationCard({ title, description, steps }: { title: string; descripti
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="ml-2 text-gray-500 hover:text-gray-300 transition text-xs shrink-0 font-mono"
+      title="Copy address"
+    >
+      {copied ? 'copied' : 'copy'}
+    </button>
+  );
+}
+
 function ContractTable({ contracts }: { contracts: Array<{ name: string; address: string; link: string }> }) {
   return (
-    <div className="bg-gray-900 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="bg-gray-900 rounded-lg overflow-hidden overflow-x-auto">
+      <table className="w-full text-xs sm:text-sm min-w-[320px]">
         <thead>
           <tr className="bg-gray-800">
-            <th className="py-3 px-4 text-left font-semibold">Contract</th>
-            <th className="py-3 px-4 text-left font-semibold">Address</th>
+            <th className="py-3 px-3 sm:px-4 text-left font-semibold whitespace-nowrap">Contract</th>
+            <th className="py-3 px-3 sm:px-4 text-left font-semibold">Address</th>
           </tr>
         </thead>
         <tbody>
           {contracts.map((c, i) => (
             <tr key={i} className="border-t border-gray-800">
-              <td className="py-3 px-4 font-medium">{c.name}</td>
-              <td className="py-3 px-4">
-                <a href={c.link} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 font-mono text-xs break-all">
-                  {c.address}
-                </a>
+              <td className="py-3 px-3 sm:px-4 font-medium whitespace-nowrap">{c.name}</td>
+              <td className="py-3 px-3 sm:px-4">
+                <div className="flex items-center gap-1">
+                  <a href={c.link} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 font-mono text-xs break-all">
+                    {c.address}
+                  </a>
+                  <CopyButton text={c.address} />
+                </div>
               </td>
             </tr>
           ))}
@@ -1097,7 +1099,6 @@ function ContractTable({ contracts }: { contracts: Array<{ name: string; address
   );
 }
 
-
 function FlowCard({ step, title, description, details, color }: { step: number; title: string; description: string; details: string; color: string }) {
   const colorClasses = {
     purple: 'border-purple-500/30 bg-purple-900/20',
@@ -1105,14 +1106,14 @@ function FlowCard({ step, title, description, details, color }: { step: number; 
     yellow: 'border-yellow-500/30 bg-yellow-900/20',
   };
   return (
-    <div className={`rounded-lg p-5 border ${colorClasses[color as keyof typeof colorClasses]}`}>
+    <div className={`rounded-lg p-4 sm:p-5 border ${colorClasses[color as keyof typeof colorClasses]}`}>
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-lg">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm sm:text-lg shrink-0">
           {step}
         </div>
-        <h4 className="font-bold text-lg">{title}</h4>
+        <h4 className="font-bold text-base sm:text-lg">{title}</h4>
       </div>
-      <p className="text-sm text-gray-300 mb-2">{description}</p>
+      <p className="text-xs sm:text-sm text-gray-300 mb-2">{description}</p>
       <p className="text-xs text-gray-400">{details}</p>
     </div>
   );
@@ -1121,13 +1122,13 @@ function FlowCard({ step, title, description, details, color }: { step: number; 
 function StepCard({ step, title, description, details }: { step: number; title: string; description: string; details: string }) {
   return (
     <div className="bg-gray-700 rounded-lg p-4">
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm">
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-xs sm:text-sm">
           {step}
         </div>
-        <div className="flex-1">
-          <h4 className="font-bold mb-1">{title}</h4>
-          <p className="text-sm text-gray-400 mb-2">{description}</p>
+        <div className="flex-1 min-w-0">
+          <h4 className="font-bold mb-1 text-sm sm:text-base">{title}</h4>
+          <p className="text-xs sm:text-sm text-gray-400 mb-1">{description}</p>
           <p className="text-xs text-gray-500">{details}</p>
         </div>
       </div>
