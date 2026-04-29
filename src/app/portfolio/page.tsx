@@ -2474,8 +2474,8 @@ export default function PortfolioPage() {
 
                 {/* Increase Liquidity Modal - Compact Mobile Style */}
                 {showIncreaseLiquidityModal && selectedPosition && (
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-                        <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto animate-slide-up">
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm pb-[80px] sm:pb-0">
+                        <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[80vh] sm:max-h-[90vh] overflow-auto animate-slide-up">
                             {/* Header */}
                             <div className="sticky top-0 bg-[#0d0d14] z-10 px-4 py-3 border-b border-white/10">
                                 <div className="flex items-center justify-between">

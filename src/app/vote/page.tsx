@@ -482,13 +482,13 @@ export default function VotePage() {
         setIsClaimingVotingRewards(null);
     };
 
-    // Handle distribute rewards (anyone can call this!) - batch in groups of 10 to avoid gas limits
+    // Handle distribute rewards (anyone can call this!) - batch in groups of 6 to avoid gas limits
     const handleDistributeRewards = async () => {
         if (!voterPoolCount || Number(voterPoolCount) === 0) return;
         setIsDistributing(true);
 
         const totalPools = Number(voterPoolCount);
-        const batchSize = 2;
+        const batchSize = 6;
 
         try {
             for (let start = 0; start < totalPools; start += batchSize) {

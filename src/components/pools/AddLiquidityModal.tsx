@@ -1509,8 +1509,21 @@ export function AddLiquidityModal({ isOpen, onClose, initialPool }: AddLiquidity
                                                     setTokenB(tokenA);
                                                     setAmountA(amountB);
                                                     setAmountB(amountA);
-                                                    setPriceLower('');
-                                                    setPriceUpper('');
+                                                    // Invert price range: P_low..P_high in A/B becomes 1/P_high..1/P_low in B/A
+                                                    const oldLower = parseFloat(priceLower);
+                                                    const oldUpper = parseFloat(priceUpper);
+                                                    if (oldLower > 0 && oldUpper > 0 && isFinite(oldLower) && isFinite(oldUpper)) {
+                                                        setPriceLower((1 / oldUpper).toString());
+                                                        setPriceUpper((1 / oldLower).toString());
+                                                    } else {
+                                                        setPriceLower('');
+                                                        setPriceUpper('');
+                                                    }
+                                                    // Invert initial price (used when creating a new pool)
+                                                    const ip = parseFloat(initialPrice);
+                                                    if (ip > 0 && isFinite(ip)) {
+                                                        setInitialPrice((1 / ip).toString());
+                                                    }
                                                 }}
                                                 className="p-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white transition-colors"
                                                 title="Swap token order"
