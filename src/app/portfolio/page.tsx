@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAccount, useReadContract } from 'wagmi';
 import { useWriteContract } from '@/hooks/useWriteContract';
 import { useBatchTransactions } from '@/hooks/useBatchTransactions';
@@ -2480,8 +2481,9 @@ export default function PortfolioPage() {
                     </div>
                 )}
 
-                {/* Increase Liquidity Modal - Compact Mobile Style */}
-                {showIncreaseLiquidityModal && selectedPosition && (
+                {/* Increase Liquidity Modal - portaled to body so its `position: fixed`
+                    isn't broken by the pull-to-refresh container's transform style */}
+                {showIncreaseLiquidityModal && selectedPosition && typeof window !== 'undefined' && createPortal(
                     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
                         <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto animate-slide-up pb-[env(safe-area-inset-bottom)] sm:pb-0">
                             {/* Header */}
@@ -2633,7 +2635,8 @@ export default function PortfolioPage() {
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div>,
+                    document.body
                 )}
             </div>
         </div>
