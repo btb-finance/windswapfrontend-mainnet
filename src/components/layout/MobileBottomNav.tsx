@@ -150,7 +150,7 @@ export function MobileBottomNav() {
 
             {/* Bottom nav bar */}
             <nav
-                className={`md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[var(--bg-primary)]/95 safe-area-bottom transition-opacity duration-200 ${isWalletModalOpen ? 'pointer-events-none opacity-50' : ''}`}
+                className={`mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[var(--bg-primary)]/95 safe-area-bottom transition-opacity duration-200 ${isWalletModalOpen ? 'pointer-events-none opacity-50' : ''}`}
                 style={{ borderTop: '1px solid transparent', backgroundImage: 'linear-gradient(var(--bg-primary), var(--bg-primary)), linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4)', backgroundOrigin: 'border-box', backgroundClip: 'padding-box, border-box' }}
                 aria-hidden={isWalletModalOpen}
             >

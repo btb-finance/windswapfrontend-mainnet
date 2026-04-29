@@ -394,6 +394,14 @@ export default function PortfolioPage() {
     // Fetch balances and pool price when modal opens
     const [currentTick, setCurrentTick] = useState<number | null>(null);
 
+    // Hide mobile bottom nav while the Increase Liquidity sheet is open so its
+    // action button isn't covered/intercepted by the nav at viewport bottom.
+    useEffect(() => {
+        if (!showIncreaseLiquidityModal) return;
+        document.body.classList.add('hide-mobile-nav');
+        return () => document.body.classList.remove('hide-mobile-nav');
+    }, [showIncreaseLiquidityModal]);
+
     useEffect(() => {
         const fetchBalancesAndPrice = async () => {
             if (!address || !selectedPosition || !showIncreaseLiquidityModal) {
@@ -2474,8 +2482,8 @@ export default function PortfolioPage() {
 
                 {/* Increase Liquidity Modal - Compact Mobile Style */}
                 {showIncreaseLiquidityModal && selectedPosition && (
-                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm pb-[80px] sm:pb-0">
-                        <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[80vh] sm:max-h-[90vh] overflow-auto animate-slide-up">
+                    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
+                        <div className="w-full sm:max-w-md bg-[#0d0d14] sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-auto animate-slide-up pb-[env(safe-area-inset-bottom)] sm:pb-0">
                             {/* Header */}
                             <div className="sticky top-0 bg-[#0d0d14] z-10 px-4 py-3 border-b border-white/10">
                                 <div className="flex items-center justify-between">
