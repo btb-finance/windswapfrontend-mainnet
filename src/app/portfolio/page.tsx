@@ -2528,12 +2528,20 @@ export default function PortfolioPage() {
                                 </div>
 
                                 {/* Token Inputs - Compact */}
+                                {(() => {
+                                    // Range-state flags drive which side is needed.
+                                    // currentTick < tickLower → range above current → only token0 needed
+                                    // currentTick > tickUpper → range below current → only token1 needed
+                                    const onlyToken0Needed = currentTick !== null && currentTick < selectedPosition.tickLower;
+                                    const onlyToken1Needed = currentTick !== null && currentTick > selectedPosition.tickUpper;
+                                    return (
                                 <div className="space-y-0.5">
                                     {/* Token 0 */}
-                                    <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <div className={`p-3 rounded-lg border ${onlyToken1Needed ? 'bg-white/[0.02] border-white/5' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs text-gray-400">
                                                 {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token0).symbol}
+                                                {onlyToken1Needed && <span className="ml-1 text-gray-500">· not needed</span>}
                                             </label>
                                             <span className="text-[10px] text-gray-400">
                                                 Bal: {balance0}
@@ -2543,10 +2551,11 @@ export default function PortfolioPage() {
                                             <input
                                                 type="text"
                                                 inputMode="decimal"
-                                                value={amount0ToAdd}
-                                                onChange={(e) => handleAmount0Change(e.target.value)}
+                                                value={amount1ToAdd && !amount0ToAdd && onlyToken1Needed ? '0' : amount0ToAdd}
+                                                onChange={(e) => !onlyToken1Needed && handleAmount0Change(e.target.value)}
+                                                readOnly={onlyToken1Needed}
                                                 placeholder="0.0"
-                                                className="flex-1 min-w-0 bg-transparent text-xl font-bold outline-none placeholder-gray-600"
+                                                className={`flex-1 min-w-0 bg-transparent text-xl font-bold outline-none placeholder-gray-600 ${onlyToken1Needed ? 'text-gray-500' : ''}`}
                                             />
                                             <div className="flex items-center gap-1.5 py-1.5 px-2 bg-white/10 rounded-lg flex-shrink-0">
                                                 {getTokenLogo(selectedPosition.token0) ? (
@@ -2560,7 +2569,7 @@ export default function PortfolioPage() {
                                             </div>
                                         </div>
                                         {/* Quick percentage buttons */}
-                                        {rawBalance0 && parseFloat(rawBalance0) > 0 && (
+                                        {!onlyToken1Needed && rawBalance0 && parseFloat(rawBalance0) > 0 && (
                                             <div className="flex gap-1 mt-2">
                                                 {[25, 50, 75, 100].map(pct => (
                                                     <button
@@ -2576,10 +2585,11 @@ export default function PortfolioPage() {
                                     </div>
 
                                     {/* Token 1 */}
-                                    <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+                                    <div className={`p-3 rounded-lg border ${onlyToken0Needed ? 'bg-white/[0.02] border-white/5' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs text-gray-400">
-                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token1).symbol} (auto)
+                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token1).symbol}
+                                                {onlyToken0Needed && <span className="ml-1 text-gray-500">· not needed</span>}
                                             </label>
                                             <span className="text-[10px] text-gray-400">
                                                 Bal: {balance1}
@@ -2589,10 +2599,11 @@ export default function PortfolioPage() {
                                             <input
                                                 type="text"
                                                 inputMode="decimal"
-                                                value={amount1ToAdd}
-                                                placeholder="Auto-calculated"
-                                                className="flex-1 min-w-0 bg-transparent text-xl font-bold outline-none placeholder-gray-600 text-gray-400"
-                                                readOnly
+                                                value={amount0ToAdd && !amount1ToAdd && onlyToken0Needed ? '0' : amount1ToAdd}
+                                                onChange={(e) => !onlyToken0Needed && handleAmount1Change(e.target.value)}
+                                                readOnly={onlyToken0Needed}
+                                                placeholder="0.0"
+                                                className={`flex-1 min-w-0 bg-transparent text-xl font-bold outline-none placeholder-gray-600 ${onlyToken0Needed ? 'text-gray-500' : ''}`}
                                             />
                                             <div className="flex items-center gap-1.5 py-1.5 px-2 bg-white/10 rounded-lg flex-shrink-0">
                                                 {getTokenLogo(selectedPosition.token1) ? (
@@ -2605,8 +2616,24 @@ export default function PortfolioPage() {
                                                 <span className="font-semibold text-sm">{getTokenInfo(selectedPosition.token1).symbol}</span>
                                             </div>
                                         </div>
+                                        {/* Quick percentage buttons */}
+                                        {!onlyToken0Needed && rawBalance1 && parseFloat(rawBalance1) > 0 && (
+                                            <div className="flex gap-1 mt-2">
+                                                {[25, 50, 75, 100].map(pct => (
+                                                    <button
+                                                        key={pct}
+                                                        onClick={() => handleAmount1Change((parseFloat(rawBalance1) * pct / 100).toString())}
+                                                        className="flex-1 py-1 text-[10px] font-medium rounded bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                                                    >
+                                                        {pct === 100 ? 'MAX' : `${pct}%`}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Footer */}

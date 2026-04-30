@@ -1,0 +1,6 @@
+Contact: mailto:hello@btb.finance
+Contact: https://discord.gg/QhkBUp8wVK
+Contact: https://x.com/btb_finance
+Expires: 2027-04-30T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://windswap.org/.well-known/security.txt
