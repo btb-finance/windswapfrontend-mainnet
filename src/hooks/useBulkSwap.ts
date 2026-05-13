@@ -108,12 +108,7 @@ export function useBulkSwap() {
             legs: BulkSwapLeg[],
             slippageBps: number = 100, // 1%
         ): Promise<{ hash: string } | null> => {
-            if (!address) {
-                setError('Wallet not connected');
-                return null;
-            }
-
-            const quotedLegs = legs.filter((l) => l.status === 'quoted' && l.routeSummary);
+            const quotedLegs = legs.filter((l) => l.status === 'quoted' && l.routeSummary && l.quotedAmountWei);
             if (quotedLegs.length === 0 || quotedLegs.length !== legs.length) {
                 setError('All legs must have valid quotes to execute.');
                 return null;
@@ -128,28 +123,37 @@ export function useBulkSwap() {
 
                 // Use the exact amounts from quoting — avoids mismatch when failed legs are filtered
                 // out and the last-leg remainder would otherwise balloon beyond the quoted amount.
-                const legAmountsWei = legs.map((leg) => leg.quotedAmountWei ?? BigInt(0));
+                const legAmountsWei = legs.map((leg) => leg.quotedAmountWei!);
 
-                // Build swap calldata for each leg via KyberSwap
+                // Re-fetch fresh KyberSwap calldata right before execution.
+                // Stored routeSummaries expire in ~30s, so building calldata from stale summaries
+                // fails for non-ETH pairs. Re-quoting here gets a fresh routeSummary + calldata.
                 const orders = await Promise.all(
                     legs.map(async (leg, index) => {
                         const legAmountWei = legAmountsWei[index];
                         const actualTokenOut = resolveToken(leg.token);
 
+                        // Re-quote to get a fresh routeSummary, then build calldata from it
+                        const freshQuote = await getKyberQuote(
+                            actualTokenIn.address,
+                            actualTokenOut.address,
+                            legAmountWei.toString(),
+                        );
+                        if (!freshQuote) throw new Error(`Failed to get fresh quote for ${leg.token.symbol}`);
+
                         // Build calldata — sender & recipient = proxy contract
                         const swapData = await getKyberSwapData(
-                            leg.routeSummary!,
-                            proxyAddress,     // sender = proxy (it holds the tokens)
-                            proxyAddress,     // recipient = proxy (it distributes after fee)
+                            freshQuote.routeSummary,
+                            proxyAddress,
+                            proxyAddress,
                             slippageBps,
                         );
 
                         if (!swapData) throw new Error(`Failed to build swap data for ${leg.token.symbol}`);
 
-                        // minAmountOut with slippage (account for 1% proxy fee + user slippage tolerance)
-                        const estimatedOutWei = parseUnits(leg.estimatedOut || '0', leg.token.decimals);
-                        // Deduct user slippage + 1% protocol fee (100 bps)
-                        const minOut = (estimatedOutWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
+                        // minAmountOut: use fresh quote output with slippage + 1% protocol fee
+                        const freshOutWei = BigInt(freshQuote.amountOut);
+                        const minOut = (freshOutWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
 
                         return {
                             tokenOut: actualTokenOut.address as Address,
@@ -161,12 +165,15 @@ export function useBulkSwap() {
                     }),
                 );
 
-                // If tokenIn is native ETH, send value; contract wraps to WETH
+                // Read address here — closer to actual use, avoids stale-closure false negatives
+                // that can surface during wagmi re-hydration.
+                const currentAddress = address;
+                if (!currentAddress) throw new Error('Wallet not connected');
+
                 const isNativeIn = tokenIn.isNative;
                 const tokenInAddress = resolveTokenAddress(tokenIn);
                 const actualTotalWei = legAmountsWei.reduce((a, b) => a + b, BigInt(0));
 
-                // Approve if ERC20
                 if (!isNativeIn) {
                     await approveIfNeeded(actualTokenIn.address as Address, proxyAddress, actualTotalWei);
                 }
@@ -175,7 +182,7 @@ export function useBulkSwap() {
                     address: proxyAddress,
                     abi: AGGREGATOR_PROXY_ABI,
                     functionName: 'bulkSwap',
-                    args: [tokenInAddress, orders, address],
+                    args: [tokenInAddress, orders, currentAddress],
                     value: isNativeIn ? actualTotalWei : undefined,
                 });
 
