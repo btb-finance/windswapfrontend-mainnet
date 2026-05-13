@@ -20,6 +20,8 @@ export interface BulkSwapLeg {
     estimatedOut?: string;
     /** KyberSwap route summary (needed to build calldata) */
     routeSummary?: object;
+    /** Exact input amount (wei) used when this leg was quoted — used verbatim at execution */
+    quotedAmountWei?: bigint;
     /** Status of this leg */
     status: 'idle' | 'quoting' | 'quoted' | 'failed';
 }
@@ -83,6 +85,7 @@ export function useBulkSwap() {
                             status: 'quoted',
                             estimatedOut: formatUnits(BigInt(quote.amountOut), leg.token.decimals),
                             routeSummary: quote.routeSummary,
+                            quotedAmountWei: legAmountWei,
                         };
                     } catch {
                         return { ...leg, status: 'failed', estimatedOut: '0' };
@@ -102,7 +105,6 @@ export function useBulkSwap() {
     const executeBulkSwap = useCallback(
         async (
             tokenIn: Token,
-            amountIn: string,
             legs: BulkSwapLeg[],
             slippageBps: number = 100, // 1%
         ): Promise<{ hash: string } | null> => {
@@ -122,18 +124,11 @@ export function useBulkSwap() {
 
             try {
                 const actualTokenIn = resolveToken(tokenIn);
-                const totalWei = parseUnits(amountIn, tokenIn.decimals);
                 const proxyAddress = V2_CONTRACTS.AggregatorProxy as Address;
 
-                // Calculate exact wei per leg to match totalWei (and the previous quoting step)
-                const legAmountsWei = legs.map((leg, index) => {
-                    if (index === legs.length - 1) return BigInt(0);
-                    return (totalWei * BigInt(Math.round(leg.allocation * 10000))) / BigInt(10000);
-                });
-                const sumSoFar = legAmountsWei.reduce((a, b) => a + b, BigInt(0));
-                if (legs.length > 0) {
-                    legAmountsWei[legs.length - 1] = totalWei - sumSoFar;
-                }
+                // Use the exact amounts from quoting — avoids mismatch when failed legs are filtered
+                // out and the last-leg remainder would otherwise balloon beyond the quoted amount.
+                const legAmountsWei = legs.map((leg) => leg.quotedAmountWei ?? BigInt(0));
 
                 // Build swap calldata for each leg via KyberSwap
                 const orders = await Promise.all(
@@ -169,10 +164,11 @@ export function useBulkSwap() {
                 // If tokenIn is native ETH, send value; contract wraps to WETH
                 const isNativeIn = tokenIn.isNative;
                 const tokenInAddress = resolveTokenAddress(tokenIn);
+                const actualTotalWei = legAmountsWei.reduce((a, b) => a + b, BigInt(0));
 
                 // Approve if ERC20
                 if (!isNativeIn) {
-                    await approveIfNeeded(actualTokenIn.address as Address, proxyAddress, totalWei);
+                    await approveIfNeeded(actualTokenIn.address as Address, proxyAddress, actualTotalWei);
                 }
 
                 const hash = await writeContractAsync({
@@ -180,7 +176,7 @@ export function useBulkSwap() {
                     abi: AGGREGATOR_PROXY_ABI,
                     functionName: 'bulkSwap',
                     args: [tokenInAddress, orders, address],
-                    value: isNativeIn ? totalWei : undefined,
+                    value: isNativeIn ? actualTotalWei : undefined,
                 });
 
                 return { hash };

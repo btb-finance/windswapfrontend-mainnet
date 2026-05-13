@@ -156,11 +156,11 @@ export function BulkSwapCard() {
         if (!isConnected || !amountIn || legs.length === 0) return;
         const executableLegs = legs.filter((l) => l.status !== 'failed');
         if (executableLegs.length === 0) return;
-        const result = await executeBulkSwap(tokenIn, amountIn, executableLegs);
+        const result = await executeBulkSwap(tokenIn, executableLegs);
         if (result) {
             success('Bulk swap submitted!');
             setAmountIn('');
-            setLegs((prev) => prev.map((l) => ({ ...l, status: 'idle', estimatedOut: undefined, routeSummary: undefined })));
+            setLegs((prev) => prev.map((l) => ({ ...l, status: 'idle', estimatedOut: undefined, routeSummary: undefined, quotedAmountWei: undefined })));
         } else if (error) {
             showError(error);
         }
