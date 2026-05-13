@@ -710,35 +710,39 @@ export default function PortfolioPage() {
             const deadline = getDeadline();
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
-            // Build batch: decrease liquidity + collect (NO burn — burn is separate & optional)
-            const batchCalls = [
-                encodeContractCall(
-                    CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    NFT_POSITION_MANAGER_ABI,
-                    'decreaseLiquidity',
-                    [{
+            // Single positionManager.multicall: decreaseLiquidity + collect in one tx
+            const pmCalls: `0x${string}`[] = [
+                encodeFunctionData({
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'decreaseLiquidity',
+                    args: [{
                         tokenId: position.tokenId,
                         liquidity: position.liquidity,
                         amount0Min: BigInt(0),
                         amount1Min: BigInt(0),
                         deadline,
-                    }]
-                ),
-                encodeContractCall(
-                    CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    NFT_POSITION_MANAGER_ABI,
-                    'collect',
-                    [{
+                    }],
+                }),
+                encodeFunctionData({
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'collect',
+                    args: [{
                         tokenId: position.tokenId,
                         recipient: address,
                         amount0Max: maxUint128,
                         amount1Max: maxUint128,
-                    }]
-                ),
+                    }],
+                }),
             ];
 
-            // Try batch first
-            await batchOrSequential(batchCalls);
+            await batchOrSequential([
+                encodeContractCall(
+                    CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    NFT_POSITION_MANAGER_ABI,
+                    'multicall',
+                    [pmCalls]
+                ),
+            ]);
             toast.success('Liquidity removed & fees collected!');
 
             refetchCL();
