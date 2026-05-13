@@ -125,35 +125,43 @@ export function useBulkSwap() {
                 // out and the last-leg remainder would otherwise balloon beyond the quoted amount.
                 const legAmountsWei = legs.map((leg) => leg.quotedAmountWei!);
 
-                // Re-fetch fresh KyberSwap calldata right before execution.
-                // Stored routeSummaries expire in ~30s, so building calldata from stale summaries
-                // fails for non-ETH pairs. Re-quoting here gets a fresh routeSummary + calldata.
+                // Build calldata: try the stored routeSummary first (fast path).
+                // If it's expired (~30s TTL), fall back to a fresh quote for that leg only.
                 const orders = await Promise.all(
                     legs.map(async (leg, index) => {
                         const legAmountWei = legAmountsWei[index];
                         const actualTokenOut = resolveToken(leg.token);
 
-                        // Re-quote to get a fresh routeSummary, then build calldata from it
-                        const freshQuote = await getKyberQuote(
-                            actualTokenIn.address,
-                            actualTokenOut.address,
-                            legAmountWei.toString(),
-                        );
-                        if (!freshQuote) throw new Error(`Failed to get fresh quote for ${leg.token.symbol}`);
-
-                        // Build calldata — sender & recipient = proxy contract
-                        const swapData = await getKyberSwapData(
-                            freshQuote.routeSummary,
+                        let swapData = await getKyberSwapData(
+                            leg.routeSummary!,
                             proxyAddress,
                             proxyAddress,
                             slippageBps,
                         );
 
-                        if (!swapData) throw new Error(`Failed to build swap data for ${leg.token.symbol}`);
+                        let outWei = parseUnits(leg.estimatedOut || '0', leg.token.decimals);
 
-                        // minAmountOut: use fresh quote output with slippage + 1% protocol fee
-                        const freshOutWei = BigInt(freshQuote.amountOut);
-                        const minOut = (freshOutWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
+                        // Stored summary was stale — re-quote this leg only
+                        if (!swapData) {
+                            const freshQuote = await getKyberQuote(
+                                actualTokenIn.address,
+                                actualTokenOut.address,
+                                legAmountWei.toString(),
+                            );
+                            if (!freshQuote) throw new Error(`No route for ${leg.token.symbol} — try again`);
+
+                            swapData = await getKyberSwapData(
+                                freshQuote.routeSummary,
+                                proxyAddress,
+                                proxyAddress,
+                                slippageBps,
+                            );
+                            if (!swapData) throw new Error(`Failed to build swap data for ${leg.token.symbol}`);
+
+                            outWei = BigInt(freshQuote.amountOut);
+                        }
+
+                        const minOut = (outWei * BigInt(10000 - slippageBps - 100)) / BigInt(10000);
 
                         return {
                             tokenOut: actualTokenOut.address as Address,
