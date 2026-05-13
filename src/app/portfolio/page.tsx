@@ -905,44 +905,51 @@ export default function PortfolioPage() {
             const deadline = getDeadline();
             const maxUint128 = BigInt('340282366920938463463374607431768211455');
 
-            const batchCalls = [];
+            // Build positionManager multicall data (decreaseLiquidity + collect in one tx)
+            const pmCalls: `0x${string}`[] = [];
 
-            // 1. Unstake from gauge FIRST
-            batchCalls.push(encodeContractCall(
-                pos.gaugeAddress as Address,
-                CL_GAUGE_ABI,
-                'withdraw',
-                [pos.tokenId]
-            ));
-
-            // 2. Decrease liquidity (remove all) SECOND
             if (pos.liquidity && pos.liquidity > BigInt(0)) {
-                batchCalls.push(encodeContractCall(
-                    CL_CONTRACTS.NonfungiblePositionManager as Address,
-                    NFT_POSITION_MANAGER_ABI,
-                    'decreaseLiquidity',
-                    [{
+                pmCalls.push(encodeFunctionData({
+                    abi: NFT_POSITION_MANAGER_ABI,
+                    functionName: 'decreaseLiquidity',
+                    args: [{
                         tokenId: pos.tokenId,
                         liquidity: pos.liquidity,
                         amount0Min: BigInt(0),
                         amount1Min: BigInt(0),
                         deadline,
-                    }]
-                ));
+                    }],
+                }));
             }
 
-            // 3. Collect fees
-            batchCalls.push(encodeContractCall(
-                CL_CONTRACTS.NonfungiblePositionManager as Address,
-                NFT_POSITION_MANAGER_ABI,
-                'collect',
-                [{
+            pmCalls.push(encodeFunctionData({
+                abi: NFT_POSITION_MANAGER_ABI,
+                functionName: 'collect',
+                args: [{
                     tokenId: pos.tokenId,
                     recipient: address,
                     amount0Max: maxUint128,
                     amount1Max: maxUint128,
-                }]
-            ));
+                }],
+            }));
+
+            // 2 calls: gauge withdraw (different contract, must be separate),
+            // then positionManager.multicall (remove LP + collect in one tx).
+            // With EIP-5792 wallets all land in one batch; without it, still only 2 prompts.
+            const batchCalls = [
+                encodeContractCall(
+                    pos.gaugeAddress as Address,
+                    CL_GAUGE_ABI,
+                    'withdraw',
+                    [pos.tokenId]
+                ),
+                encodeContractCall(
+                    CL_CONTRACTS.NonfungiblePositionManager as Address,
+                    NFT_POSITION_MANAGER_ABI,
+                    'multicall',
+                    [pmCalls]
+                ),
+            ];
 
             // Note: No burn — user can burn separately if they want
             // Rewards are auto-claimed when unstaking, no separate claim needed
