@@ -324,6 +324,17 @@ export default function PortfolioPage() {
     // Raw balances for MAX button (full precision)
     const [rawBalance0, setRawBalance0] = useState<string>('0');
     const [rawBalance1, setRawBalance1] = useState<string>('0');
+    // For WSEI sides: track native vs wrapped balance separately so the user
+    // can pick which source to spend. wei strings; only populated for the
+    // side (if any) that is WSEI.
+    const [nativeBalWei0, setNativeBalWei0] = useState<string>('0');
+    const [wethBalWei0, setWethBalWei0] = useState<string>('0');
+    const [nativeBalWei1, setNativeBalWei1] = useState<string>('0');
+    const [wethBalWei1, setWethBalWei1] = useState<string>('0');
+    // Which source the user has selected for the WSEI side: 'native' or 'weth'.
+    // Defaults to whichever has a non-zero balance (native preferred).
+    const [payMode0, setPayMode0] = useState<'native' | 'weth'>('native');
+    const [payMode1, setPayMode1] = useState<'native' | 'weth'>('native');
 
     // Contract write hook
     const { writeContractAsync } = useWriteContract();
@@ -366,6 +377,10 @@ export default function PortfolioPage() {
                 setBalance1('0');
                 setRawBalance0('0');
                 setRawBalance1('0');
+                setNativeBalWei0('0');
+                setWethBalWei0('0');
+                setNativeBalWei1('0');
+                setWethBalWei1('0');
                 setCurrentTick(null);
                 return;
             }
@@ -408,24 +423,39 @@ export default function PortfolioPage() {
 
                 console.log('Balance responses:', bal0Response, bal1Response);
 
-                // For WETH, fetch native ETH balance instead
-                if (isToken0WSEI) {
-                    const nativeBal = await fetch(getRpcForPoolData(), {
+                // Helper: fetch native ETH balance for the connected user
+                const fetchNativeBalanceWei = async (): Promise<bigint> => {
+                    const res = await fetch(getRpcForPoolData(), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             jsonrpc: '2.0',
                             method: 'eth_getBalance',
                             params: [address, 'latest'],
-                            id: 10,
+                            id: 99,
                         }),
                     }).then(r => r.json());
-                    if (nativeBal.result) {
-                        const nativeWei = BigInt(nativeBal.result);
-                        const fullValue = Number(nativeWei) / 1e18;
-                        setRawBalance0(fullValue.toString());
-                        setBalance0(fullValue.toFixed(6));
-                    }
+                    return res.result ? BigInt(res.result) : BigInt(0);
+                };
+
+                // For the WSEI side: fetch BOTH native ETH and WETH (ERC-20).
+                // Store them separately; the displayed Bal: tracks whichever the user
+                // has selected (defaults to native; switches to WETH if native is empty).
+                if (isToken0WSEI) {
+                    const nativeWei = await fetchNativeBalanceWei();
+                    const wethWei = bal0Response.result && bal0Response.result !== '0x'
+                        ? BigInt(bal0Response.result)
+                        : BigInt(0);
+                    setNativeBalWei0(nativeWei.toString());
+                    setWethBalWei0(wethWei.toString());
+                    const defaultMode: 'native' | 'weth' = nativeWei > BigInt(0)
+                        ? 'native'
+                        : (wethWei > BigInt(0) ? 'weth' : 'native');
+                    setPayMode0(defaultMode);
+                    const selectedWei = defaultMode === 'native' ? nativeWei : wethWei;
+                    const fullValue = Number(selectedWei) / 1e18;
+                    setRawBalance0(fullValue.toString());
+                    setBalance0(fullValue.toFixed(6));
                 } else if (bal0Response.result && bal0Response.result !== '0x') {
                     const bal0Wei = BigInt(bal0Response.result);
                     const fullValue = Number(bal0Wei) / (10 ** t0.decimals);
@@ -434,22 +464,20 @@ export default function PortfolioPage() {
                 }
 
                 if (isToken1WSEI) {
-                    const nativeBal = await fetch(getRpcForPoolData(), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            jsonrpc: '2.0',
-                            method: 'eth_getBalance',
-                            params: [address, 'latest'],
-                            id: 11,
-                        }),
-                    }).then(r => r.json());
-                    if (nativeBal.result) {
-                        const nativeWei = BigInt(nativeBal.result);
-                        const fullValue = Number(nativeWei) / 1e18;
-                        setRawBalance1(fullValue.toString());
-                        setBalance1(fullValue.toFixed(6));
-                    }
+                    const nativeWei = await fetchNativeBalanceWei();
+                    const wethWei = bal1Response.result && bal1Response.result !== '0x'
+                        ? BigInt(bal1Response.result)
+                        : BigInt(0);
+                    setNativeBalWei1(nativeWei.toString());
+                    setWethBalWei1(wethWei.toString());
+                    const defaultMode: 'native' | 'weth' = nativeWei > BigInt(0)
+                        ? 'native'
+                        : (wethWei > BigInt(0) ? 'weth' : 'native');
+                    setPayMode1(defaultMode);
+                    const selectedWei = defaultMode === 'native' ? nativeWei : wethWei;
+                    const fullValue = Number(selectedWei) / 1e18;
+                    setRawBalance1(fullValue.toString());
+                    setBalance1(fullValue.toFixed(6));
                 } else if (bal1Response.result && bal1Response.result !== '0x') {
                     const bal1Wei = BigInt(bal1Response.result);
                     const fullValue = Number(bal1Wei) / (10 ** t1.decimals);
@@ -1006,19 +1034,19 @@ export default function PortfolioPage() {
             const isToken0WSEI = selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase();
             const isToken1WSEI = selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase();
 
-            // Calculate native value if using WSEI
+            // For the WSEI side: spend the source the user picked (native or WETH).
+            // Native → msg.value, no approval. WETH → approve + transferFrom, no msg.value.
             let nativeValue = BigInt(0);
-            if (isToken0WSEI && amount0Desired > BigInt(0)) {
-                nativeValue = amount0Desired;
-            } else if (isToken1WSEI && amount1Desired > BigInt(0)) {
-                nativeValue = amount1Desired;
-            }
+            const useNativeForToken0 = isToken0WSEI && amount0Desired > BigInt(0) && payMode0 === 'native';
+            const useNativeForToken1 = isToken1WSEI && amount1Desired > BigInt(0) && payMode1 === 'native';
+            if (useNativeForToken0) nativeValue = amount0Desired;
+            else if (useNativeForToken1) nativeValue = amount1Desired;
 
-            // Build approval calls if needed (skip native WSEI)
-            const approve0Call = (amount0Desired > BigInt(0) && !(isToken0WSEI && nativeValue > BigInt(0)))
+            // Build approval calls if needed. Skip approval only when paying that side natively.
+            const approve0Call = (amount0Desired > BigInt(0) && !useNativeForToken0)
                 ? await buildApproveCallIfNeeded(selectedPosition.token0 as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount0Desired)
                 : null;
-            const approve1Call = (amount1Desired > BigInt(0) && !(isToken1WSEI && nativeValue > BigInt(0)))
+            const approve1Call = (amount1Desired > BigInt(0) && !useNativeForToken1)
                 ? await buildApproveCallIfNeeded(selectedPosition.token1 as Address, CL_CONTRACTS.NonfungiblePositionManager as Address, amount1Desired)
                 : null;
 
@@ -1484,9 +1512,6 @@ export default function PortfolioPage() {
                                         const feesEarnedUsd = Math.max(0, collectedUsd - withdrawnUsd);
                                         // WIND staking rewards
                                         const windEarnedUsd = (pos.totalWindEarned || 0) * (windPrice || 0);
-                                        // PnL = current value + what you got back + WIND earned - what you put in
-                                        const pnlUsd = (pos.amountUSD || 0) + collectedUsd + windEarnedUsd - depositedUsd;
-                                        const pnlPct = depositedUsd > 0 ? (pnlUsd / depositedUsd) * 100 : 0;
 
                                         const currentPoolTick = positionTicks[pos.tokenId.toString()];
                                         const hasTickData = currentPoolTick !== undefined;
@@ -1509,6 +1534,11 @@ export default function PortfolioPage() {
                                         const uncollectedFees1Usd = pos.token1PriceUSD > 0
                                             ? parseFloat(formatUnits(pos.tokensOwed1, t1.decimals)) * pos.token1PriceUSD : 0;
                                         const totalFeesUsd = uncollectedFees0Usd + uncollectedFees1Usd;
+
+                                        // PnL = current value + collected (principal + realized fees) + unclaimed fees + WIND - deposited.
+                                        // Including unclaimed fees so users see their winnings even before collecting.
+                                        const pnlUsd = (pos.amountUSD || 0) + collectedUsd + totalFeesUsd + windEarnedUsd - depositedUsd;
+                                        const pnlPct = depositedUsd > 0 ? (pnlUsd / depositedUsd) * 100 : 0;
 
                                         // Fee APR from pool data (24h volume × fee rate × 365 / TVL)
                                         const poolData = allPools.find(p => p.address.toLowerCase() === pos.poolId.toLowerCase());
@@ -2519,8 +2549,31 @@ export default function PortfolioPage() {
                                     {/* Token 0 */}
                                     <div className={`p-3 rounded-lg border ${onlyToken1Needed ? 'bg-white/[0.02] border-white/5' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center justify-between mb-2">
-                                            <label className="text-xs text-gray-400">
-                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token0).symbol}
+                                            <label className="text-xs text-gray-400 flex items-center gap-2">
+                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() ? (payMode0 === 'native' ? 'ETH' : 'WETH') : getTokenInfo(selectedPosition.token0).symbol}
+                                                {/* Pay-with toggle for WSEI side */}
+                                                {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase() && (
+                                                    <span className="inline-flex rounded-md bg-white/5 p-0.5 text-[10px]">
+                                                        <button
+                                                            onClick={() => {
+                                                                setPayMode0('native');
+                                                                const v = Number(BigInt(nativeBalWei0 || '0')) / 1e18;
+                                                                setRawBalance0(v.toString());
+                                                                setBalance0(v.toFixed(6));
+                                                            }}
+                                                            className={`px-1.5 py-0.5 rounded ${payMode0 === 'native' ? 'bg-primary/30 text-white' : 'text-gray-400'}`}
+                                                        >ETH</button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setPayMode0('weth');
+                                                                const v = Number(BigInt(wethBalWei0 || '0')) / 1e18;
+                                                                setRawBalance0(v.toString());
+                                                                setBalance0(v.toFixed(6));
+                                                            }}
+                                                            className={`px-1.5 py-0.5 rounded ${payMode0 === 'weth' ? 'bg-primary/30 text-white' : 'text-gray-400'}`}
+                                                        >WETH</button>
+                                                    </span>
+                                                )}
                                                 {onlyToken1Needed && <span className="ml-1 text-gray-500">· not needed</span>}
                                             </label>
                                             <span className="text-[10px] text-gray-400">
@@ -2545,10 +2598,14 @@ export default function PortfolioPage() {
                                                         {getTokenInfo(selectedPosition.token0).symbol.slice(0, 2)}
                                                     </div>
                                                 )}
-                                                <span className="font-semibold text-sm">{getTokenInfo(selectedPosition.token0).symbol}</span>
+                                                <span className="font-semibold text-sm">
+                                                    {selectedPosition.token0.toLowerCase() === WSEI.address.toLowerCase()
+                                                        ? (payMode0 === 'native' ? 'ETH' : 'WETH')
+                                                        : getTokenInfo(selectedPosition.token0).symbol}
+                                                </span>
                                             </div>
                                         </div>
-                                        {/* Quick percentage buttons */}
+                                        {/* Quick percentage buttons — base on the selected source's balance */}
                                         {!onlyToken1Needed && rawBalance0 && parseFloat(rawBalance0) > 0 && (
                                             <div className="flex gap-1 mt-2">
                                                 {[25, 50, 75, 100].map(pct => (
@@ -2567,8 +2624,30 @@ export default function PortfolioPage() {
                                     {/* Token 1 */}
                                     <div className={`p-3 rounded-lg border ${onlyToken0Needed ? 'bg-white/[0.02] border-white/5' : 'bg-white/5 border-white/10'}`}>
                                         <div className="flex items-center justify-between mb-2">
-                                            <label className="text-xs text-gray-400">
-                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? 'ETH' : getTokenInfo(selectedPosition.token1).symbol}
+                                            <label className="text-xs text-gray-400 flex items-center gap-2">
+                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() ? (payMode1 === 'native' ? 'ETH' : 'WETH') : getTokenInfo(selectedPosition.token1).symbol}
+                                                {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase() && (
+                                                    <span className="inline-flex rounded-md bg-white/5 p-0.5 text-[10px]">
+                                                        <button
+                                                            onClick={() => {
+                                                                setPayMode1('native');
+                                                                const v = Number(BigInt(nativeBalWei1 || '0')) / 1e18;
+                                                                setRawBalance1(v.toString());
+                                                                setBalance1(v.toFixed(6));
+                                                            }}
+                                                            className={`px-1.5 py-0.5 rounded ${payMode1 === 'native' ? 'bg-primary/30 text-white' : 'text-gray-400'}`}
+                                                        >ETH</button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setPayMode1('weth');
+                                                                const v = Number(BigInt(wethBalWei1 || '0')) / 1e18;
+                                                                setRawBalance1(v.toString());
+                                                                setBalance1(v.toFixed(6));
+                                                            }}
+                                                            className={`px-1.5 py-0.5 rounded ${payMode1 === 'weth' ? 'bg-primary/30 text-white' : 'text-gray-400'}`}
+                                                        >WETH</button>
+                                                    </span>
+                                                )}
                                                 {onlyToken0Needed && <span className="ml-1 text-gray-500">· not needed</span>}
                                             </label>
                                             <span className="text-[10px] text-gray-400">
@@ -2593,10 +2672,14 @@ export default function PortfolioPage() {
                                                         {getTokenInfo(selectedPosition.token1).symbol.slice(0, 2)}
                                                     </div>
                                                 )}
-                                                <span className="font-semibold text-sm">{getTokenInfo(selectedPosition.token1).symbol}</span>
+                                                <span className="font-semibold text-sm">
+                                                    {selectedPosition.token1.toLowerCase() === WSEI.address.toLowerCase()
+                                                        ? (payMode1 === 'native' ? 'ETH' : 'WETH')
+                                                        : getTokenInfo(selectedPosition.token1).symbol}
+                                                </span>
                                             </div>
                                         </div>
-                                        {/* Quick percentage buttons */}
+                                        {/* Quick percentage buttons — base on the selected source's balance */}
                                         {!onlyToken0Needed && rawBalance1 && parseFloat(rawBalance1) > 0 && (
                                             <div className="flex gap-1 mt-2">
                                                 {[25, 50, 75, 100].map(pct => (
