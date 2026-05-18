@@ -90,50 +90,6 @@ const getTokenLogo = (addr: string): string | undefined => {
     return getTokenLogoUtil(addr);
 };
 
-// Calculate token amounts from CL position liquidity and tick range
-// This uses the Uniswap V3 math formulas
-const calculateTokenAmounts = (
-    liquidity: bigint,
-    tickLower: number,
-    tickUpper: number,
-    currentTick: number,
-    token0Decimals: number,
-    token1Decimals: number
-): { amount0: number; amount1: number } => {
-    if (liquidity === BigInt(0)) {
-        return { amount0: 0, amount1: 0 };
-    }
-
-    // Calculate sqrt prices from ticks
-    const sqrtPriceLower = Math.pow(1.0001, tickLower / 2);
-    const sqrtPriceUpper = Math.pow(1.0001, tickUpper / 2);
-    const sqrtPriceCurrent = Math.pow(1.0001, currentTick / 2);
-
-    const L = Number(liquidity);
-    let amount0 = 0;
-    let amount1 = 0;
-
-    if (currentTick < tickLower) {
-        // Position is below the range, only token0
-        amount0 = L * (1 / sqrtPriceLower - 1 / sqrtPriceUpper);
-        amount1 = 0;
-    } else if (currentTick >= tickUpper) {
-        // Position is above the range, only token1
-        amount0 = 0;
-        amount1 = L * (sqrtPriceUpper - sqrtPriceLower);
-    } else {
-        // Position is in range
-        amount0 = L * (1 / sqrtPriceCurrent - 1 / sqrtPriceUpper);
-        amount1 = L * (sqrtPriceCurrent - sqrtPriceLower);
-    }
-
-    // Adjust for decimals
-    amount0 = amount0 / Math.pow(10, token0Decimals);
-    amount1 = amount1 / Math.pow(10, token1Decimals);
-
-    return { amount0, amount1 };
-};
-
 // CL tick constants - positions using these are "full range"
 const MIN_TICK = -887272;
 const MAX_TICK = 887272;
@@ -1517,7 +1473,7 @@ export default function PortfolioPage() {
                                     {filteredAndSortedCLPositions.map((pos, i) => {
                                         const t0 = getTokenInfo(pos.token0);
                                         const t1 = getTokenInfo(pos.token1);
-                                        const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
+                                        const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
                                         const isExpanded = expandedCLPosition === pos.tokenId.toString();
 
                                         // Use historical USD values from subgraph (captured at time of event)
@@ -1535,8 +1491,14 @@ export default function PortfolioPage() {
                                         const currentPoolTick = positionTicks[pos.tokenId.toString()];
                                         const hasTickData = currentPoolTick !== undefined;
                                         const inRange = hasTickData && isPositionInRange(currentPoolTick, pos.tickLower, pos.tickUpper);
-                                        const amounts = hasTickData
-                                            ? calculateTokenAmounts(pos.liquidity, pos.tickLower, pos.tickUpper, currentPoolTick, t0.decimals, t1.decimals)
+                                        // Exact amounts from on-chain slot0 + BigInt math (computed in usePositions).
+                                        // sqrtPriceX96 === 0 means the slot0 batch hasn't resolved yet.
+                                        const hasAmounts = pos.sqrtPriceX96 > BigInt(0);
+                                        const amounts = hasAmounts
+                                            ? {
+                                                amount0: parseFloat(formatUnits(pos.amount0, t0.decimals)),
+                                                amount1: parseFloat(formatUnits(pos.amount1, t1.decimals)),
+                                            }
                                             : { amount0: 0, amount1: 0 };
                                         const priceLower = tickToPrice(pos.tickLower, t0.decimals, t1.decimals);
                                         const priceUpper = tickToPrice(pos.tickUpper, t0.decimals, t1.decimals);
@@ -1729,7 +1691,7 @@ export default function PortfolioPage() {
                                                                     <span className="text-xs text-gray-400">{t0.symbol}</span>
                                                                 </div>
                                                                 <div className="font-semibold text-sm">
-                                                                    {hasTickData ? amounts.amount0.toFixed(amounts.amount0 < 0.01 ? 6 : 4) : '...'}
+                                                                    {hasAmounts ? amounts.amount0.toFixed(amounts.amount0 < 0.01 ? 6 : 4) : '...'}
                                                                 </div>
                                                             </div>
                                                             <div className="p-2.5 rounded-xl bg-white/5">
@@ -1740,7 +1702,7 @@ export default function PortfolioPage() {
                                                                     <span className="text-xs text-gray-400">{t1.symbol}</span>
                                                                 </div>
                                                                 <div className="font-semibold text-sm">
-                                                                    {hasTickData ? amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 6 : 4) : '...'}
+                                                                    {hasAmounts ? amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 6 : 4) : '...'}
                                                                 </div>
                                                             </div>
                                                             <div className="p-2.5 rounded-xl bg-green-500/5 border border-green-500/10">
@@ -2116,8 +2078,15 @@ export default function PortfolioPage() {
                         ) : (
                             <div className="space-y-2">
                                 {filteredAndSortedStakedPositions.map((pos, i) => {
-                                    const feeMap: Record<number, string> = { 1: '0.005%', 10: '0.05%', 50: '0.02%', 80: '0.30%', 100: '0.045%', 200: '0.25%', 2000: '1%' };
-                                    const amounts = calculateTokenAmounts(pos.liquidity, pos.tickLower, pos.tickUpper, pos.currentTick, pos.token0Decimals, pos.token1Decimals);
+                                    const feeMap: Record<number, string> = { 1: '0.005%', 2: '1%', 3: '0.03%', 4: '0.05%', 5: '0.26%' };
+                                    // Exact amounts from on-chain slot0 + BigInt math (computed in PoolDataProvider).
+                                    const stakedHasAmounts = pos.sqrtPriceX96 > BigInt(0);
+                                    const amounts = stakedHasAmounts
+                                        ? {
+                                            amount0: parseFloat(formatUnits(pos.amount0, pos.token0Decimals)),
+                                            amount1: parseFloat(formatUnits(pos.amount1, pos.token1Decimals)),
+                                        }
+                                        : { amount0: 0, amount1: 0 };
                                     const inRange = pos.currentTick >= pos.tickLower && pos.currentTick < pos.tickUpper;
                                     const rewardsAmount = parseFloat(formatUnits(pos.pendingRewards, 18));
                                     const stakedPriceLower = tickToPrice(pos.tickLower, pos.token0Decimals, pos.token1Decimals);
@@ -2179,7 +2148,7 @@ export default function PortfolioPage() {
                                                             <span className="text-xs text-gray-400">{pos.token0Symbol}</span>
                                                         </div>
                                                         <div className="font-semibold text-sm">
-                                                            {amounts.amount0.toFixed(amounts.amount0 < 0.01 ? 4 : 2)}
+                                                            {stakedHasAmounts ? amounts.amount0.toFixed(amounts.amount0 < 0.01 ? 4 : 2) : '...'}
                                                         </div>
                                                     </div>
                                                     <div className="p-2.5 rounded-xl bg-white/5">
@@ -2190,7 +2159,7 @@ export default function PortfolioPage() {
                                                             <span className="text-xs text-gray-400">{pos.token1Symbol}</span>
                                                         </div>
                                                         <div className="font-semibold text-sm">
-                                                            {amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 4 : 2)}
+                                                            {stakedHasAmounts ? amounts.amount1.toFixed(amounts.amount1 < 0.01 ? 4 : 2) : '...'}
                                                         </div>
                                                     </div>
                                                     <div className="p-2.5 rounded-xl bg-yellow-500/5 border border-yellow-500/10">

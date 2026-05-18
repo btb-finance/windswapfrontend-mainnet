@@ -381,3 +381,43 @@ export function getSqrtRatioAtTick(tick: number): bigint {
 
     return sqrtPriceX96;
 }
+
+/**
+ * Compute the exact token amounts for a CL position using Q96 BigInt math.
+ * Mirrors Uniswap V3's `LiquidityAmounts.getAmountsForLiquidity`.
+ *
+ * @param sqrtPriceX96 - Current pool sqrt price (Q64.96), from slot0()
+ * @param tickLower - Position lower tick
+ * @param tickUpper - Position upper tick
+ * @param liquidity - Position liquidity (uint128)
+ * @returns amount0 / amount1 in raw token units (wei)
+ */
+export function getAmountsForLiquidityX96(
+    sqrtPriceX96: bigint,
+    tickLower: number,
+    tickUpper: number,
+    liquidity: bigint,
+): { amount0: bigint; amount1: bigint } {
+    if (liquidity === BigInt(0)) return { amount0: BigInt(0), amount1: BigInt(0) };
+
+    const sqrtA = getSqrtRatioAtTick(tickLower);
+    const sqrtB = getSqrtRatioAtTick(tickUpper);
+    const [sqrtPa, sqrtPb] = sqrtA < sqrtB ? [sqrtA, sqrtB] : [sqrtB, sqrtA];
+
+    let amount0 = BigInt(0);
+    let amount1 = BigInt(0);
+
+    if (sqrtPriceX96 <= sqrtPa) {
+        // Current price below range — position is all token0
+        amount0 = (liquidity * (sqrtPb - sqrtPa) * Q96) / (sqrtPb * sqrtPa);
+    } else if (sqrtPriceX96 >= sqrtPb) {
+        // Current price above range — position is all token1
+        amount1 = (liquidity * (sqrtPb - sqrtPa)) / Q96;
+    } else {
+        // In range
+        amount0 = (liquidity * (sqrtPb - sqrtPriceX96) * Q96) / (sqrtPb * sqrtPriceX96);
+        amount1 = (liquidity * (sqrtPriceX96 - sqrtPa)) / Q96;
+    }
+
+    return { amount0, amount1 };
+}

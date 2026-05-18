@@ -1,11 +1,12 @@
 'use client';
 
 import { useAccount, useReadContract } from 'wagmi';
-import { Address, parseUnits, encodeFunctionData, decodeFunctionResult } from 'viem';
+import { Address, parseUnits, formatUnits, encodeFunctionData, decodeFunctionResult } from 'viem';
 import { CL_CONTRACTS, V2_CONTRACTS } from '@/config/contracts';
 import { NFT_POSITION_MANAGER_ABI, ERC20_ABI, POOL_FACTORY_ABI, POOL_ABI } from '@/config/abis';
 import { useState, useEffect, useCallback } from 'react';
 import { batchRpcCall, getRpcForUserData } from '@/utils/rpc';
+import { getAmountsForLiquidityX96 } from '@/utils/liquidityMath';
 
 export interface CLPosition {
     tokenId: bigint;
@@ -23,6 +24,11 @@ export interface CLPosition {
     liquidity: bigint;
     tokensOwed0: bigint;
     tokensOwed1: bigint;
+    // Exact on-chain amounts computed from slot0() + liquidity (BigInt math).
+    // Zero until the slot0 batch resolves; UI should treat undefined sqrtPriceX96 as "loading".
+    amount0: bigint;
+    amount1: bigint;
+    sqrtPriceX96: bigint;
     amountUSD: number;
     depositedToken0: number;
     depositedToken1: number;
@@ -102,6 +108,45 @@ async function fetchRealTimeFees(
 }
 
 /**
+ * Batched fetch of slot0() for a list of CL pool addresses.
+ * Returns a Map<lowercased pool address, sqrtPriceX96>.
+ *
+ * slot0() returns (sqrtPriceX96 uint160, tick int24, ...). The first 32-byte word
+ * is sqrtPriceX96 right-padded — we can `BigInt(firstWord)` directly because
+ * the upper 96 bits are zero for any valid uint160.
+ */
+async function fetchPoolSqrtPrices(
+    poolAddrs: string[],
+    rpcUrl: string,
+): Promise<Map<string, bigint>> {
+    if (poolAddrs.length === 0) return new Map();
+
+    // slot0() selector
+    const slot0Data = '0x3850c7bd';
+    const calls = poolAddrs.map(addr => ({
+        method: 'eth_call',
+        params: [{ to: addr, data: slot0Data }, 'latest'],
+    }));
+
+    const results = await batchRpcCall(calls, rpcUrl);
+    const map = new Map<string, bigint>();
+
+    poolAddrs.forEach((addr, i) => {
+        const raw = results[i] as string | null;
+        if (!raw || raw === '0x') return;
+        try {
+            // First 32 bytes (66 chars incl. 0x) is sqrtPriceX96
+            const sqrtHex = raw.slice(0, 66);
+            map.set(addr.toLowerCase(), BigInt(sqrtHex));
+        } catch {
+            // Skip pools that fail to decode
+        }
+    });
+
+    return map;
+}
+
+/**
  * Primary hook for fetching CL positions from subgraph + real-time fees from RPC
  * @param showZeroBalance - If true, show positions with 0 liquidity and 0 fees (default: false)
  */
@@ -109,6 +154,7 @@ export function useCLPositionsFromSubgraph(showZeroBalance: boolean = true) {
     const { address } = useAccount();
     const { positions: subgraphPositions, isLoading, error, refetch } = useUserPositions(address);
     const [rpcFees, setRpcFees] = useState<Map<string, { amount0: bigint; amount1: bigint }>>(new Map());
+    const [poolSqrtPrices, setPoolSqrtPrices] = useState<Map<string, bigint>>(new Map());
     const [feesLoading, setFeesLoading] = useState(false);
 
     // Filter: exclude staked positions (they appear in the gauge/staking section, not positions list)
@@ -130,6 +176,23 @@ export function useCLPositionsFromSubgraph(showZeroBalance: boolean = true) {
                 ? rpcFee.amount1
                 : (p.tokensOwed1 ? parseUnits(p.tokensOwed1, dec1) : BigInt(0));
 
+            // Exact on-chain amounts: requires sqrtPriceX96 from pool slot0().
+            // While the slot0 batch is in flight, amounts stay at 0 (UI shows loading state).
+            const liquidity = BigInt(p.liquidity);
+            const sqrtPriceX96 = poolSqrtPrices.get(p.pool.id.toLowerCase()) ?? BigInt(0);
+            const { amount0, amount1 } = sqrtPriceX96 > BigInt(0)
+                ? getAmountsForLiquidityX96(sqrtPriceX96, p.tickLower, p.tickUpper, liquidity)
+                : { amount0: BigInt(0), amount1: BigInt(0) };
+
+            // Live USD value: live amounts × subgraph token prices.
+            // Falls back to subgraph's stored amountUSD until slot0 resolves so totals don't flash to 0.
+            const token0PriceUSD = p.pool.token0.priceUSD ? parseFloat(p.pool.token0.priceUSD) : 0;
+            const token1PriceUSD = p.pool.token1.priceUSD ? parseFloat(p.pool.token1.priceUSD) : 0;
+            const liveAmountUSD = sqrtPriceX96 > BigInt(0)
+                ? parseFloat(formatUnits(amount0, dec0)) * token0PriceUSD
+                    + parseFloat(formatUnits(amount1, dec1)) * token1PriceUSD
+                : (p.amountUSD ? parseFloat(p.amountUSD) : 0);
+
             return {
                 tokenId: BigInt(p.tokenId),
                 poolId: p.pool.id as Address,
@@ -137,16 +200,19 @@ export function useCLPositionsFromSubgraph(showZeroBalance: boolean = true) {
                 token1: p.pool.token1.id as Address,
                 token0Decimals: dec0,
                 token1Decimals: dec1,
-                token0PriceUSD: p.pool.token0.priceUSD ? parseFloat(p.pool.token0.priceUSD) : 0,
-                token1PriceUSD: p.pool.token1.priceUSD ? parseFloat(p.pool.token1.priceUSD) : 0,
+                token0PriceUSD,
+                token1PriceUSD,
                 tickSpacing: p.pool.tickSpacing,
                 tickLower: p.tickLower,
                 tickUpper: p.tickUpper,
                 currentTick: p.pool.tick ?? 0,
-                liquidity: BigInt(p.liquidity),
+                liquidity,
                 tokensOwed0,
                 tokensOwed1,
-                amountUSD: p.amountUSD ? parseFloat(p.amountUSD) : 0,
+                amount0,
+                amount1,
+                sqrtPriceX96,
+                amountUSD: liveAmountUSD,
                 depositedToken0: p.depositedToken0 ? parseFloat(p.depositedToken0) : 0,
                 depositedToken1: p.depositedToken1 ? parseFloat(p.depositedToken1) : 0,
                 withdrawnToken0: p.withdrawnToken0 ? parseFloat(p.withdrawnToken0) : 0,
@@ -174,6 +240,21 @@ export function useCLPositionsFromSubgraph(showZeroBalance: boolean = true) {
             .then(fees => setRpcFees(fees))
             .catch(err => console.warn('[useCLPositions] RPC fee fetch failed, using subgraph data:', err))
             .finally(() => setFeesLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [unstakedSubgraphPositions.length, address]);
+
+    // Fetch slot0() for unique pools so we can compute exact amount0/amount1 in BigInt.
+    // The subgraph's `tick` is only precise to a tick (~1bps); slot0 gives the exact sqrtPriceX96.
+    useEffect(() => {
+        if (unstakedSubgraphPositions.length === 0) return;
+        const uniquePools = Array.from(
+            new Set(unstakedSubgraphPositions.map(p => p.pool.id.toLowerCase())),
+        );
+        if (uniquePools.length === 0) return;
+
+        fetchPoolSqrtPrices(uniquePools, getRpcForUserData())
+            .then(prices => setPoolSqrtPrices(prices))
+            .catch(err => console.warn('[useCLPositions] slot0 fetch failed:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [unstakedSubgraphPositions.length, address]);
 

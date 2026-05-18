@@ -1,14 +1,15 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Address, encodeFunctionData, decodeFunctionResult } from 'viem';
+import { Address, encodeFunctionData, decodeFunctionResult, formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { DEFAULT_TOKEN_LIST, WETH } from '@/config/tokens';
 import { useWindPrice as useWindPriceHook } from '@/hooks/useWindPrice';
 import { useUserPositions } from '@/hooks/useSubgraph';
-import { getRpcForUserData, rpcCall } from '@/utils/rpc';
+import { getRpcForUserData, rpcCall, batchRpcCall } from '@/utils/rpc';
 import { V2_CONTRACTS, NOTABLE_POOLS, NOTABLE_GAUGES } from '@/config/contracts';
 import { SUBGRAPH_URL, SUBGRAPH_HEADERS } from '@/config/subgraph';
+import { getAmountsForLiquidityX96 } from '@/utils/liquidityMath';
 
 interface SubgraphGauge {
     id: string;
@@ -174,6 +175,11 @@ export interface StakedPosition {
     tickUpper: number;
     currentTick: number;
     liquidity: bigint;
+    // Exact on-chain amounts computed from slot0() + liquidity (BigInt math).
+    // sqrtPriceX96 is 0 until the slot0 batch resolves.
+    amount0: bigint;
+    amount1: bigint;
+    sqrtPriceX96: bigint;
     pendingRewards: bigint;
     rewardRate: bigint;
     token0PriceUSD: number;
@@ -551,6 +557,48 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
         return value.includes('.') ? toWei(value) : BigInt(value);
     };
 
+    // Batch slot0() for every unique pool referenced by the user's staked positions.
+    // Stored as a map<lowercased pool address, sqrtPriceX96> so we can compute exact
+    // on-chain amounts in BigInt math (matches Uniswap V3 LiquidityAmounts).
+    const stakedPoolAddrs = Array.from(new Set(
+        filteredSubgraphStaked
+            .map(sp => String(sp.gauge?.pool?.id || '').toLowerCase())
+            .filter(Boolean),
+    )).sort();
+    const stakedPoolsKey = stakedPoolAddrs.join('|');
+    const [stakedPoolSqrtPrices, setStakedPoolSqrtPrices] = useState<Map<string, bigint>>(new Map());
+
+    useEffect(() => {
+        if (stakedPoolAddrs.length === 0) {
+            setStakedPoolSqrtPrices(new Map());
+            return;
+        }
+        let cancelled = false;
+        const slot0Data = '0x3850c7bd';
+        const calls = stakedPoolAddrs.map(addr => ({
+            method: 'eth_call',
+            params: [{ to: addr, data: slot0Data }, 'latest'],
+        }));
+        batchRpcCall(calls, getRpcForUserData())
+            .then(results => {
+                if (cancelled) return;
+                const next = new Map<string, bigint>();
+                stakedPoolAddrs.forEach((addr, i) => {
+                    const raw = results[i] as string | null;
+                    if (!raw || raw === '0x') return;
+                    try {
+                        next.set(addr, BigInt(raw.slice(0, 66)));
+                    } catch {
+                        // skip
+                    }
+                });
+                setStakedPoolSqrtPrices(next);
+            })
+            .catch(err => console.warn('[PoolDataProvider] slot0 batch failed:', err));
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stakedPoolsKey]);
+
     // Transform subgraph veNFT data to provider format
     const veNFTs: VeNFT[] = subgraphVeNFTs.map(nft => ({
         tokenId: BigInt(nft.tokenId),
@@ -578,6 +626,25 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
         const earnedKey = `${gaugeId}-${tokenId.toString()}`;
         const earnedFromRpc = rpcEarnedMap.get(earnedKey) ?? BigInt(0);
 
+        const liquidity = toBigIntSafe(sp.position?.liquidity || sp.amount || '0');
+        const tickLower = sp.tickLower ?? sp.position?.tickLower ?? 0;
+        const tickUpper = sp.tickUpper ?? sp.position?.tickUpper ?? 0;
+        const sqrtPriceX96 = stakedPoolSqrtPrices.get(String(pool?.id || '').toLowerCase()) ?? BigInt(0);
+        const { amount0, amount1 } = sqrtPriceX96 > BigInt(0)
+            ? getAmountsForLiquidityX96(sqrtPriceX96, tickLower, tickUpper, liquidity)
+            : { amount0: BigInt(0), amount1: BigInt(0) };
+
+        const dec0 = pool?.token0?.decimals || known0?.decimals || 18;
+        const dec1 = pool?.token1?.decimals || known1?.decimals || 18;
+        const token0PriceUSD = pool?.token0?.priceUSD ? parseFloat(pool.token0.priceUSD) : 0;
+        const token1PriceUSD = pool?.token1?.priceUSD ? parseFloat(pool.token1.priceUSD) : 0;
+        // Live USD value from live amounts × token prices; fall back to subgraph snapshot
+        // until slot0 resolves so totals don't flash to 0.
+        const liveAmountUSD = sqrtPriceX96 > BigInt(0)
+            ? parseFloat(formatUnits(amount0, dec0)) * token0PriceUSD
+                + parseFloat(formatUnits(amount1, dec1)) * token1PriceUSD
+            : (sp.position?.amountUSD ? parseFloat(sp.position.amountUSD) : 0);
+
         return {
             tokenId,
             gaugeAddress: gauge?.id as Address || '' as Address,
@@ -586,18 +653,21 @@ export function PoolDataProvider({ children }: { children: ReactNode }) {
             token1: pool?.token1?.id as Address || '' as Address,
             token0Symbol: known0?.symbol || pool?.token0?.symbol || 'UNK',
             token1Symbol: known1?.symbol || pool?.token1?.symbol || 'UNK',
-            token0Decimals: pool?.token0?.decimals || known0?.decimals || 18,
-            token1Decimals: pool?.token1?.decimals || known1?.decimals || 18,
+            token0Decimals: dec0,
+            token1Decimals: dec1,
             tickSpacing: pool?.tickSpacing || 0,
-            tickLower: sp.tickLower ?? sp.position?.tickLower ?? 0,
-            tickUpper: sp.tickUpper ?? sp.position?.tickUpper ?? 0,
+            tickLower,
+            tickUpper,
             currentTick: pool?.tick || 0,
-            liquidity: toBigIntSafe(sp.position?.liquidity || sp.amount || '0'),
+            liquidity,
+            amount0,
+            amount1,
+            sqrtPriceX96,
             pendingRewards: earnedFromRpc,
             rewardRate: BigInt(0),
-            token0PriceUSD: pool?.token0?.priceUSD ? parseFloat(pool.token0.priceUSD) : 0,
-            token1PriceUSD: pool?.token1?.priceUSD ? parseFloat(pool.token1.priceUSD) : 0,
-            amountUSD: sp.position?.amountUSD ? parseFloat(sp.position.amountUSD) : 0,
+            token0PriceUSD,
+            token1PriceUSD,
+            amountUSD: liveAmountUSD,
             depositedUSD: sp.position?.depositedUSD ? parseFloat(sp.position.depositedUSD) : 0,
             withdrawnUSD: sp.position?.withdrawnUSD ? parseFloat(sp.position.withdrawnUSD) : 0,
             collectedUSD: sp.position?.collectedUSD ? parseFloat(sp.position.collectedUSD) : 0,
