@@ -5,7 +5,7 @@ import { useReadContract, useAccount, useWaitForTransactionReceipt } from 'wagmi
 import { parseEther, formatEther, formatUnits } from 'viem';
 import { BTB_CONTRACTS } from '@/config/contracts';
 import { ERC20_ABI, BTBB_TOKEN_ABI, BEAR_NFT_ABI, BEAR_STAKING_ABI } from '@/config/abis';
-import { ethereum } from '@/config/chains';
+import { ethereum, ETHEREUM_RPCS } from '@/config/chains';
 import { useWriteContract } from '@/hooks/useWriteContract';
 
 // ============================================
@@ -155,15 +155,26 @@ export function useUserNFTTokenIds(address: `0x${string}` | undefined) {
                     id: i + 1,
                 }));
 
-                const response = await fetch('https://eth.llamarpc.com', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(rpcCalls),
-                });
-
-                const results = await response.json();
-                const ids = (Array.isArray(results) ? results : [results])
-                    .filter(r => r.result && r.result !== '0x')
+                // Try each ETH RPC in turn until one returns a usable response
+                type RpcResult = { result?: string };
+                let results: RpcResult | RpcResult[] | null = null;
+                for (const rpc of ETHEREUM_RPCS) {
+                    try {
+                        const response = await fetch(rpc, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(rpcCalls),
+                        });
+                        if (!response.ok) continue;
+                        results = await response.json();
+                        if (results) break;
+                    } catch {
+                        continue;
+                    }
+                }
+                const resultArray = results == null ? [] : Array.isArray(results) ? results : [results];
+                const ids = resultArray
+                    .filter((r): r is { result: string } => !!r.result && r.result !== '0x')
                     .map(r => BigInt(r.result))
                     .sort((a, b) => Number(a - b));
 

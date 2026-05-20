@@ -41,7 +41,7 @@ export function BearNFTMint() {
     // Calculate total price
     const totalPrice = pricePerNFT ? pricePerNFT * BigInt(quantity) : BigInt(0);
     const hasEnoughETH = ethBalance && ethBalance.value >= totalPrice;
-    const maxBuy = remainingSupply ? Math.min(Number(remainingSupply), 10) : 10;
+    const maxBuy = remainingSupply ? Math.min(Number(remainingSupply), 200) : 200;
 
     // Refetch on success
     useEffect(() => {
@@ -126,7 +126,18 @@ export function BearNFTMint() {
                         >
                             −
                         </button>
-                        <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={quantity}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                                const digits = e.target.value.replace(/[^0-9]/g, '');
+                                if (digits === '') { setQuantity(1); return; }
+                                setQuantity(Math.min(maxBuy, Math.max(1, parseInt(digits, 10))));
+                            }}
+                            className="text-2xl font-bold w-16 text-center bg-transparent outline-none focus:bg-white/5 rounded-lg"
+                        />
                         <button
                             onClick={() => setQuantity(q => Math.min(maxBuy, q + 1))}
                             disabled={quantity >= maxBuy}

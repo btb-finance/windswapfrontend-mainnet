@@ -27,7 +27,7 @@ import {
     uniswapWallet,
     zerionWallet,
 } from '@rainbow-me/rainbowkit/wallets';
-import { sei, ethereum } from '@/config/chains';
+import { sei, ethereum, ETHEREUM_RPCS } from '@/config/chains';
 import { PoolDataProvider } from '@/providers/PoolDataProvider';
 import { UserBalanceProvider } from '@/providers/UserBalanceProvider';
 import { SafeAutoConnect } from '@/components/SafeAutoConnect';
@@ -48,10 +48,7 @@ const config = getDefaultConfig({
             http('https://base.meowrpc.com'),
             http('https://rpc.ankr.com/base'),
         ]),
-        [ethereum.id]: fallback([
-            http('https://eth.llamarpc.com'),
-            http('https://rpc.ankr.com/eth'),
-        ]),
+        [ethereum.id]: fallback(ETHEREUM_RPCS.map((url) => http(url))),
     },
     ssr: false,
     dataSuffix: DATA_SUFFIX,

@@ -32,13 +32,25 @@ export const sei = defineChain({ // exported as "sei" for legacy code compatibil
 
 export const base = sei;
 
+// Working Ethereum mainnet RPC endpoints (llamarpc was down). First is primary,
+// the rest are fallbacks. Shared across wagmi transports and raw fetch calls.
+export const ETHEREUM_RPCS = [
+    'https://eth.rpc.blxrbdn.com',
+    'https://api.zan.top/eth-mainnet',
+    'https://rpc.eth.gateway.fm',
+    'https://eth1.lava.build',
+    'https://mainnet.gateway.tenderly.co',
+    'https://ethereum-mainnet.gateway.tatum.io',
+    'https://eth.api.pocket.network',
+];
+
 export const ethereum = defineChain({
     id: 1,
     name: 'Ethereum',
     nativeCurrency: { decimals: 18, name: 'Ether', symbol: 'ETH' },
     rpcUrls: {
         default: {
-            http: ['https://eth.llamarpc.com', 'https://rpc.ankr.com/eth'],
+            http: ETHEREUM_RPCS,
         },
     },
     blockExplorers: {
