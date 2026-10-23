@@ -5,7 +5,13 @@
 
 export const V4_NETWORK = 'testnet' as const;
 export const V4_CONTRACT_ID = 'windswapv4-btb.testnet';
-export const V4_RPC_URL = 'https://rpc.testnet.near.org';
+/**
+ * NEAR RPC endpoints, tried in order (comma-separated). The public rpc.testnet.near.org rate-limits
+ * (HTTP 429, shown as "Failed to fetch"), so FastNEAR comes first. Override with NEXT_PUBLIC_V4_RPC_URLS.
+ */
+export const V4_RPC_URL =
+  process.env.NEXT_PUBLIC_V4_RPC_URLS ||
+  'https://rpc.testnet.fastnear.com,https://test.rpc.fastnear.com,https://rpc.testnet.near.org';
 export const V4_EXPLORER_URL = 'https://testnet.nearblocks.io';
 
 /** Pool ids probed on load. The contract has no pool count view. Pools that do not exist are skipped. */

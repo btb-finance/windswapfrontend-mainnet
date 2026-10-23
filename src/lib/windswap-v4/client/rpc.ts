@@ -42,13 +42,30 @@ export async function callView<T>(
     },
   };
 
-  const response = await fetchImpl(rpcUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new WindSwapError(`RPC HTTP ${response.status} ${response.statusText}`);
+  // `rpcUrl` may list several endpoints separated by commas: each is tried in order on a network
+  // error, a rate limit (429) or a server error, so one overloaded provider does not break the app.
+  const urls = rpcUrl.split(",").map((u) => u.trim()).filter(Boolean);
+  let response: Response | undefined;
+  let lastError = "no RPC endpoint configured";
+  for (const url of urls) {
+    try {
+      const r = await fetchImpl(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (r.ok) {
+        response = r;
+        break;
+      }
+      lastError = `RPC HTTP ${r.status} ${r.statusText} from ${url}`;
+      if (r.status !== 429 && r.status < 500) break;
+    } catch (e) {
+      lastError = `RPC unreachable (${url}): ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+  if (!response) {
+    throw new WindSwapError(lastError);
   }
 
   const json = (await response.json()) as {

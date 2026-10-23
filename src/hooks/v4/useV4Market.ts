@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { sqrtPriceX96ToPrice, type PoolView } from '@/lib/windswap-v4';
-import { V4_EVM_TOKENS, V4_POOL_PROBE_MAX, V4_TOKENS, getV4Token, type V4Token } from '@/lib/v4/config';
+import { V4_EVM_TOKENS, V4_TOKENS, getV4Token, type V4Token } from '@/lib/v4/config';
 import { v4Client } from '@/lib/v4/client';
 import { readableNearError } from '@/lib/v4/near';
 
@@ -35,8 +35,20 @@ export interface V4Market {
 
 /**
  * Loads the whitelisted tokens and every pool whose tokens are both whitelisted.
- * The contract has no pool-count view, so pool ids 0..V4_POOL_PROBE_MAX-1 are probed.
+ * Pools come from one `get_pools` call (saved per-pool summaries, contract v9).
  */
+
+/** Row of the contract's `get_pools` view. */
+interface PoolSummary {
+  pool_id: number;
+  token0: string;
+  token1: string;
+  tick_spacing: number;
+  fee: number;
+  sqrt_price_x96: string;
+  tick: number;
+  liquidity: string;
+}
 export function useV4Market(accountId: string | null, pollMs = 20_000): V4Market {
   const [tokens, setTokens] = useState<V4Token[]>([]);
   const [allTokens, setAllTokens] = useState<V4Token[]>([]);
@@ -56,38 +68,36 @@ export function useV4Market(accountId: string | null, pollMs = 20_000): V4Market
         // Base Sepolia assets are always known: they are not NEAR tokens, so `get_tokens` does not list them.
         const nearTokens = V4_TOKENS.filter((t) => whitelisted.includes(t.accountId));
         const known = [...nearTokens, ...V4_EVM_TOKENS];
-        const ids = Array.from({ length: V4_POOL_PROBE_MAX }, (_, i) => i);
-        const results = await Promise.allSettled(ids.map((id) => v4Client.getPool(id)));
-        const feeAccount = accountId ?? v4Client.contractId;
-
-        const views = results.flatMap((r, id) => (r.status === 'fulfilled' ? [{ id, view: r.value }] : []));
-        const usable = views.filter(
-          ({ view }: { view: PoolView }) =>
-            view.initialized &&
-            view.slot0.sqrt_price_x96 !== '0' &&
-            known.some((t) => t.accountId === view.token0) &&
-            known.some((t) => t.accountId === view.token1),
+        // One view call returns every pool's saved summary (contract v9 `get_pools`), instead of
+        // probing pool ids one by one.
+        const summaries: PoolSummary[] = [];
+        for (let from = 0; ; from += 100) {
+          const page = await v4Client.view<PoolSummary[]>('get_pools', { from_index: from, limit: 100 });
+          summaries.push(...page);
+          if (page.length < 100) break;
+        }
+        const usable = summaries.filter(
+          (p) =>
+            p.sqrt_price_x96 !== '0' &&
+            known.some((t) => t.accountId === p.token0) &&
+            known.some((t) => t.accountId === p.token1),
         );
-
-        const built = await Promise.all(
-          usable.map(async ({ id, view }) => {
-            const token0 = getV4Token(view.token0)!;
-            const token1 = getV4Token(view.token1)!;
-            const sqrtPriceX96 = BigInt(view.slot0.sqrt_price_x96);
-            const fee = await v4Client.getFee(id, feeAccount).catch(() => 0);
-            return {
-              poolId: id,
-              token0,
-              token1,
-              tickSpacing: view.tick_spacing,
-              tick: view.slot0.tick,
-              sqrtPriceX96,
-              price: sqrtPriceX96ToPrice(sqrtPriceX96, token0.decimals, token1.decimals),
-              liquidity: BigInt(view.liquidity),
-              fee,
-            } satisfies V4Pool;
-          }),
-        );
+        const built = usable.map((p) => {
+          const token0 = getV4Token(p.token0)!;
+          const token1 = getV4Token(p.token1)!;
+          const sqrtPriceX96 = BigInt(p.sqrt_price_x96);
+          return {
+            poolId: p.pool_id,
+            token0,
+            token1,
+            tickSpacing: p.tick_spacing,
+            tick: p.tick,
+            sqrtPriceX96,
+            price: sqrtPriceX96ToPrice(sqrtPriceX96, token0.decimals, token1.decimals),
+            liquidity: BigInt(p.liquidity),
+            fee: p.fee,
+          } satisfies V4Pool;
+        });
 
         if (cancelled) return;
         setTokens(nearTokens);

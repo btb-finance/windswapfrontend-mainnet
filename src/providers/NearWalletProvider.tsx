@@ -27,7 +27,14 @@ let sessionPromise: Promise<Session> | null = null;
 function getSession(): Promise<Session> {
   if (!sessionPromise) {
     sessionPromise = setupWalletSelector({
-      network: V4_NETWORK,
+      // Explicit network so wallet RPC traffic avoids the rate-limited public endpoint.
+      network: {
+        networkId: V4_NETWORK,
+        nodeUrl: 'https://rpc.testnet.fastnear.com',
+        helperUrl: 'https://helper.testnet.near.org',
+        explorerUrl: 'https://testnet.nearblocks.io',
+        indexerUrl: 'https://testnet-api.kitwallet.app',
+      },
       modules: [setupMyNearWallet(), setupMeteorWallet(), setupHereWallet()],
     }).then((selector) => ({
       selector,
