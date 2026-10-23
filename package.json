@@ -8,7 +8,8 @@
     "analyze": "next experimental-analyze",
     "start": "bun --bun next start",
     "lint": "eslint",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "check:v4-signed": "node scripts/check-v4-signed.mts"
   },
   "dependencies": {
     "@base-org/account": "^2.5.3",

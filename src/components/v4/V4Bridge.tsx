@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { erc20Abi } from 'viem';
 import { useAccount, useBalance, useReadContract, useSendTransaction, useSwitchChain } from 'wagmi';
 import { V4WalletGate } from '@/components/v4/V4WalletGate';
@@ -18,12 +18,12 @@ import {
   V4_TEST1_ADDRESS,
   V4_VAULT_ADDRESS,
 } from '@/lib/v4/config';
-import { balanceViews, type WithdrawalView } from '@/lib/v4/ve/views';
+import { ownerViews } from '@/lib/v4/owner-views';
+import type { WithdrawalView } from '@/lib/v4/ve/views';
 import { formatTokenAmount, parseTokenAmount, shortHex } from '@/lib/v4/format';
 
 const DECIMALS = 18;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
-const WITHDRAWALS_KEY = 'windswap.v4.withdrawals';
 
 type Asset = 'ETH' | 'test1';
 const ASSET_ID: Record<Asset, string> = { ETH: V4_ASSET_ETH, test1: V4_ASSET_TEST1 };
@@ -59,15 +59,12 @@ function V4BridgeInner() {
   const { writeContractAsync } = useWriteContract();
   const wrongChain = chainId !== V4_EVM_CHAIN_ID;
 
-  // DEX balances of this EVM owner (credited by the relayer after each deposit).
+  // DEX balances of this EVM owner (credited by the relayer after each deposit), from the owner's balance list.
   const dex = useV4Query<Balances>(
     owner ? `bridge-bal:${owner}` : null,
     async () => {
-      const [eth, test1] = await Promise.all([
-        balanceViews.balanceOfOwner(owner!, V4_ASSET_ETH),
-        balanceViews.balanceOfOwner(owner!, V4_ASSET_TEST1),
-      ]);
-      return { eth: BigInt(eth), test1: BigInt(test1) };
+      const held = new Map(await ownerViews.balancesOfOwner(owner!));
+      return { eth: BigInt(held.get(V4_ASSET_ETH) ?? '0'), test1: BigInt(held.get(V4_ASSET_TEST1) ?? '0') };
     },
     10_000,
   );
@@ -134,6 +131,9 @@ function V4BridgeInner() {
   else if (wAmount !== null && wAvailable !== undefined && wAmount > wAvailable) wError = `More than your DEX balance of ${wAsset}.`;
   else if (toAddress && !toValid) wError = 'Enter a 0x address with 40 hex digits.';
 
+  // Every withdrawal of this owner, from the contract (get_withdrawals_of_owner). Polled while open.
+  const withdrawals = useV4Query(owner ? `wd:${owner}` : null, () => ownerViews.withdrawalsOfOwner(owner!), 15_000);
+
   async function onWithdraw() {
     if (wAmount === null || !toValid) return;
     const outcome = await runSigned(
@@ -148,46 +148,10 @@ function V4BridgeInner() {
       `Withdrawal of ${wInput} ${wAsset} signed`,
     );
     if (!outcome) return;
-    if (outcome.kind === 'relayed') {
-      const id = withdrawalIdOf(outcome.result.result);
-      if (id !== null) trackWithdrawal(id);
-    }
     setWInput('');
     dex.refresh();
+    withdrawals.refresh();
   }
-
-  // Withdrawal status: ids are remembered in this browser, plus any id added by hand.
-  const [trackedIds, setTrackedIds] = useState<number[]>([]);
-  const [trackInput, setTrackInput] = useState('');
-  useEffect(() => {
-    if (!owner) return;
-    try {
-      const raw = localStorage.getItem(`${WITHDRAWALS_KEY}.${owner}`);
-      setTrackedIds(raw ? (JSON.parse(raw) as number[]) : []);
-    } catch {
-      setTrackedIds([]);
-    }
-  }, [owner]);
-
-  function saveIds(next: number[]) {
-    setTrackedIds(next);
-    if (!owner) return;
-    try {
-      localStorage.setItem(`${WITHDRAWALS_KEY}.${owner}`, JSON.stringify(next));
-    } catch {
-      // Storage blocked: the list lasts for this page load.
-    }
-  }
-
-  function trackWithdrawal(id: number) {
-    if (!trackedIds.includes(id)) saveIds([...trackedIds, id]);
-  }
-
-  const withdrawals = useV4Query(
-    trackedIds.length && owner ? `wd:${owner}:${trackedIds.join(',')}` : null,
-    () => Promise.all(trackedIds.map((id) => balanceViews.getWithdrawal(id))),
-    15_000,
-  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-4">
@@ -289,25 +253,12 @@ function V4BridgeInner() {
       <div className="swap-card space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Withdrawals</h2>
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const id = Number(trackInput);
-              if (Number.isInteger(id) && id >= 0) {
-                trackWithdrawal(id);
-                setTrackInput('');
-              }
-            }}
-          >
-            <input className="input-field !text-xs !py-1.5 w-28" inputMode="numeric" placeholder="Withdrawal id" value={trackInput} onChange={(e) => setTrackInput(e.target.value)} aria-label="Withdrawal id to track" />
-            <button type="submit" className="btn-secondary px-3 py-1.5 text-xs">Track</button>
-          </form>
+          {withdrawals.loading && <span className="text-[11px] text-gray-500">refreshing...</span>}
         </div>
-        {trackedIds.length === 0 && <p className="text-sm text-gray-500">No withdrawals tracked. Sign one above, or add an id from the relayer.</p>}
         {withdrawals.error && <V4Banner tone="error">{withdrawals.error}</V4Banner>}
-        {(withdrawals.data ?? []).map((w, i) => (
-          <WithdrawalRow key={trackedIds[i]} id={trackedIds[i]} view={w} />
+        {withdrawals.data && withdrawals.data.length === 0 && <p className="text-sm text-gray-500">No withdrawals yet. Sign one above.</p>}
+        {(withdrawals.data ?? []).map((w) => (
+          <WithdrawalRow key={w.id} view={w} />
         ))}
         <p className="text-[11px] text-gray-500">
           Status: Pending (waiting for the relayer), Signed (MPC signature ready), Broadcast (transaction sent on Base Sepolia), Failed.
@@ -317,18 +268,8 @@ function V4BridgeInner() {
   );
 }
 
-function withdrawalIdOf(result: unknown): number | null {
-  if (result && typeof result === 'object' && 'WithdrawEvm' in result) {
-    const id = (result as { WithdrawEvm: unknown }).WithdrawEvm;
-    if (typeof id === 'number') return id;
-  }
-  return null;
-}
-
-function WithdrawalRow({ id, view }: { id: number; view: WithdrawalView | null }) {
-  if (!view) {
-    return <div className="text-xs text-gray-400 rounded-lg bg-white/5 px-3 py-2">#{id}: not found</div>;
-  }
+function WithdrawalRow({ view }: { view: WithdrawalView }) {
+  const id = view.id;
   const tone =
     view.status === 'Broadcast' ? 'text-emerald-300' : view.status === 'Failed' ? 'text-red-300' : view.status === 'Signed' ? 'text-sky-300' : 'text-amber-300';
   const hash = view.tx_hash ? (view.tx_hash.startsWith('0x') ? view.tx_hash : `0x${view.tx_hash}`) : null;

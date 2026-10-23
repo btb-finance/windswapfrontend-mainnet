@@ -33,6 +33,7 @@ function V4LockInner() {
 
   const [amountInput, setAmountInput] = useState('');
   const [weeks, setWeeks] = useState(52);
+  const [permanent, setPermanent] = useState(false);
 
   const windBal = wind.data ? BigInt(wind.data) : 0n;
   const amount = parseTokenAmount(amountInput, WIND_DECIMALS);
@@ -46,7 +47,8 @@ function V4LockInner() {
 
   async function onCreate() {
     if (amount === null) return;
-    const outcome = await run(veCalls.createLock(amount, durationSec), 'Lock created');
+    // One step: a permanent lock is created with `permanent` set, not created and then locked.
+    const outcome = await run(veCalls.createLock(amount, durationSec, permanent), permanent ? 'Permanent lock created' : 'Lock created');
     if (outcome) {
       setAmountInput('');
       locks.refresh();
@@ -102,9 +104,22 @@ function V4LockInner() {
         </div>
 
         <div className="rounded-lg bg-white/5 px-3 py-3 text-sm space-y-1">
-          <div className="flex justify-between"><span className="text-gray-400">Unlocks</span><span>{formatUnixDate(unlock)}</span></div>
+          <div className="flex justify-between"><span className="text-gray-400">Unlocks</span><span>{permanent ? 'Never (permanent)' : formatUnixDate(unlock)}</span></div>
           <div className="flex justify-between"><span className="text-gray-400">Voting power (estimate)</span><span className="font-mono">{powerEstimate !== null ? formatTokenAmount(powerEstimate, WIND_DECIMALS) : '--'}</span></div>
         </div>
+
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={permanent}
+            onChange={(e) => setPermanent(e.target.checked)}
+            className="mt-1 accent-amber-400"
+          />
+          <span>
+            Permanent lock
+            <span className="block text-[11px] text-gray-500">Does not unlock. You can unlock it later with Unlock permanent below.</span>
+          </span>
+        </label>
 
         {createError && <V4Banner tone="error">{createError}</V4Banner>}
 
@@ -113,7 +128,7 @@ function V4LockInner() {
           disabled={pending || amount === null || createError !== null}
           className="w-full btn-primary py-3 disabled:opacity-50"
         >
-          {pending ? 'Confirm in wallet...' : 'Create lock'}
+          {pending ? 'Confirm in wallet...' : permanent ? 'Create permanent lock' : 'Create lock'}
         </button>
 
         <V4Banner tone="info">

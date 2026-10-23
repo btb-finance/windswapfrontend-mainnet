@@ -1,7 +1,8 @@
 /** Loaders that combine several views into the rows the v4 ve pages show. */
 
-import { V4_POOL_PROBE_MAX, internalTokenSymbol } from '@/lib/v4/config';
+import { internalTokenSymbol } from '@/lib/v4/config';
 import { v4Client } from '@/lib/v4/client';
+import { ownerViews } from '@/lib/v4/owner-views';
 import { veViews, type GaugeView, type LockView } from './views';
 
 export interface VeRow {
@@ -35,23 +36,25 @@ export interface GaugeRow {
   token1: string;
 }
 
-/** Gauges of the probed pools (`V4_POOL_PROBE_MAX`). The contract has no gauge list view. */
+/** Every gauge (`get_gauges`), with its pool's pair. Pools whose details fail to load are skipped. */
 export async function loadGauges(): Promise<GaugeRow[]> {
-  const ids = Array.from({ length: V4_POOL_PROBE_MAX }, (_, i) => i + 1);
-  const found = await Promise.all(
-    ids.map(async (poolId) => {
-      const gauge = await veViews.getGauge(poolId);
-      if (!gauge) return null;
-      const pool = await v4Client.getPool(poolId);
-      return {
-        poolId,
-        gauge,
-        token0: pool.token0,
-        token1: pool.token1,
-        pair: `${internalTokenSymbol(pool.token0)} / ${internalTokenSymbol(pool.token1)}`,
-      } satisfies GaugeRow;
+  const gauges = await ownerViews.getGauges();
+  const rows = await Promise.all(
+    gauges.map(async (gauge) => {
+      try {
+        const pool = await v4Client.getPool(gauge.pool_id);
+        return {
+          poolId: gauge.pool_id,
+          gauge,
+          token0: pool.token0,
+          token1: pool.token1,
+          pair: `${internalTokenSymbol(pool.token0)} / ${internalTokenSymbol(pool.token1)}`,
+        } satisfies GaugeRow;
+      } catch {
+        return null;
+      }
     }),
   );
-  return found.filter((g): g is GaugeRow => g !== null);
+  return rows.filter((g): g is GaugeRow => g !== null);
 }
 

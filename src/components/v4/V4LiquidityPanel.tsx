@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { formatUnits } from 'viem';
 import { v4Client } from '@/lib/v4/client';
 import { readableNearError } from '@/lib/v4/near';
+import { ownerViews, type OwnerPositionDetail } from '@/lib/v4/owner-views';
 import { formatFeeBps, formatPrice, formatTokenAmount, parseTokenAmount } from '@/lib/v4/format';
 import {
   amountsForLiquidity,
@@ -23,7 +24,6 @@ import { useV4Balances } from '@/hooks/v4/useV4Balances';
 import { useV4Send } from '@/hooks/v4/useV4Send';
 import { V4TokenField } from '@/components/v4/V4TokenField';
 import { V4Banner } from '@/components/v4/V4Banner';
-import type { PositionView } from '@/lib/windswap-v4';
 
 /** Form state for one pool. Reset when the selected pool changes. */
 interface Draft {
@@ -53,7 +53,7 @@ function formatPlain(value: number): string {
 }
 
 export function V4LiquidityPanel() {
-  const { accountId, connect } = useNearWallet();
+  const { accountId } = useNearWallet();
   const market = useV4Market(accountId);
   const searchParams = useSearchParams();
   const requestedParam = searchParams.get('pool');
@@ -66,9 +66,10 @@ export function V4LiquidityPanel() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const d: Draft = pool && draft.poolId === pool.poolId ? draft : EMPTY_DRAFT;
 
-  const { nearOwner } = useV4Actor();
-  const balances = useV4Balances(nearOwner, accountId, market.tokens);
-  const { send, pending } = useV4Send({ nearOnly: true });
+  // Works for NEAR and EVM wallets: positions, balances and actions are keyed by owner.
+  const { owner, mode, connected, connect } = useV4Actor();
+  const balances = useV4Balances(owner, mode === 'near' ? accountId : null, market.tokens);
+  const { send, pending } = useV4Send();
 
   const patch = (p: Partial<Draft>) => {
     if (!pool) return;
@@ -114,19 +115,19 @@ export function V4LiquidityPanel() {
   const enoughDex = !!needed && dex0 >= needed.amount0 && dex1 >= needed.amount1;
 
   // Position for the chosen range.
-  const [position, setPosition] = useState<PositionView | null>(null);
+  const [position, setPosition] = useState<OwnerPositionDetail | null>(null);
   const [positionError, setPositionError] = useState<string | null>(null);
   const [burnInput, setBurnInput] = useState('');
   const [positionTick, setPositionTick] = useState(0);
 
   useEffect(() => {
-    if (!pool || !ticks || !accountId) {
+    if (!pool || !ticks || !owner) {
       setPosition(null);
       return;
     }
     let cancelled = false;
-    v4Client
-      .getPosition(pool.poolId, accountId, ticks.tickLower, ticks.tickUpper)
+    ownerViews
+      .getPositionOfOwner(owner, pool.poolId, ticks.tickLower, ticks.tickUpper)
       .then((p) => {
         if (!cancelled) {
           setPosition(p);
@@ -142,7 +143,7 @@ export function V4LiquidityPanel() {
     return () => {
       cancelled = true;
     };
-  }, [pool, ticks, accountId, positionTick]);
+  }, [pool, ticks, owner, positionTick]);
 
   const positionLiquidity = position ? BigInt(position.liquidity) : 0n;
   const burnAmount = parseBigInt(burnInput);
@@ -199,7 +200,7 @@ export function V4LiquidityPanel() {
 
   const inRange = ticks ? isInRange(pool, ticks) : false;
   let action: { label: string; onClick?: () => void; disabled: boolean };
-  if (!accountId) action = { label: 'Connect NEAR wallet', onClick: connect, disabled: false };
+  if (!connected) action = { label: mode === 'near' ? 'Connect NEAR wallet' : 'Connect EVM wallet', onClick: connect, disabled: false };
   else if (rangeError) action = { label: 'Fix price range', disabled: true };
   else if (liquidity === 0n) action = { label: 'Enter an amount', disabled: true };
   else if (!enoughDex) action = { label: 'Insufficient DEX balance', disabled: true };
@@ -274,19 +275,19 @@ export function V4LiquidityPanel() {
             token={pool.token0}
             value={shown0}
             onChange={(v) => patch({ amount0: v, last: 0 })}
-            balance={accountId ? formatTokenAmount(dex0, pool.token0.decimals) : '--'}
-            hint={accountId ? 'Amounts come from your DEX balance' : undefined}
+            balance={connected ? formatTokenAmount(dex0, pool.token0.decimals) : '--'}
+            hint={connected ? 'Amounts come from your DEX balance' : undefined}
           />
           <V4TokenField
             label="Amount"
             token={pool.token1}
             value={shown1}
             onChange={(v) => patch({ amount1: v, last: 1 })}
-            balance={accountId ? formatTokenAmount(dex1, pool.token1.decimals) : '--'}
+            balance={connected ? formatTokenAmount(dex1, pool.token1.decimals) : '--'}
           />
         </div>
 
-        {needed && liquidity > 0n && !enoughDex && accountId && (
+        {needed && liquidity > 0n && !enoughDex && connected && (
           <V4Banner tone="warning">
             This position needs more DEX balance than you have. <Link href="/v4/portfolio" className="underline font-medium">Deposit in Portfolio</Link>.
           </V4Banner>
@@ -309,8 +310,8 @@ export function V4LiquidityPanel() {
           {ticks ? `Ticks ${ticks.tickLower} to ${ticks.tickUpper}` : 'Select a price range to see your position.'}
         </p>
 
-        {!accountId ? (
-          <p className="text-sm text-gray-400">Connect a NEAR wallet to see your position.</p>
+        {!connected ? (
+          <p className="text-sm text-gray-400">Connect a wallet to see your position.</p>
         ) : positionError ? (
           <V4Banner tone="error">{positionError}</V4Banner>
         ) : (
@@ -320,7 +321,7 @@ export function V4LiquidityPanel() {
           </dl>
         )}
 
-        {accountId && positionLiquidity > 0n && (
+        {connected && positionLiquidity > 0n && (
           <div className="mt-4 space-y-2">
             <label className="text-sm text-gray-400 block">Remove liquidity (raw units)</label>
             <div className="flex gap-2">
@@ -344,7 +345,7 @@ export function V4LiquidityPanel() {
           </div>
         )}
 
-        {accountId && position && (BigInt(position.tokens_owed0) > 0n || BigInt(position.tokens_owed1) > 0n) && (
+        {connected && position && (BigInt(position.tokens_owed0) > 0n || BigInt(position.tokens_owed1) > 0n) && (
           <button onClick={() => void onCollect()} disabled={pending} className="w-full btn-primary py-3 text-sm mt-3 disabled:opacity-50">
             Collect to DEX balance
           </button>

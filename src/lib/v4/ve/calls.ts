@@ -26,7 +26,12 @@ export function roundToWeek(nowSec: number, durationSec: number): number {
 }
 
 export const veCalls = {
-  createLock: (amount: bigint, duration: number) => call('create_lock', { amount: amount.toString(), duration }),
+  /**
+   * `permanent` makes the lock permanent in the same step (contract v7). NEAR sends it as an
+   * argument. EVM mode writes it into the signed CreateLock only when true.
+   */
+  createLock: (amount: bigint, duration: number, permanent = false) =>
+    call('create_lock', { amount: amount.toString(), duration, permanent }),
   increaseAmount: (tokenId: number, amount: bigint) => call('increase_amount', { token_id: tokenId, amount: amount.toString() }),
   increaseUnlockTime: (tokenId: number, duration: number) => call('increase_unlock_time', { token_id: tokenId, duration }),
   withdrawLock: (tokenId: number) => call('withdraw_lock', { token_id: tokenId }),
@@ -52,6 +57,6 @@ export const veCalls = {
   /** `poolId` is a pool id. The bribe goes to that pool's gauge. */
   bribe: (poolId: number, token: string, amount: bigint) => call('bribe', { pool_id: poolId, token, amount: amount.toString() }),
   claimRebase: (tokenId: number) => call('claim_rebase', { token_id: tokenId }),
-  /** Permissionless epoch flip. NEAR only: it is not a SignedAction. */
+  /** Permissionless epoch flip. Also a SignedAction (`"Distribute"`), so EVM wallets can run it. */
   distribute: () => call('distribute', {}, GAS_DISTRIBUTE),
 };

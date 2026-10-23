@@ -10,7 +10,11 @@
 
 import type { FunctionCallAction } from '@/lib/windswap-v4';
 
-export type SignedAction = { [variant: string]: Record<string, unknown> };
+/**
+ * Externally tagged, like serde. Struct variants are `{ "Variant": { ...fields } }`. `Distribute` is a
+ * unit variant, so its JSON is the bare string `"Distribute"`.
+ */
+export type SignedAction = { [variant: string]: Record<string, unknown> } | 'Distribute';
 
 export interface SignedPayload {
   /** `evm:0x…` (lower case), the wallet the contract resolves to an owner. */
@@ -31,6 +35,10 @@ export interface SignedPayload {
 const STRING_FIELDS = new Set(['amount', 'amount_in', 'min_amount_out', 'liquidity', 'weights']);
 /** Fields that are String on the contract (token ids, addresses, token lists). */
 const TEXT_FIELDS = new Set(['token', 'tokens', 'to_address']);
+/** Fields that are bool on the contract. */
+const BOOL_FIELDS = new Set(['permanent']);
+/** Fields with `skip_serializing_if`: left out of the JSON when false (`CreateLock.permanent`). */
+const OMIT_WHEN_FALSE = new Set(['permanent']);
 /** Fields that are integers on the contract (u64 / i32 / vectors of u64). */
 const NUMBER_FIELDS = new Set(['token_id', 'pool_id', 'tick_lower', 'tick_upper', 'duration', 'from', 'to', 'delegator', 'delegatee', 'pools', 'gauges']);
 
@@ -38,6 +46,8 @@ interface SignedMapping {
   variant: string;
   /** Field order of the Rust variant. */
   fields: readonly string[];
+  /** Fields that may be missing from the call's args (defaulted on the contract). */
+  optional?: readonly string[];
 }
 
 /** NEAR method name -> SignedAction variant. The names match the SDK builders' argument names. */
@@ -46,7 +56,7 @@ const SIGNED_METHODS: Record<string, SignedMapping> = {
   mint_position: { variant: 'MintPosition', fields: ['pool_id', 'tick_lower', 'tick_upper', 'liquidity'] },
   burn_position: { variant: 'BurnPosition', fields: ['pool_id', 'tick_lower', 'tick_upper', 'liquidity'] },
   collect: { variant: 'Collect', fields: ['pool_id', 'tick_lower', 'tick_upper'] },
-  create_lock: { variant: 'CreateLock', fields: ['amount', 'duration'] },
+  create_lock: { variant: 'CreateLock', fields: ['amount', 'duration', 'permanent'], optional: ['permanent'] },
   increase_amount: { variant: 'IncreaseAmount', fields: ['token_id', 'amount'] },
   increase_unlock_time: { variant: 'IncreaseUnlockTime', fields: ['token_id', 'duration'] },
   withdraw_lock: { variant: 'WithdrawLock', fields: ['token_id'] },
@@ -67,9 +77,14 @@ const SIGNED_METHODS: Record<string, SignedMapping> = {
   claim_rebase: { variant: 'ClaimRebase', fields: ['token_id'] },
 };
 
-/** Methods that have a signed form. Others (token deposits, storage, `distribute`) need a NEAR account. */
+/** NEAR method name -> unit variants (no fields). */
+const UNIT_METHODS: Record<string, 'Distribute'> = {
+  distribute: 'Distribute',
+};
+
+/** Methods that have a signed form. Others (token deposits, storage) need a NEAR account. */
 export function hasSignedForm(methodName: string): boolean {
-  return methodName in SIGNED_METHODS;
+  return methodName in SIGNED_METHODS || methodName in UNIT_METHODS;
 }
 
 /** Hops in the contract's order: `{pool_id, token_in}`. */
@@ -83,6 +98,7 @@ function normalizePath(value: unknown): unknown {
 
 function normalizeValue(field: string, value: unknown): unknown {
   if (field === 'path') return normalizePath(value);
+  if (BOOL_FIELDS.has(field)) return Boolean(value);
   if (STRING_FIELDS.has(field)) {
     return Array.isArray(value) ? value.map((v) => String(v)) : String(value);
   }
@@ -97,14 +113,24 @@ function normalizeValue(field: string, value: unknown): unknown {
 
 /** Builds the SignedAction for a NEAR call that has a signed form. Throws for other methods. */
 export function toSignedAction(call: FunctionCallAction): SignedAction {
+  const unit = UNIT_METHODS[call.methodName];
+  if (unit) return unit;
+
   const mapping = SIGNED_METHODS[call.methodName];
   if (!mapping) {
     throw new Error(`"${call.methodName}" is not available in EVM mode. Use a NEAR account for it.`);
   }
   const body: Record<string, unknown> = {};
   for (const field of mapping.fields) {
-    if (!(field in call.args)) throw new Error(`Missing ${field} for ${call.methodName}`);
-    body[field] = normalizeValue(field, call.args[field]);
+    const missingOk = mapping.optional?.includes(field) ?? false;
+    if (!(field in call.args) || call.args[field] === undefined) {
+      if (missingOk) continue;
+      throw new Error(`Missing ${field} for ${call.methodName}`);
+    }
+    const value = normalizeValue(field, call.args[field]);
+    // skip_serializing_if = "is_false": the field is left out, not written as false.
+    if (OMIT_WHEN_FALSE.has(field) && value === false) continue;
+    body[field] = value;
   }
   return { [mapping.variant]: body };
 }

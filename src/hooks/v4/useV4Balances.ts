@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { V4Token } from '@/lib/v4/config';
 import { nearView, readableNearError } from '@/lib/v4/near';
-import { balanceViews } from '@/lib/v4/ve/views';
+import { ownerViews } from '@/lib/v4/owner-views';
 
 export interface V4Balances {
   /** Internal DEX balance per token account id (base units). Keyed by owner, so it works for NEAR and EVM wallets. */
@@ -57,9 +57,11 @@ export function useV4Balances(
     async function load() {
       setLoading(true);
       try {
+        // One call for every DEX balance of the owner (tokens with a zero balance are not listed).
+        const dexList = new Map(await ownerViews.balancesOfOwner(owner!));
         const entries = await Promise.all(
           ids.map(async (tokenId) => {
-            const dexBal = BigInt(await balanceViews.balanceOfOwner(owner!, tokenId));
+            const dexBal = BigInt(dexList.get(tokenId) ?? '0');
             if (!nearAccountId) return { tokenId, dexBal, walletBal: null, registered: null };
             const [walletBal, storage] = await Promise.all([
               nearView<string>(tokenId, 'ft_balance_of', { account_id: nearAccountId }).then(BigInt),
@@ -69,7 +71,11 @@ export function useV4Balances(
           }),
         );
         if (cancelled) return;
-        setDex(Object.fromEntries(entries.map((e) => [e.tokenId, e.dexBal])));
+        // Every held token, including ones that are not in `tokens`, so the UI can list them too.
+        setDex({
+          ...Object.fromEntries([...dexList].map(([token, amount]) => [token, BigInt(amount)])),
+          ...Object.fromEntries(entries.map((e) => [e.tokenId, e.dexBal])),
+        });
         if (nearAccountId) {
           setWallet(Object.fromEntries(entries.map((e) => [e.tokenId, e.walletBal ?? 0n])));
           setRegistered(Object.fromEntries(entries.map((e) => [e.tokenId, e.registered ?? false])));

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useNearWallet } from '@/providers/NearWalletProvider';
 import { useV4Market, type V4Pool } from '@/hooks/v4/useV4Market';
 import { V4Banner } from '@/components/v4/V4Banner';
+import { V4Solvency } from '@/components/v4/V4Solvency';
 import { formatFeeBps, formatPrice } from '@/lib/v4/format';
 
 /** Pools of the v4 DEX whose tokens are whitelisted. Each card links to the liquidity page. */
@@ -38,6 +39,10 @@ export function V4PoolsList() {
         {market.pools.map((pool) => (
           <PoolCard key={pool.poolId} pool={pool} />
         ))}
+      </div>
+
+      <div className="mt-6">
+        <V4Solvency />
       </div>
     </div>
   );

@@ -47,17 +47,38 @@ export function storageDepositAction(tokenAccountId: string, accountId: string):
   };
 }
 
-const PANIC_MESSAGES: Record<string, string> = {
-  TooLittleReceived: 'Output is below your minimum received. Increase slippage or retry with a fresh quote.',
-  TooMuchRequested: 'Required input is above your maximum. Increase slippage or retry.',
-  ZeroAmount: 'Amount must be greater than zero.',
-  InvalidPriceLimit: 'Invalid price limit for this swap.',
-  InvalidTickRange: 'Invalid price range. The lower price must be below the upper price, and both must be on the tick spacing.',
-  NoPositionLiquidity: 'This position has no liquidity to update.',
-  PoolNotInitialized: 'This pool is not initialized yet.',
-  Overflow: 'Amount is too large.',
-  DivisionByZero: 'Cannot compute this amount. Check the price range.',
-};
+/**
+ * Contract panics and engine error names, matched as substrings (first match wins). Keys are the
+ * exact text the contract or engine produces (see crates/engine/src/error.rs, near-contract/src/lib.rs).
+ */
+const PANIC_MESSAGES: Array<[string, string]> = [
+  ['InsufficientLiquidity', 'The pool cannot fill this amount at its current liquidity. Try a smaller amount or another route.'],
+  ['TooLittleReceived', 'Output is below your minimum received. Increase slippage or retry with a fresh quote.'],
+  ['TooMuchRequested', 'Required input is above your maximum. Increase slippage or retry.'],
+  ['AlreadyVotedOrDeposited', 'This veNFT already voted or was changed in this epoch. Wait for the next epoch, or reset its votes first.'],
+  ['ZeroAmount', 'Amount must be greater than zero.'],
+  ['amount must be positive', 'Amount must be greater than zero.'],
+  ['path must not be empty', 'Pick at least one route.'],
+  ['empty path', 'Pick at least one route.'],
+  ['InvalidPriceLimit', 'Invalid price limit for this swap.'],
+  ['InvalidTickRange', 'Invalid price range. The lower price must be below the upper price, and both must be on the tick spacing.'],
+  ['NoPositionLiquidity', 'This position has no liquidity to update.'],
+  ['no liquidity in that range', 'There is no liquidity in that price range yet. Add liquidity first.'],
+  ['position is already staked', 'This position is already staked.'],
+  ['position is not staked', 'This position is not staked.'],
+  ['PoolNotInitialized', 'This pool is not initialized yet.'],
+  ['pool does not exist', 'This pool does not exist.'],
+  ['gauge does not exist', 'This pool has no gauge yet.'],
+  ['token not allowed', 'This token is not whitelisted on the DEX.'],
+  ['token already allowed', 'This token is already whitelisted.'],
+  ['a distribution is already in progress', 'An epoch distribution is already running. Wait for it to finish.'],
+  ['no distribution is pending', 'There is no epoch to distribute yet.'],
+  ['action has expired', 'The signed action expired before it reached the contract. Sign it again.'],
+  ['action nonce was already used', 'This signed action was already submitted. Sign a new one.'],
+  ['wallet signature does not verify', 'The wallet signature did not verify. Sign the action again.'],
+  ['Overflow', 'Amount is too large.'],
+  ['DivisionByZero', 'Cannot compute this amount. Check the price range.'],
+];
 
 /**
  * Turns a contract panic, RPC error or wallet error into a sentence for the user.
@@ -76,7 +97,7 @@ export function readableNearError(err: unknown): string {
   const panic = /panicked: ([^\n"]+)/.exec(raw);
   const message = panic ? panic[1].trim() : raw;
 
-  for (const [key, text] of Object.entries(PANIC_MESSAGES)) {
+  for (const [key, text] of PANIC_MESSAGES) {
     if (message.includes(key)) return text;
   }
   if (/only owner/i.test(message)) return 'Only the contract owner can do this.';

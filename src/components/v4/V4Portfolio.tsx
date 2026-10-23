@@ -2,42 +2,52 @@
 
 import { useState } from 'react';
 import { formatUnits } from 'viem';
-import { useNearWallet } from '@/providers/NearWalletProvider';
 import { useV4Actor } from '@/providers/V4ActorProvider';
 import { useV4Market } from '@/hooks/v4/useV4Market';
 import { useV4Balances } from '@/hooks/v4/useV4Balances';
 import { useV4Send } from '@/hooks/v4/useV4Send';
 import { V4TokenField } from '@/components/v4/V4TokenField';
 import { V4Banner } from '@/components/v4/V4Banner';
+import { V4NearOnlyNotice } from '@/components/v4/V4NearOnlyNotice';
 import { v4Client } from '@/lib/v4/client';
 import { storageDepositAction } from '@/lib/v4/near';
 import { formatTokenAmount, parseTokenAmount } from '@/lib/v4/format';
-import { explorerAccountUrl, V4_CONTRACT_ID, type V4Token } from '@/lib/v4/config';
+import { internalTokenSymbol, explorerAccountUrl, V4_CONTRACT_ID, type V4Token } from '@/lib/v4/config';
 
 type Mode = 'deposit' | 'withdraw';
 
+/**
+ * DEX balances, read by owner so NEAR and EVM wallets both see them. Deposit, withdraw and storage
+ * registration move tokens to or from a NEAR wallet, so they stay NEAR-only.
+ */
 export function V4Portfolio() {
-  const { accountId, connect } = useNearWallet();
+  const { nearAccountId: accountId, mode: activeMode, setMode: setActiveMode, connected, connect, owner } = useV4Actor();
   const market = useV4Market(accountId);
-  const { nearOwner } = useV4Actor();
-  const balances = useV4Balances(nearOwner, accountId, market.tokens);
+  const balances = useV4Balances(owner, activeMode === 'near' ? accountId : null, market.tokens);
   const { send, pending, error } = useV4Send({ nearOnly: true });
 
   const [mode, setMode] = useState<Mode>('deposit');
   const [tokenId, setTokenId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
 
-  const token: V4Token | undefined = market.tokens.find((t) => t.accountId === (tokenId ?? market.tokens[0]?.accountId));
-
-  if (!accountId) {
+  if (!connected) {
     return (
       <div className="max-w-xl mx-auto swap-card text-center space-y-4">
-        <p className="text-sm text-gray-300">Connect a NEAR testnet wallet to see your balances and move tokens in and out of the DEX.</p>
-        <button onClick={connect} className="btn-primary px-6 py-3">Connect NEAR wallet</button>
+        <p className="text-sm text-gray-300">
+          {activeMode === 'near'
+            ? 'Connect a NEAR testnet wallet to see your balances and move tokens in and out of the DEX.'
+            : 'Connect an EVM wallet to see your DEX balances. Deposits and withdrawals use a NEAR wallet.'}
+        </p>
+        <button onClick={connect} className="btn-primary px-6 py-3">
+          {activeMode === 'near' ? 'Connect NEAR wallet' : 'Connect EVM wallet'}
+        </button>
       </div>
     );
   }
 
+  const nearMode = activeMode === 'near' && accountId !== null;
+  const token: V4Token | undefined = market.tokens.find((t) => t.accountId === (tokenId ?? market.tokens[0]?.accountId));
+  const otherTokens = Object.keys(balances.dex).filter((id) => !market.tokens.some((t) => t.accountId === id));
   const parsed = token ? parseTokenAmount(amount, token.decimals) : null;
   const dexBal = token ? (balances.dex[token.accountId] ?? 0n) : 0n;
   const walletBal = token ? (balances.wallet[token.accountId] ?? 0n) : 0n;
@@ -45,7 +55,8 @@ export function V4Portfolio() {
   const maxAmount = mode === 'deposit' ? walletBal : dexBal;
 
   let action: { label: string; disabled: boolean; run?: () => void };
-  if (!token) action = { label: 'No tokens', disabled: true };
+  if (!nearMode) action = { label: 'Switch to NEAR mode', disabled: false, run: () => setActiveMode('near') };
+  else if (!token) action = { label: 'No tokens', disabled: true };
   else if (registered === undefined) action = { label: 'Loading...', disabled: true };
   else if (!registered) action = { label: `Register ${token.symbol} storage (0.00125 NEAR)`, disabled: pending, run: () => void onRegister(token) };
   else if (parsed === null) action = { label: 'Enter an amount', disabled: true };
@@ -54,17 +65,18 @@ export function V4Portfolio() {
   else action = { label: pending ? 'Confirm in wallet...' : mode === 'deposit' ? 'Deposit' : 'Withdraw', disabled: pending, run: () => void onMove(token, parsed) };
 
   async function onRegister(t: V4Token) {
-    const ok = await send(storageDepositAction(t.accountId, accountId!), `${t.symbol} storage registered`);
+    if (!accountId) return;
+    const ok = await send(storageDepositAction(t.accountId, accountId), `${t.symbol} storage registered`);
     if (ok) balances.refresh();
   }
 
   async function onMove(t: V4Token, value: bigint) {
-    const action =
+    const call =
       mode === 'deposit'
         ? v4Client.actions.deposit({ token: t.accountId, amount: value })
         : v4Client.actions.withdraw({ token: t.accountId, amount: value });
     const ok = await send(
-      action,
+      call,
       mode === 'deposit' ? `Deposited ${amount} ${t.symbol} to the DEX` : `Withdrew ${amount} ${t.symbol} to your wallet`,
     );
     if (ok) {
@@ -85,7 +97,9 @@ export function V4Portfolio() {
               <div key={t.accountId} className="rounded-lg bg-white/5 px-3 py-3">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">{t.symbol}</span>
-                  {reg === undefined ? (
+                  {!nearMode ? (
+                    <span className="text-[11px] text-gray-500">NEAR wallet only</span>
+                  ) : reg === undefined ? (
                     <span className="text-[11px] text-gray-500">checking...</span>
                   ) : reg === false ? (
                     <button onClick={() => void onRegister(t)} disabled={pending} className="text-xs btn-secondary px-2 py-1 disabled:opacity-50">
@@ -102,13 +116,21 @@ export function V4Portfolio() {
                   </div>
                   <div>
                     <div className="text-[11px] text-gray-400">In wallet</div>
-                    <div className="font-mono">{formatTokenAmount(balances.wallet[t.accountId] ?? 0n, t.decimals)}</div>
+                    <div className="font-mono">{nearMode ? formatTokenAmount(balances.wallet[t.accountId] ?? 0n, t.decimals) : '--'}</div>
                   </div>
                 </div>
               </div>
             );
           })}
+          {otherTokens.map((id) => (
+            <div key={id} className="rounded-lg bg-white/5 px-3 py-3 flex items-center justify-between text-sm">
+              <span className="font-semibold">{internalTokenSymbol(id)}</span>
+              <span className="text-[11px] text-gray-400 mr-auto ml-3">In DEX</span>
+              <span className="font-mono">{formatTokenAmount(balances.dex[id] ?? 0n, 18)}</span>
+            </div>
+          ))}
           {balances.loading && market.tokens.length === 0 && <div className="text-sm text-gray-400">Loading...</div>}
+          {balances.error && <V4Banner tone="error">{balances.error}</V4Banner>}
         </div>
         <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
           Swaps and liquidity use the DEX balance. Deposit tokens from your wallet first. The DEX contract is{' '}
@@ -118,6 +140,7 @@ export function V4Portfolio() {
 
       {/* Deposit / withdraw */}
       <div className="swap-card">
+        <V4NearOnlyNotice what="Deposit and withdraw" />
         <div className="flex rounded-xl bg-white/5 border border-white/10 p-1 gap-1 mb-4">
           {(['deposit', 'withdraw'] as const).map((m) => (
             <button
@@ -144,7 +167,7 @@ export function V4Portfolio() {
           ))}
         </div>
 
-        {token && (
+        {token && nearMode && (
           <V4TokenField
             label={mode === 'deposit' ? 'Deposit amount' : 'Withdraw amount'}
             token={token}
