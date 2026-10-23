@@ -7,7 +7,7 @@ import { minAmountOut } from '@/lib/windswap-v4';
 import { SwapSettings } from '@/components/swap/SwapSettings';
 import { V4TokenField } from '@/components/v4/V4TokenField';
 import { V4Banner } from '@/components/v4/V4Banner';
-import { useNearWallet } from '@/providers/NearWalletProvider';
+import { useV4Actor } from '@/providers/V4ActorProvider';
 import { useV4Market } from '@/hooks/v4/useV4Market';
 import { useV4Balances } from '@/hooks/v4/useV4Balances';
 import { useV4Send } from '@/hooks/v4/useV4Send';
@@ -20,9 +20,10 @@ type RouteChoice = 'best' | string;
 type QuoteState = { out: bigint } | { error: string };
 
 export function V4SwapCard() {
-  const { accountId, connect } = useNearWallet();
-  const market = useV4Market(accountId);
-  const balances = useV4Balances(accountId, market.tokens);
+  const { mode, nearAccountId, owner, connected, label, connect } = useV4Actor();
+  const accountId = connected ? label : null;
+  const market = useV4Market(mode === 'near' ? nearAccountId : null);
+  const balances = useV4Balances(owner, mode === 'near' ? nearAccountId : null, market.tokens);
   const { send, pending } = useV4Send();
 
   const [inId, setInId] = useState<string | null>(null);
@@ -117,7 +118,7 @@ export function V4SwapCard() {
   };
 
   let action: { label: string; onClick?: () => void; disabled: boolean };
-  if (!accountId) action = { label: 'Connect NEAR wallet', onClick: connect, disabled: false };
+  if (!accountId) action = { label: mode === 'near' ? 'Connect NEAR wallet' : 'Connect EVM wallet', onClick: connect, disabled: false };
   else if (market.loading && market.pools.length === 0) action = { label: 'Loading pools...', disabled: true };
   else if (routes.length === 0) action = { label: 'No pool for this pair', disabled: true };
   else if (parsedIn === null) action = { label: 'Enter an amount', disabled: true };
@@ -148,7 +149,13 @@ export function V4SwapCard() {
           onChange={setAmountIn}
           balance={accountId ? formatTokenAmount(dexIn, tokenIn.decimals) : '--'}
           onMax={accountId && dexIn > 0n ? () => setAmountIn(formatUnits(dexIn, tokenIn.decimals)) : undefined}
-          hint={accountId ? `Trades use your DEX balance. Wallet: ${formatTokenAmount(balances.wallet[tokenIn.accountId] ?? 0n, tokenIn.decimals)} ${tokenIn.symbol}` : undefined}
+          hint={
+            accountId
+              ? mode === 'near'
+                ? `Trades use your DEX balance. Wallet: ${formatTokenAmount(balances.wallet[tokenIn.accountId] ?? 0n, tokenIn.decimals)} ${tokenIn.symbol}`
+                : 'Trades use your DEX balance.'
+              : undefined
+          }
         />
       )}
 
@@ -233,7 +240,11 @@ export function V4SwapCard() {
       {accountId && parsedIn !== null && !dexEnough && (
         <V4Banner tone="warning">
           Swaps spend your internal DEX balance, not your wallet. You have {formatTokenAmount(dexIn, tokenIn?.decimals ?? 18)} {tokenIn?.symbol} in the DEX.{' '}
-          <Link href="/v4/portfolio" className="underline font-medium">Deposit in Portfolio</Link>.
+          {mode === 'near' ? (
+            <Link href="/v4/portfolio" className="underline font-medium">Deposit in Portfolio</Link>
+          ) : (
+            <Link href="/v4/bridge" className="underline font-medium">Deposit on the Bridge</Link>
+          )}.
         </V4Banner>
       )}
 

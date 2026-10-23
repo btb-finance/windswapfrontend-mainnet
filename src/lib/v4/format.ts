@@ -32,3 +32,22 @@ export function formatPrice(value: number): string {
 export function formatFeeBps(fee: number): string {
   return `${(fee / 10000).toFixed(fee % 100 === 0 ? 2 : 4)}%`;
 }
+
+/** Unix seconds as a local date and time, e.g. "29 Oct 2026, 00:00". */
+export function formatUnixDate(sec: number): string {
+  return new Date(sec * 1000).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** Seconds as a short countdown, e.g. "2d 04h 13m". Zero or less shows "now". */
+export function formatCountdown(sec: number): string {
+  if (sec <= 0) return 'now';
+  const d = Math.floor(sec / 86_400);
+  const h = Math.floor((sec % 86_400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return d > 0 ? `${d}d ${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m` : `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`;
+}
+
+/** Shortens a 0x or owner hex string for display. */
+export function shortHex(value: string, head = 6, tail = 4): string {
+  return value.length > head + tail + 1 ? `${value.slice(0, head)}…${value.slice(-tail)}` : value;
+}

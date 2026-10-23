@@ -44,3 +44,43 @@ export function getV4Token(accountId: string): V4Token | undefined {
 export function explorerAccountUrl(accountId: string): string {
   return `${V4_EXPLORER_URL}/address/${accountId}`;
 }
+
+/* ---- EVM wallet (MetaMask) side: Base Sepolia vault and test tokens ---- */
+
+/** Base Sepolia. The v4 EVM bridge (deposits, withdrawals) only runs here. */
+export const V4_EVM_CHAIN_ID = 84532;
+export const V4_EVM_EXPLORER_URL = 'https://sepolia.basescan.org';
+/** The contract's MPC-derived address on Base Sepolia. Deposits are sent here. */
+export const V4_VAULT_ADDRESS = '0xaa817ca355475d22d5a410f401dc877ec401259e' as const;
+/** Test ERC-20 (`Usdctest`, symbol test1, 18 decimals). Registered as `base-sepolia:test1`. */
+export const V4_TEST1_ADDRESS = '0x2d330FEe66912f3eB54086357c2eAB46b998bd4f' as const;
+
+/** Internal token ids (DEX balances). NEAR token ids are account ids; EVM assets use `base-sepolia:*`. */
+export const V4_WIND_TOKEN = 'windswapv4-wind.testnet';
+export const V4_ASSET_ETH = 'base-sepolia:eth';
+export const V4_ASSET_TEST1 = 'base-sepolia:test1';
+
+export interface V4InternalToken {
+  id: string;
+  symbol: string;
+  decimals: number;
+}
+
+/** Every token id that can have a DEX balance. Decimals are 18 for all of them. */
+export const V4_INTERNAL_TOKENS: readonly V4InternalToken[] = [
+  { id: V4_ASSET_ETH, symbol: 'ETH', decimals: 18 },
+  { id: V4_ASSET_TEST1, symbol: 'test1', decimals: 18 },
+  { id: 'windswapv4-tusdc.testnet', symbol: 'tUSDC', decimals: 18 },
+  { id: 'windswapv4-tweth.testnet', symbol: 'tWETH', decimals: 18 },
+  { id: V4_WIND_TOKEN, symbol: 'WIND', decimals: 18 },
+];
+
+export function internalTokenSymbol(id: string): string {
+  return V4_INTERNAL_TOKENS.find((t) => t.id === id)?.symbol ?? id;
+}
+
+/**
+ * Relayer endpoint that submits `execute` to NEAR and pays the gas. Unset means "not built yet":
+ * signed payloads are shown with a copy button for an operator to relay. Never put a key here.
+ */
+export const V4_RELAY_URL: string = process.env.NEXT_PUBLIC_V4_RELAY_URL ?? '';

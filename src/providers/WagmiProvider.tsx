@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { http, fallback } from 'viem';
+import { baseSepolia } from 'viem/chains';
 import { Attribution } from 'ox/erc8021';
 import {
     RainbowKitProvider,
@@ -41,7 +42,8 @@ const DATA_SUFFIX = Attribution.toDataSuffix({ codes: ['bc_rco9r2hr'] });
 const config = getDefaultConfig({
     appName: 'Wind Swap',
     projectId,
-    chains: [sei, ethereum],
+    // baseSepolia is last so the default chain of the existing pages does not change.
+    chains: [sei, ethereum, baseSepolia],
     transports: {
         [sei.id]: fallback([
             http('https://base-rpc.publicnode.com'),
@@ -49,6 +51,7 @@ const config = getDefaultConfig({
             http('https://rpc.ankr.com/base'),
         ]),
         [ethereum.id]: fallback(ETHEREUM_RPCS.map((url) => http(url))),
+        [baseSepolia.id]: http(),
     },
     ssr: false,
     dataSuffix: DATA_SUFFIX,

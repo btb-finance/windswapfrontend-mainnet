@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { formatUnits } from 'viem';
 import { useNearWallet } from '@/providers/NearWalletProvider';
+import { useV4Actor } from '@/providers/V4ActorProvider';
 import { useV4Market } from '@/hooks/v4/useV4Market';
 import { useV4Balances } from '@/hooks/v4/useV4Balances';
 import { useV4Send } from '@/hooks/v4/useV4Send';
@@ -18,8 +19,9 @@ type Mode = 'deposit' | 'withdraw';
 export function V4Portfolio() {
   const { accountId, connect } = useNearWallet();
   const market = useV4Market(accountId);
-  const balances = useV4Balances(accountId, market.tokens);
-  const { send, pending, error } = useV4Send();
+  const { nearOwner } = useV4Actor();
+  const balances = useV4Balances(nearOwner, accountId, market.tokens);
+  const { send, pending, error } = useV4Send({ nearOnly: true });
 
   const [mode, setMode] = useState<Mode>('deposit');
   const [tokenId, setTokenId] = useState<string | null>(null);

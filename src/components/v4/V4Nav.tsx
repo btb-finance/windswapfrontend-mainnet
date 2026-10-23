@@ -2,22 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { NearConnectButton } from '@/components/v4/NearConnectButton';
+import { V4ModeSwitch } from '@/components/v4/V4ModeSwitch';
 
 const tabs = [
   { href: '/v4', label: 'Swap' },
   { href: '/v4/pools', label: 'Pools' },
   { href: '/v4/liquidity', label: 'Liquidity' },
   { href: '/v4/portfolio', label: 'Portfolio' },
+  { href: '/v4/bridge', label: 'Bridge' },
+  { href: '/v4/lock', label: 'Lock' },
+  { href: '/v4/vote', label: 'Vote' },
+  { href: '/v4/rewards', label: 'Rewards' },
 ];
 
-/** Header for the v4 routes: title, testnet badge, NEAR wallet, and section tabs. */
+/** Header for the v4 routes: title, testnet badge, wallet mode switch, and section tabs. */
 export function V4Nav() {
   const pathname = usePathname();
 
   return (
     <div className="mb-4 sm:mb-6 animate-fade-up">
-      <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <h1 className="text-xl sm:text-3xl font-bold truncate">
             <span className="gradient-text">Wind Swap v4</span>
@@ -26,7 +30,7 @@ export function V4Nav() {
             testnet
           </span>
         </div>
-        <NearConnectButton />
+        <V4ModeSwitch />
       </div>
 
       <nav className="flex gap-1 overflow-x-auto scrollbar-none rounded-xl bg-white/5 border border-white/10 p-1" aria-label="Wind Swap v4 sections">
@@ -47,7 +51,7 @@ export function V4Nav() {
         })}
       </nav>
       <p className="mt-2 text-[11px] sm:text-xs text-gray-500">
-        NEAR testnet · contract <span className="font-mono">windswapv4-btb.testnet</span> · test tokens have no value.
+        NEAR testnet · contract <span className="font-mono">windswapv4-btb.testnet</span> · EVM bridge on Base Sepolia · test tokens have no value.
       </p>
     </div>
   );

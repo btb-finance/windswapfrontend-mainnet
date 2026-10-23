@@ -17,6 +17,7 @@ import {
   type RangeTicks,
 } from '@/lib/v4/liquidity';
 import { useNearWallet } from '@/providers/NearWalletProvider';
+import { useV4Actor } from '@/providers/V4ActorProvider';
 import { useV4Market, type V4Pool } from '@/hooks/v4/useV4Market';
 import { useV4Balances } from '@/hooks/v4/useV4Balances';
 import { useV4Send } from '@/hooks/v4/useV4Send';
@@ -65,8 +66,9 @@ export function V4LiquidityPanel() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const d: Draft = pool && draft.poolId === pool.poolId ? draft : EMPTY_DRAFT;
 
-  const balances = useV4Balances(accountId, market.tokens);
-  const { send, pending } = useV4Send();
+  const { nearOwner } = useV4Actor();
+  const balances = useV4Balances(nearOwner, accountId, market.tokens);
+  const { send, pending } = useV4Send({ nearOnly: true });
 
   const patch = (p: Partial<Draft>) => {
     if (!pool) return;
