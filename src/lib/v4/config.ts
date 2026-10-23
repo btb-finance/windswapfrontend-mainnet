@@ -38,7 +38,7 @@ export const V4_TOKENS: readonly V4Token[] = [
 ];
 
 export function getV4Token(accountId: string): V4Token | undefined {
-  return V4_TOKENS.find((t) => t.accountId === accountId);
+  return V4_TOKENS.find((t) => t.accountId === accountId) ?? V4_EVM_TOKENS.find((t) => t.accountId === accountId);
 }
 
 export function explorerAccountUrl(accountId: string): string {
@@ -75,9 +75,28 @@ export const V4_INTERNAL_TOKENS: readonly V4InternalToken[] = [
   { id: V4_WIND_TOKEN, symbol: 'WIND', decimals: 18 },
 ];
 
+/** Base Sepolia assets (`base-sepolia:*`) as pool tokens. Their `accountId` is the internal id, not a NEAR account. */
+export const V4_EVM_TOKENS: readonly V4Token[] = V4_INTERNAL_TOKENS.filter((t) => isEvmAssetId(t.id)).map((t) => ({
+  accountId: t.id,
+  symbol: t.symbol,
+  name: t.symbol,
+  decimals: t.decimals,
+}));
+
+/** True for a Base Sepolia asset id (`base-sepolia:eth`), false for a NEAR account id. */
+export function isEvmAssetId(id: string): boolean {
+  return id.includes(':');
+}
+
 export function internalTokenSymbol(id: string): string {
   return V4_INTERNAL_TOKENS.find((t) => t.id === id)?.symbol ?? id;
 }
+
+/**
+ * Gas for a NEAR `ft_transfer_call` that swaps or adds liquidity (the token contract then calls the
+ * DEX's `ft_on_transfer`). 200 TGas. The spec minimum is 150 TGas.
+ */
+export const V4_NEAR_FT_CALL_GAS = '200000000000000';
 
 /**
  * Relayer endpoint that submits `execute` to NEAR and pays the gas. Unset means "not built yet":

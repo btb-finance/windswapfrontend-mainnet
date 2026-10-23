@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { sqrtPriceX96ToPrice, type PoolView } from '@/lib/windswap-v4';
-import { V4_POOL_PROBE_MAX, V4_TOKENS, getV4Token, type V4Token } from '@/lib/v4/config';
+import { V4_EVM_TOKENS, V4_POOL_PROBE_MAX, V4_TOKENS, getV4Token, type V4Token } from '@/lib/v4/config';
 import { v4Client } from '@/lib/v4/client';
 import { readableNearError } from '@/lib/v4/near';
 
@@ -22,8 +22,10 @@ export interface V4Pool {
 }
 
 export interface V4Market {
-  /** Whitelisted tokens that the UI knows about. */
+  /** Whitelisted NEAR tokens that the UI knows about. Deposits and wallet balances use these. */
   tokens: V4Token[];
+  /** `tokens` plus the Base Sepolia assets that pools may hold (EVM mode). */
+  allTokens: V4Token[];
   /** Pools whose two tokens are both whitelisted and known. Pools with other tokens are hidden. */
   pools: V4Pool[];
   loading: boolean;
@@ -37,6 +39,7 @@ export interface V4Market {
  */
 export function useV4Market(accountId: string | null, pollMs = 20_000): V4Market {
   const [tokens, setTokens] = useState<V4Token[]>([]);
+  const [allTokens, setAllTokens] = useState<V4Token[]>([]);
   const [pools, setPools] = useState<V4Pool[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +53,9 @@ export function useV4Market(accountId: string | null, pollMs = 20_000): V4Market
     async function load() {
       try {
         const whitelisted = await v4Client.getTokens();
-        const known = V4_TOKENS.filter((t) => whitelisted.includes(t.accountId));
+        // Base Sepolia assets are always known: they are not NEAR tokens, so `get_tokens` does not list them.
+        const nearTokens = V4_TOKENS.filter((t) => whitelisted.includes(t.accountId));
+        const known = [...nearTokens, ...V4_EVM_TOKENS];
         const ids = Array.from({ length: V4_POOL_PROBE_MAX }, (_, i) => i);
         const results = await Promise.allSettled(ids.map((id) => v4Client.getPool(id)));
         const feeAccount = accountId ?? v4Client.contractId;
@@ -85,7 +90,8 @@ export function useV4Market(accountId: string | null, pollMs = 20_000): V4Market
         );
 
         if (cancelled) return;
-        setTokens(known);
+        setTokens(nearTokens);
+        setAllTokens(known);
         setPools(built.sort((a, b) => a.poolId - b.poolId));
         setError(null);
       } catch (err) {
@@ -103,5 +109,5 @@ export function useV4Market(accountId: string | null, pollMs = 20_000): V4Market
     };
   }, [accountId, pollMs, tick]);
 
-  return { tokens, pools, loading, error, refresh };
+  return { tokens, allTokens, pools, loading, error, refresh };
 }

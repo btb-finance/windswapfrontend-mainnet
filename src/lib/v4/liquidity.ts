@@ -84,3 +84,15 @@ export function amountsForLiquidity(pool: V4Pool, ticks: RangeTicks, liquidity: 
 export function isInRange(pool: V4Pool, ticks: RangeTicks): boolean {
   return ticks.tickLower <= pool.tick && pool.tick < ticks.tickUpper;
 }
+
+/**
+ * Lowest liquidity a single-token zap may mint, for `min_liquidity`: the liquidity that `amount`
+ * of `side` (0 = token0, 1 = token1) buys, less `slippageBps`. A zap in range swaps about half of
+ * the input into the other token first, so the estimate uses half the amount. Out of range only
+ * one token is used, so the whole amount counts. This is an estimate: confirm it on testnet.
+ */
+export function zapMinLiquidity(pool: V4Pool, ticks: RangeTicks, side: 0 | 1, amount: bigint, slippageBps: number): bigint {
+  const effective = isInRange(pool, ticks) ? amount / 2n : amount;
+  const liquidity = side === 0 ? liquidityFromAmount0(pool, ticks, effective) : liquidityFromAmount1(pool, ticks, effective);
+  return (liquidity * BigInt(10_000 - Math.round(slippageBps))) / 10_000n;
+}

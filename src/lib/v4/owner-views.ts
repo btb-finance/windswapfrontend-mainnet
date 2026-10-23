@@ -82,6 +82,9 @@ export const ownerViews = {
   /** Every token the owner holds a nonzero DEX balance of, as `[token, amount]`. */
   balancesOfOwner: (owner: string) => view<Array<[string, string]>>('get_balances_of_owner', { owner }),
 
+  /** One intent by id: Open, Executed{result} or Failed{reason}. Parse with `parseIntentState`. */
+  getIntent: (id: string) => view<unknown>('get_intent', { id: /^\d+$/.test(id) ? Number(id) : id }),
+
   /** Tokens the DEX accepts for bribes. */
   getBribeTokens: () => view<string[]>('get_bribe_tokens'),
 

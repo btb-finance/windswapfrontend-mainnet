@@ -9,7 +9,8 @@
     "start": "bun --bun next start",
     "lint": "eslint",
     "typecheck": "tsgo --noEmit",
-    "check:v4-signed": "node scripts/check-v4-signed.mts"
+    "check:v4-signed": "node scripts/check-v4-signed.mts",
+    "check:v4-intents": "node scripts/check-v4-intents.mts"
   },
   "dependencies": {
     "@base-org/account": "^2.5.3",

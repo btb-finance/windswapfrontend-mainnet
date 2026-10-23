@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { formatUnits } from 'viem';
 import { v4Client } from '@/lib/v4/client';
+import { isEvmAssetId } from '@/lib/v4/config';
 import { readableNearError } from '@/lib/v4/near';
 import { ownerViews, type OwnerPositionDetail } from '@/lib/v4/owner-views';
 import { formatFeeBps, formatPrice, formatTokenAmount, parseTokenAmount } from '@/lib/v4/format';
@@ -24,6 +25,7 @@ import { useV4Balances } from '@/hooks/v4/useV4Balances';
 import { useV4Send } from '@/hooks/v4/useV4Send';
 import { V4TokenField } from '@/components/v4/V4TokenField';
 import { V4Banner } from '@/components/v4/V4Banner';
+import { V4ZapAdd } from '@/components/v4/V4ZapAdd';
 
 /** Form state for one pool. Reset when the selected pool changes. */
 interface Draft {
@@ -59,15 +61,19 @@ export function V4LiquidityPanel() {
   const requestedParam = searchParams.get('pool');
   const requestedPool = requestedParam !== null ? Number(requestedParam) : null;
 
+  // Works for NEAR and EVM wallets: positions, balances and actions are keyed by owner.
+  const { owner, mode, connected, connect } = useV4Actor();
+
+  // One-token zap: pools of the active chain (NEAR tokens, or Base Sepolia assets). Two-token: every pool.
+  const [tab, setTab] = useState<'one' | 'two'>('one');
+  const visiblePools = market.pools.filter((p) => tab === 'two' || poolMatchesMode(p, mode));
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const wantedId = selectedId ?? requestedPool;
-  const pool: V4Pool | undefined = market.pools.find((p) => p.poolId === wantedId) ?? market.pools[0];
+  const pool: V4Pool | undefined = visiblePools.find((p) => p.poolId === wantedId) ?? visiblePools[0];
 
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const d: Draft = pool && draft.poolId === pool.poolId ? draft : EMPTY_DRAFT;
 
-  // Works for NEAR and EVM wallets: positions, balances and actions are keyed by owner.
-  const { owner, mode, connected, connect } = useV4Actor();
   const balances = useV4Balances(owner, mode === 'near' ? accountId : null, market.tokens);
   const { send, pending } = useV4Send();
 
@@ -193,7 +199,7 @@ export function V4LiquidityPanel() {
   if (!pool) {
     return (
       <div className="swap-card max-w-md mx-auto text-center text-sm text-gray-400 py-10">
-        {market.error ?? 'No pools with whitelisted tokens yet.'}
+        {market.error ?? (tab === 'one' ? `No ${mode === 'evm' ? 'Base Sepolia' : 'NEAR token'} pools yet. Try the two-token form.` : 'No pools with whitelisted tokens yet.')}
       </div>
     );
   }
@@ -213,8 +219,28 @@ export function V4LiquidityPanel() {
       <div className="swap-card">
         <h2 className="text-lg font-semibold mb-3">Add liquidity</h2>
 
+        <div className="flex gap-2 mb-4" role="tablist" aria-label="Liquidity form">
+          {([
+            ['one', 'One token'],
+            ['two', 'Two tokens (advanced)'],
+          ] as const).map(([value, text]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => setTab(value)}
+              className={`flex-1 py-2 rounded-lg text-xs sm:text-sm border transition ${
+                tab === value ? 'border-primary bg-primary/10 text-white' : 'border-white/10 bg-white/5 text-gray-300 hover:bg-white/10'
+              }`}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-wrap gap-2 mb-4">
-          {market.pools.map((p) => (
+          {visiblePools.map((p) => (
             <button
               key={p.poolId}
               onClick={() => setSelectedId(p.poolId)}
@@ -268,39 +294,57 @@ export function V4LiquidityPanel() {
         </div>
         {rangeError && <V4Banner tone="warning">{rangeError}</V4Banner>}
 
-        {/* Amounts */}
-        <div className="space-y-3 mt-4">
-          <V4TokenField
-            label="Amount"
-            token={pool.token0}
-            value={shown0}
-            onChange={(v) => patch({ amount0: v, last: 0 })}
-            balance={connected ? formatTokenAmount(dex0, pool.token0.decimals) : '--'}
-            hint={connected ? 'Amounts come from your DEX balance' : undefined}
-          />
-          <V4TokenField
-            label="Amount"
-            token={pool.token1}
-            value={shown1}
-            onChange={(v) => patch({ amount1: v, last: 1 })}
-            balance={connected ? formatTokenAmount(dex1, pool.token1.decimals) : '--'}
-          />
-        </div>
+        {tab === 'one' ? (
+          <div className="mt-4">
+            <V4ZapAdd
+              pool={pool}
+              ticks={ticks}
+              rangeError={rangeError}
+              walletBalances={balances.wallet}
+              onAdded={() => {
+                balances.refresh();
+                market.refresh();
+                setPositionTick((t) => t + 1);
+              }}
+            />
+          </div>
+        ) : (
+          <>
+          {/* Amounts */}
+          <div className="space-y-3 mt-4">
+            <V4TokenField
+              label="Amount"
+              token={pool.token0}
+              value={shown0}
+              onChange={(v) => patch({ amount0: v, last: 0 })}
+              balance={connected ? formatTokenAmount(dex0, pool.token0.decimals) : '--'}
+              hint={connected ? 'Amounts come from your DEX balance' : undefined}
+            />
+            <V4TokenField
+              label="Amount"
+              token={pool.token1}
+              value={shown1}
+              onChange={(v) => patch({ amount1: v, last: 1 })}
+              balance={connected ? formatTokenAmount(dex1, pool.token1.decimals) : '--'}
+            />
+          </div>
 
-        {needed && liquidity > 0n && !enoughDex && connected && (
-          <V4Banner tone="warning">
-            This position needs more DEX balance than you have. <Link href="/v4/portfolio" className="underline font-medium">Deposit in Portfolio</Link>.
-          </V4Banner>
+          {needed && liquidity > 0n && !enoughDex && connected && (
+            <V4Banner tone="warning">
+              This position needs more DEX balance than you have. <Link href="/v4/portfolio" className="underline font-medium">Deposit in Portfolio</Link>.
+            </V4Banner>
+          )}
+
+          <button
+            onClick={action.onClick}
+            disabled={action.disabled}
+            className="w-full btn-primary py-4 text-base mt-4 disabled:opacity-50"
+            aria-label={action.label}
+          >
+            {action.label}
+          </button>
+          </>
         )}
-
-        <button
-          onClick={action.onClick}
-          disabled={action.disabled}
-          className="w-full btn-primary py-4 text-base mt-4 disabled:opacity-50"
-          aria-label={action.label}
-        >
-          {action.label}
-        </button>
       </div>
 
       {/* Position */}
@@ -392,4 +436,11 @@ function parseBigInt(s: string): bigint | null {
   if (!/^\d+$/.test(s)) return null;
   const v = BigInt(s);
   return v > 0n ? v : null;
+}
+
+/** NEAR mode pools have two NEAR tokens; EVM mode pools have two Base Sepolia assets. */
+function poolMatchesMode(p: V4Pool, mode: 'near' | 'evm'): boolean {
+  const bothEvm = isEvmAssetId(p.token0.accountId) && isEvmAssetId(p.token1.accountId);
+  const bothNear = !isEvmAssetId(p.token0.accountId) && !isEvmAssetId(p.token1.accountId);
+  return mode === 'evm' ? bothEvm : bothNear;
 }

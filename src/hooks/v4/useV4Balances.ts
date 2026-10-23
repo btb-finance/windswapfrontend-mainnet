@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { V4Token } from '@/lib/v4/config';
+import { isEvmAssetId, type V4Token } from '@/lib/v4/config';
 import { nearView, readableNearError } from '@/lib/v4/near';
 import { ownerViews } from '@/lib/v4/owner-views';
 
@@ -62,7 +62,8 @@ export function useV4Balances(
         const entries = await Promise.all(
           ids.map(async (tokenId) => {
             const dexBal = BigInt(dexList.get(tokenId) ?? '0');
-            if (!nearAccountId) return { tokenId, dexBal, walletBal: null, registered: null };
+            // Base Sepolia assets are not NEAR accounts: no wallet or storage call for them.
+            if (!nearAccountId || isEvmAssetId(tokenId)) return { tokenId, dexBal, walletBal: null, registered: null };
             const [walletBal, storage] = await Promise.all([
               nearView<string>(tokenId, 'ft_balance_of', { account_id: nearAccountId }).then(BigInt),
               nearView<StorageBalance | null>(tokenId, 'storage_balance_of', { account_id: nearAccountId }),
