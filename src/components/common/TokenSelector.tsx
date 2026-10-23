@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { getAddress } from 'viem';
-import { useQuery } from 'convex/react';
-import { api } from '../../../convex/_generated/api';
 import { Token, DEFAULT_TOKEN_LIST } from '@/config/tokens';
 import { useUserBalances } from '@/providers/UserBalanceProvider';
 import { getRpcForPoolData } from '@/utils/rpc';
@@ -136,20 +134,7 @@ export function TokenSelector({
     const [trendingTokens, setTrendingTokens] = useState<Token[]>([]);
     const [liquidityTokens, setLiquidityTokens] = useState<Token[]>([]);
     const [loadingTabs, setLoadingTabs] = useState(false);
-    // Pre-computed token list from Convex DB — no external fetching on client
-    const convexTokens = useQuery(api.tokens.listAll);
-    const cgTokens: Token[] = useMemo(
-        () => convexTokens
-            ? convexTokens.map((t: { address: string; symbol: string; name: string; decimals: number; logoURI?: string }) => ({
-                address: t.address,
-                symbol: t.symbol,
-                name: t.name,
-                decimals: t.decimals,
-                logoURI: t.logoURI,
-            }))
-            : DEFAULT_TOKEN_LIST,
-        [convexTokens]
-    );
+    const cgTokens: Token[] = DEFAULT_TOKEN_LIST;
 
     // Get global balances (sorted by balance)
     const { sortedTokens, getBalance } = useUserBalances();
