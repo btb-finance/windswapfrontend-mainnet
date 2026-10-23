@@ -9,6 +9,10 @@ interface SwapSettingsProps {
     priceImpact?: number | null;
     onSlippageChange?: (slippage: number) => void;
     onDeadlineChange?: (deadline: number) => void;
+    /** Show the Auto preset (default true). */
+    showAuto?: boolean;
+    /** Show the transaction deadline field (default true). */
+    showDeadline?: boolean;
 }
 
 export function SwapSettings({
@@ -18,6 +22,8 @@ export function SwapSettings({
     priceImpact,
     onSlippageChange,
     onDeadlineChange,
+    showAuto = true,
+    showDeadline = true,
 }: SwapSettingsProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [customSlippage, setCustomSlippage] = useState('');
@@ -83,18 +89,20 @@ export function SwapSettings({
                         </label>
                         <div className="flex gap-2">
                             {/* Auto button */}
-                            <button
-                                onClick={() => {
-                                    onSlippageChange?.(-1); // -1 = reset to auto
-                                    setCustomSlippage('');
-                                }}
-                                className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${isAutoSlippage
-                                    ? 'bg-primary text-white'
-                                    : 'bg-white/5 hover:bg-white/10'
-                                    }`}
-                            >
-                                Auto
-                            </button>
+                            {showAuto && (
+                                <button
+                                    onClick={() => {
+                                        onSlippageChange?.(-1); // -1 = reset to auto
+                                        setCustomSlippage('');
+                                    }}
+                                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${isAutoSlippage
+                                        ? 'bg-primary text-white'
+                                        : 'bg-white/5 hover:bg-white/10'
+                                        }`}
+                                >
+                                    Auto
+                                </button>
+                            )}
                             {slippagePresets.map((preset) => (
                                 <button
                                     key={preset}
@@ -136,6 +144,7 @@ export function SwapSettings({
                     </div>
 
                     {/* Transaction Deadline */}
+                    {showDeadline && (
                     <div>
                         <label className="text-sm text-gray-400 mb-2 block">
                             Transaction Deadline
@@ -152,6 +161,7 @@ export function SwapSettings({
                             <span className="text-sm text-gray-400">minutes</span>
                         </div>
                     </div>
+                    )}
                 </div>
             )}
         </div>

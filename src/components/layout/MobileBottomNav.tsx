@@ -49,6 +49,7 @@ const moreItems = [
     { href: '/btb',     label: 'BTB',    sub: 'Bear the bull' },
     { href: '/mining',  label: 'LORE',   sub: 'Mining & bonding curve' },
     { href: '/lottery', label: 'Lottery', sub: 'Daily USDC jackpot' },
+    { href: '/v4', label: 'v4 (NEAR)', sub: 'Wind Swap v4 on NEAR · testnet' },
     { href: 'https://discord.gg/q5nENswbg5', label: 'Discord', sub: 'Join the community', isExternal: true },
 ];
 
@@ -122,7 +123,7 @@ export function MobileBottomNav() {
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Products</p>
                     </div>
                     {moreItems.map((item) => {
-                        const isActive = !item.isExternal && pathname === item.href;
+                        const isActive = !item.isExternal && (pathname === item.href || (item.href === '/v4' && pathname.startsWith('/v4/')));
                         return (
                             <button
                                 key={item.href}

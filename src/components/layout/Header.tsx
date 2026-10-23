@@ -13,12 +13,13 @@ const mainLinks = [
     { href: '/vote', label: 'Vote' },
 ];
 
-const moreLinks = [
+const moreLinks: { href: string; label: string; sub: string; badge?: string }[] = [
     { href: '/milk',    label: 'MILK',   sub: 'USDC-backed token' },
     { href: '/wind',    label: 'WINDC',  sub: 'Wind bonding curve' },
     { href: '/btb',     label: 'BTB',    sub: 'Bear the bull' },
     { href: '/mining',  label: 'LORE',   sub: 'Mining & bonding curve' },
     { href: '/lottery', label: 'Lottery', sub: 'Daily USDC jackpot' },
+    { href: '/v4',      label: 'v4 (NEAR)', sub: 'Wind Swap v4 on NEAR', badge: 'testnet' },
 ];
 
 export function Header() {
@@ -26,7 +27,7 @@ export function Header() {
     const [moreOpen, setMoreOpen] = useState(false);
     const moreRef = useRef<HTMLDivElement>(null);
 
-    const moreActive = moreLinks.some(l => pathname === l.href);
+    const moreActive = moreLinks.some(l => pathname === l.href || pathname.startsWith(`${l.href}/`));
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -95,7 +96,10 @@ export function Header() {
                                                     }}
                                                     className={`flex flex-col px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 ${isActive ? 'bg-primary/10' : ''}`}
                                                 >
-                                                    <span className={`text-sm font-medium ${isActive ? 'text-primary' : 'text-white'}`}>{link.label}</span>
+                                                    <span className={`text-sm font-medium flex items-center gap-2 ${isActive ? 'text-primary' : 'text-white'}`}>
+                                                        {link.label}
+                                                        {link.badge && <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">{link.badge}</span>}
+                                                    </span>
                                                     <span className="text-[11px] text-gray-500 mt-0.5">{link.sub}</span>
                                                 </Link>
                                             );
